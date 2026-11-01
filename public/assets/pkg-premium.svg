@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <!-- Deep Forest Green & Champagne Gold Luxury Theme (Blends into #1C3A2F Active Card) -->
+  <rect width="240" height="240" rx="24" fill="#152C23"/>
+  <rect x="6" y="6" width="228" height="228" rx="18" stroke="#E6CBA8" stroke-width="2.5"/>
+
+  <!-- Top Crown Header Pill -->
+  <rect x="18" y="16" width="204" height="34" rx="10" fill="#E6CBA8"/>
+  <text x="120" y="39" text-anchor="middle" fill="#152C23" font-family="Plus Jakarta Sans, sans-serif" font-size="18" font-weight="800" letter-spacing="1">BWP 710 MARINE</text>
+
+  <!-- Left: Luxury Floor-to-Ceiling Wardrobe & Fluted Designer Panel -->
+  <g transform="translate(20, 60)">
+    <rect x="0" y="0" width="112" height="122" rx="6" fill="#22493A" stroke="#E6CBA8" stroke-width="3"/>
+    <!-- Left Fluted Walnut Panel -->
+    <rect x="6" y="6" width="32" height="110" rx="2" fill="#B5834C" stroke="#E6CBA8" stroke-width="1.5"/>
+    <line x1="14" y1="6" x2="14" y2="116" stroke="#152C23" stroke-width="2"/>
+    <line x1="22" y1="6" x2="22" y2="116" stroke="#152C23" stroke-width="2"/>
+    <line x1="30" y1="6" x2="30" y2="116" stroke="#152C23" stroke-width="2"/>
+    <!-- Right Designer Wardrobe Shutters -->
+    <rect x="42" y="6" width="30" height="110" rx="2" fill="#DFC7A4" stroke="#E6CBA8" stroke-width="1.5"/>
+    <rect x="76" y="6" width="30" height="110" rx="2" fill="#C89D66" stroke="#E6CBA8" stroke-width="1.5"/>
+    <!-- Long Champagne Gold Profiles -->
+    <rect x="66" y="34" width="3" height="52" rx="1.5" fill="#152C23"/>
+    <rect x="79" y="34" width="3" height="52" rx="1.5" fill="#152C23"/>
+  </g>
+
+  <!-- Right: 100% Waterproof BWP 710 Marine Shield & 30Y Stamp -->
+  <g transform="translate(142, 60)">
+    <rect x="0" y="0" width="78" height="122" rx="8" fill="#1C3A2F" stroke="#E6CBA8" stroke-width="3"/>
+    <!-- Gold Marine Shield -->
+    <path d="M39 14L65 25V52C65 73 53 87 39 95C25 87 13 73 13 52V25L39 14Z" fill="#E6CBA8"/>
+    <!-- Checkmark inside Gold Shield -->
+    <path d="M28 53L36 61L51 44" stroke="#152C23" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="39" y="114" text-anchor="middle" fill="#E6CBA8" font-family="JetBrains Mono, monospace" font-size="16" font-weight="800">100% BWP</text>
+  </g>
+
+  <!-- Bottom Tier Badge -->
+  <rect x="18" y="192" width="204" height="32" rx="8" fill="#E6CBA8"/>
+  <text x="120" y="213" text-anchor="middle" fill="#152C23" font-family="Plus Jakarta Sans, sans-serif" font-size="16" font-weight="800" letter-spacing="1.5">21–30 YRS WARRANTY</text>
+</svg>

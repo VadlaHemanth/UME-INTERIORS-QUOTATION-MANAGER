@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <!-- Background blends into warm architectural palette -->
+  <rect width="240" height="240" rx="24" fill="#EFE7D6"/>
+  <rect x="6" y="6" width="228" height="228" rx="18" stroke="#1C3A2F" stroke-width="2.5"/>
+
+  <!-- Top Warranty Header Pill -->
+  <rect x="18" y="16" width="204" height="34" rx="10" fill="#1C3A2F"/>
+  <text x="120" y="39" text-anchor="middle" fill="#E6CBA8" font-family="Plus Jakarta Sans, sans-serif" font-size="18" font-weight="800" letter-spacing="1">10–20 YRS BWR</text>
+
+  <!-- Left: Modular Kitchen Overhead & Soft-Close Tandem Drawers -->
+  <g transform="translate(20, 60)">
+    <!-- Overhead Cabinet (12" Depth) -->
+    <rect x="0" y="0" width="112" height="38" rx="5" fill="#DFC7A4" stroke="#1C3A2F" stroke-width="3"/>
+    <line x1="56" y1="2" x2="56" y2="36" stroke="#1C3A2F" stroke-width="2.5"/>
+    <rect x="44" y="28" width="8" height="3" rx="1.5" fill="#1C3A2F"/>
+    <rect x="60" y="28" width="8" height="3" rx="1.5" fill="#1C3A2F"/>
+
+    <!-- Granite Countertop Bar -->
+    <rect x="0" y="46" width="112" height="8" rx="2" fill="#1C3A2F"/>
+
+    <!-- Base Unit Tandem Soft-Close Drawers (21" Depth) -->
+    <rect x="0" y="54" width="112" height="68" rx="5" fill="#C89D66" stroke="#1C3A2F" stroke-width="3"/>
+    <rect x="6" y="60" width="100" height="16" rx="2" fill="#FAF8F4" stroke="#1C3A2F" stroke-width="2"/>
+    <rect x="42" y="66" width="28" height="4" rx="2" fill="#1C3A2F"/>
+    <rect x="6" y="80" width="100" height="16" rx="2" fill="#FAF8F4" stroke="#1C3A2F" stroke-width="2"/>
+    <rect x="42" y="86" width="28" height="4" rx="2" fill="#1C3A2F"/>
+    <rect x="6" y="100" width="100" height="16" rx="2" fill="#E5D3B7" stroke="#1C3A2F" stroke-width="2"/>
+  </g>
+
+  <!-- Right: Verified Termite-Proof Shield & Hydraulic Damper Badge -->
+  <g transform="translate(142, 60)">
+    <rect x="0" y="0" width="78" height="122" rx="8" fill="#FAF8F4" stroke="#1C3A2F" stroke-width="3"/>
+    <!-- Shield Emblem -->
+    <path d="M39 16L63 26V52C63 72 52 86 39 93C26 86 15 72 15 52V26L39 16Z" fill="#1C3A2F"/>
+    <path d="M29 53L36 60L50 44" stroke="#E6CBA8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="39" y="113" text-anchor="middle" fill="#1C3A2F" font-family="JetBrains Mono, monospace" font-size="15" font-weight="800">710/303</text>
+  </g>
+
+  <!-- Bottom Tier Badge -->
+  <rect x="18" y="192" width="204" height="32" rx="8" fill="#1C3A2F"/>
+  <text x="120" y="213" text-anchor="middle" fill="#E6CBA8" font-family="Plus Jakarta Sans, sans-serif" font-size="16" font-weight="800" letter-spacing="1.5">SOFT-CLOSE</text>
+</svg>

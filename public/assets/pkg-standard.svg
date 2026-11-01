@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <!-- Background blends seamlessly into #F3EDE0 / #FAF8F4 card -->
+  <rect width="240" height="240" rx="24" fill="#F3EDE0"/>
+  <rect x="6" y="6" width="228" height="228" rx="18" stroke="#D5C8B4" stroke-width="2"/>
+
+  <!-- Top Specification Header Pill -->
+  <rect x="18" y="16" width="204" height="34" rx="10" fill="#1C3A2F"/>
+  <text x="120" y="39" text-anchor="middle" fill="#E6CBA8" font-family="Plus Jakarta Sans, sans-serif" font-size="18" font-weight="800" letter-spacing="1">710 + 303 PLY</text>
+
+  <!-- Left: Modular Wardrobe + Loft Architectural Elevation -->
+  <rect x="20" y="60" width="96" height="122" rx="6" fill="#C89D66" stroke="#1C3A2F" stroke-width="3"/>
+  <!-- Overhead Loft Section -->
+  <rect x="25" y="65" width="41" height="24" rx="2" fill="#E5D3B7" stroke="#1C3A2F" stroke-width="2"/>
+  <rect x="70" y="65" width="41" height="24" rx="2" fill="#E5D3B7" stroke="#1C3A2F" stroke-width="2"/>
+  <!-- Main Wardrobe Doors -->
+  <rect x="25" y="93" width="41" height="84" rx="2" fill="#DFC7A4" stroke="#1C3A2F" stroke-width="2"/>
+  <rect x="70" y="93" width="41" height="84" rx="2" fill="#D5B88E" stroke="#1C3A2F" stroke-width="2"/>
+  <!-- Wardrobe Handles -->
+  <rect x="59" y="122" width="3.5" height="24" rx="1.75" fill="#1C3A2F"/>
+  <rect x="73.5" y="122" width="3.5" height="24" rx="1.75" fill="#1C3A2F"/>
+
+  <!-- Right: 18mm Multi-Ply Hardwood Core + 1.0mm Laminate Swatch -->
+  <g transform="translate(126, 62)">
+    <!-- 18mm Calibrated Plywood Layer Stack -->
+    <rect x="0" y="0" width="92" height="72" rx="6" fill="#FAF8F4" stroke="#1C3A2F" stroke-width="3"/>
+    <!-- Outer 1.0mm Laminate Top Layer -->
+    <rect x="4" y="4" width="84" height="10" rx="2" fill="#1C3A2F"/>
+    <!-- Alternating Hardwood Core Plies -->
+    <rect x="4" y="17" width="84" height="8" fill="#B5834C"/>
+    <rect x="4" y="27" width="84" height="8" fill="#DEC39B"/>
+    <rect x="4" y="37" width="84" height="8" fill="#9E6D3A"/>
+    <rect x="4" y="47" width="84" height="8" fill="#DEC39B"/>
+    <!-- Inner 0.8mm White Liner Layer -->
+    <rect x="4" y="58" width="84" height="9" rx="2" fill="#FFFFFF" stroke="#1C3A2F" stroke-width="1.5"/>
+
+    <!-- 18MM + 1.0MM Swatch Callout Box -->
+    <rect x="0" y="80" width="92" height="40" rx="6" fill="#E4EFE7" stroke="#1C3A2F" stroke-width="2.5"/>
+    <text x="46" y="106" text-anchor="middle" fill="#1C3A2F" font-family="JetBrains Mono, monospace" font-size="18" font-weight="800">18MM CORE</text>
+  </g>
+
+  <!-- Bottom Tier Badge -->
+  <rect x="18" y="192" width="204" height="32" rx="8" fill="#1C3A2F"/>
+  <text x="120" y="213" text-anchor="middle" fill="#FFFFFF" font-family="Plus Jakarta Sans, sans-serif" font-size="16" font-weight="800" letter-spacing="1.5">1.0MM LAMINATE</text>
+</svg>
