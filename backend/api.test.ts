@@ -363,14 +363,14 @@ test('public portal loads current business identity without bank, rate-card or o
 });
 
 
-test('customer quote allowlist retains estimate basis and customer-facing note while hiding private metadata', async () => {
+test('customer quote allowlist retains floor-plan checkbox metadata while hiding private metadata', async () => {
   const state = paymentFixture();
-  state.quotes[0].draft.quote.estimate_basis = 'floor_plan';
-  state.quotes[0].draft.quote.estimate_note = 'Confirm laminate colours after the site review.';
+  state.quotes[0].draft.quote.is_floor_plan_estimate = true;
+  state.quotes[0].draft.quote.estimate_basis = 'floor_plan'; // Accepted legacy import metadata.
   (state.quotes[0].draft.quote as any).internalOwnerNote = 'Not customer visible';
   const response = await handleApi(request('/api/quotes/ume-test-api'), memoryStore(state), environment);
   const payload = await response.json() as any;
+  assert.equal(payload.quote.draft.quote.is_floor_plan_estimate, true);
   assert.equal(payload.quote.draft.quote.estimate_basis, 'floor_plan');
-  assert.equal(payload.quote.draft.quote.estimate_note, state.quotes[0].draft.quote.estimate_note);
   assert.equal('internalOwnerNote' in payload.quote.draft.quote, false);
 });

@@ -21,7 +21,7 @@ Customer quotations open at `/q/<private-token>`. `/studio` remains a legacy own
 
 1. Copy the current **Assistant instructions** into one Gemini Gem or Custom GPT. They include the current reusable rate card. Copy them again after changing reusable rates.
 2. Paste/upload the assistant's `quotation-studio.draft.v2` JSON, or start a blank quotation.
-3. Review customer details, measurements, work types, optional items, PVC eligibility, rates and open questions. Set **Estimate based on** only when confirmed and add an optional customer-visible note. No missing measurements are guessed. `Base` is the schema name for the customer-facing **Standard** package.
+3. Review customer details, measurements, work types, optional items, PVC eligibility, rates and open questions. Tick **This quotation is based on the supplied floor plan** only when that is true. No missing measurements are guessed. `Base` is the schema name for the customer-facing **Standard** package.
 4. Review **Suggested for this home** recommendations returned in `suggested_addons`. Add useful ideas as optional items or dismiss them. Unaccepted suggestions never enter the scope or totals; accepted ideas still need confirmed measurements and prices.
 5. Choose a default package using the clickable package cards or dropdown. Select **Save & publish quotation** for a private link; use revision mode when replacing an earlier quotation.
 6. Review saved customer selections and messages in **Quotations & selections**. Verify payment screenshots received on WhatsApp against the bank statement, then record confirmed receipts in **Payments**. A screenshot never counts as verified payment by itself.
@@ -30,11 +30,11 @@ Customers can compare three packages, mix room grades, add eligible PVC, select 
 
 ## Quotation basis and notes
 
-Each quotation can use **Not specified**, **Floor-plan estimate**, or **Based on site measurements**. Existing drafts with no basis stay unspecified; the app does not assume that a site visit has happened. The optional customer-visible note accepts up to 1,000 characters of English text.
+The owner studio has one clear checkbox: **This quotation is based on the supplied floor plan**. When it is checked, the customer quotation and PDF include the standard preliminary-estimate notice. When it is unchecked, the app generates no quotation-basis note and does not imply that a site visit has happened.
 
-A floor-plan estimate always carries a preliminary estimate notice in the customer view and PDF: on-site measurements, scope, requirements, material specifications and prices may change after the site visit; changes require a revised quotation and written customer approval before work proceeds. Custom notes supplement this notice. Review the customer preview before publishing.
+A checked floor-plan estimate carries a preliminary estimate notice in the customer view and PDF: on-site measurements, scope, requirements, material specifications and prices may change after the site visit; changes require a revised quotation and written customer approval before work proceeds. Review the customer preview before publishing.
 
-In assistant JSON, the optional fields are `quote.estimate_basis` (`floor_plan` or `site_measurement`) and `quote.estimate_note` (English text or null). Omit the basis when it is unknown.
+In assistant JSON, use the preferred boolean `quote.is_floor_plan_estimate`: `true` when the owner confirms the supplied floor plan is the basis, otherwise `false` (or omit it). The legacy `quote.estimate_basis` and `quote.estimate_note` fields remain accepted when importing existing JSON, but new assistant output should use the boolean and omit automatic notes when it is false.
 
 ## Business, bank and account settings
 

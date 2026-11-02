@@ -58,7 +58,7 @@ After sign-in, use **Settings → Business** for business identity, address and 
 
 Subsequent quotation loads and PDF previews use saved business/payment details. Payment QR codes encode the saved UPI recipient and account holder name, with the entered customer amount or the PDF booking amount. Format validation does not verify the account. Regenerate a PDF when you need it to reflect changed details; an already downloaded PDF is a static file.
 
-Each quotation also supports optional `quote.estimate_basis` (`floor_plan` or `site_measurement`) and a customer-visible English `quote.estimate_note` of up to 1,000 characters. Missing legacy metadata remains unspecified. Floor-plan estimates retain the preliminary estimate notice in both customer and PDF views even when custom notes are added.
+Each quotation has an owner checkbox, **This quotation is based on the supplied floor plan**. When checked, the customer view and PDF include the standard preliminary-estimate notice; when unchecked, no quotation-basis note is generated and the app does not claim a site visit. New assistant JSON should use `quote.is_floor_plan_estimate` as a boolean. Legacy `quote.estimate_basis` and `quote.estimate_note` fields remain accepted for existing imports, but new output should omit automatic notes unless the checkbox/boolean is true.
 
 Deploy over HTTPS for native screenshot file sharing. The mobile **Pay with UPI** action requires a compatible installed UPI app; desktop users use bank details or scan the QR with a phone. Screenshot sharing depends on browser/device file-share support. When unavailable, the customer downloads the image, opens WhatsApp and attaches it manually. No delivery or payment verification is implied by opening the share sheet.
 

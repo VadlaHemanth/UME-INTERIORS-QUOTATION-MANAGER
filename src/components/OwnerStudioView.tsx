@@ -46,7 +46,6 @@ import {
 } from '../lib/pricing';
 import {
   FinishOption,
-  MAX_QUOTATION_ESTIMATE_NOTE_LENGTH,
   migrateV1ToV2Draft,
   PlywoodGrade,
   ProtectionOption,
@@ -54,7 +53,7 @@ import {
   ResolvedPackageSelection,
   validateQuotationDraftV2,
 } from '../lib/schema';
-import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
+import { getQuotationBasisLabel, getQuotationEstimateNote, isFloorPlanEstimate } from '../lib/quotation-notes';
 
 export interface PublishedQuoteSummary {
   publicId: string;
@@ -948,39 +947,33 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 </div>
 
                 <fieldset className="space-y-3 border-t border-[#E5DFD3] pt-4">
-                  <legend className="text-sm font-bold text-[#18221D] px-0 pt-4">Quotation basis and notes</legend>
-                  <div>
-                    <label htmlFor="quotation-estimate-basis" className="block text-xs font-bold text-[#18221D] mb-1">Estimate based on</label>
-                    <select
-                      id="quotation-estimate-basis"
-                      aria-describedby="quotation-estimate-help"
-                      value={workingDraft.quote.estimate_basis || ''}
-                      onChange={(e) => syncDraft({ ...workingDraft, quote: { ...workingDraft.quote, estimate_basis: e.target.value ? e.target.value as QuotationDraftV2['quote']['estimate_basis'] : undefined } })}
-                      className="w-full px-3 py-2 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl"
-                    >
-                      <option value="">Not specified</option>
-                      <option value="floor_plan">Floor-plan estimate</option>
-                      <option value="site_measurement">Based on site measurements</option>
-                    </select>
-                    <p id="quotation-estimate-help" className="text-xs text-[#5C645F] mt-1.5 leading-relaxed">Choose only the basis confirmed for this quotation. A floor-plan estimate includes a notice that measurements, scope, requirements, materials and prices may change after the site visit.</p>
-                  </div>
-                  <div>
-                    <label htmlFor="quotation-estimate-note" className="block text-xs font-bold text-[#18221D] mb-1">Customer-visible note (optional)</label>
-                    <textarea
-                      id="quotation-estimate-note"
-                      aria-describedby="quotation-estimate-note-help"
-                      rows={3}
-                      maxLength={MAX_QUOTATION_ESTIMATE_NOTE_LENGTH}
-                      value={workingDraft.quote.estimate_note || ''}
-                      onChange={(e) => syncDraft({ ...workingDraft, quote: { ...workingDraft.quote, estimate_note: e.target.value || null } })}
-                      className="w-full px-3 py-2 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl resize-y"
+                  <legend className="text-sm font-bold text-[#18221D] px-0 pt-4">Quotation basis</legend>
+                  <label htmlFor="quotation-floor-plan-estimate" className="flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border border-[#D8D0C2] bg-[#FAF8F4] p-3 text-xs text-[#18221D]">
+                    <input
+                      id="quotation-floor-plan-estimate"
+                      type="checkbox"
+                      checked={isFloorPlanEstimate(workingDraft.quote)}
+                      onChange={(event) => {
+                        const { estimate_basis: _legacyBasis, estimate_note: _legacyNote, ...quoteWithoutLegacyNote } = workingDraft.quote;
+                        syncDraft({
+                          ...workingDraft,
+                          quote: event.target.checked
+                            ? { ...quoteWithoutLegacyNote, is_floor_plan_estimate: true }
+                            : { ...quoteWithoutLegacyNote, is_floor_plan_estimate: false },
+                        });
+                      }}
+                      className="mt-0.5 h-[22px] w-[22px] shrink-0 accent-[#1C3A2F]"
                     />
-                    <p id="quotation-estimate-note-help" className="text-xs text-[#5C645F] mt-1.5">Use clear English, up to {MAX_QUOTATION_ESTIMATE_NOTE_LENGTH.toLocaleString('en-IN')} characters. This note appears in the customer quotation and PDF alongside the estimate notice.</p>
-                  </div>
-                  {(getQuotationBasisLabel(workingDraft.quote) || getQuotationEstimateNote(workingDraft.quote)) && (
+                    <span>
+                      <span className="block font-bold">This quotation is based on the supplied floor plan</span>
+                      <span className="mt-1 block leading-relaxed text-[#5C645F]">When checked, customers see the preliminary-estimate notice in their quotation and PDF.</span>
+                    </span>
+                  </label>
+                  <p className="text-xs leading-relaxed text-[#5C645F]">Leave it unchecked to generate the quotation without an estimate-basis note.</p>
+                  {isFloorPlanEstimate(workingDraft.quote) && (
                     <div className="text-xs leading-relaxed text-[#18221D] bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl p-3">
-                      <p className="font-bold">Customer preview · {getQuotationBasisLabel(workingDraft.quote) || 'Quotation note'}</p>
-                      {getQuotationEstimateNote(workingDraft.quote) && <p className="mt-1.5 whitespace-pre-line break-words">{getQuotationEstimateNote(workingDraft.quote)}</p>}
+                      <p className="font-bold">Customer preview · {getQuotationBasisLabel(workingDraft.quote)}</p>
+                      <p className="mt-1.5 whitespace-pre-line break-words">{getQuotationEstimateNote(workingDraft.quote)}</p>
                     </div>
                   )}
                 </fieldset>

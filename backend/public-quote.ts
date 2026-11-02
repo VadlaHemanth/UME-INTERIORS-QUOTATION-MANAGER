@@ -15,6 +15,7 @@ function publicDraft(draft: QuotationDraftV2): QuotationDraftV2 {
     customer: { name: draft.customer.name, phone: draft.customer.phone, site: draft.customer.site },
     quote: {
       number: draft.quote.number, date: draft.quote.date, valid_until: draft.quote.valid_until,
+      ...(typeof draft.quote.is_floor_plan_estimate === 'boolean' ? { is_floor_plan_estimate: draft.quote.is_floor_plan_estimate } : {}),
       ...(draft.quote.estimate_basis ? { estimate_basis: draft.quote.estimate_basis } : {}),
       ...(draft.quote.estimate_note ? { estimate_note: draft.quote.estimate_note } : {}),
     },

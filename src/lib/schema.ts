@@ -37,6 +37,9 @@ export interface QuoteMeta {
   number: string | null;
   date: string | null;
   valid_until: string | null;
+  /** Preferred flag for the standard floor-plan preliminary estimate notice. */
+  is_floor_plan_estimate?: boolean;
+  /** Legacy import fields retained for existing quotations and JSON. */
   estimate_basis?: 'floor_plan' | 'site_measurement';
   estimate_note?: string | null;
 }
@@ -356,6 +359,18 @@ export function validateQuotationDraftV2(
 
   // Quote meta checks
   if (d.quote) {
+    if (d.quote.is_floor_plan_estimate !== undefined && typeof d.quote.is_floor_plan_estimate !== 'boolean') {
+      issues.push({
+        path: '/quote/is_floor_plan_estimate', severity: 'error', code: 'SCHEMA_MISMATCH',
+        message: 'Set is_floor_plan_estimate to true or false.',
+      });
+    }
+    if (d.quote.is_floor_plan_estimate === true && d.quote.estimate_basis !== undefined && d.quote.estimate_basis !== 'floor_plan') {
+      issues.push({
+        path: '/quote/estimate_basis', severity: 'error', code: 'SCHEMA_MISMATCH',
+        message: 'A floor-plan estimate cannot also use a different legacy estimate basis.',
+      });
+    }
     if (d.quote.estimate_basis !== undefined && !['floor_plan', 'site_measurement'].includes(d.quote.estimate_basis)) {
       issues.push({
         path: '/quote/estimate_basis', severity: 'error', code: 'SCHEMA_MISMATCH',
@@ -615,6 +630,7 @@ export function migrateV1ToV2Draft(raw: Record<string, any>): QuotationDraftV2 {
       number: raw.quote?.number ?? null,
       date: raw.quote?.date ?? null,
       valid_until: raw.quote?.valid_until ?? null,
+      ...(raw.quote?.is_floor_plan_estimate !== undefined ? { is_floor_plan_estimate: raw.quote.is_floor_plan_estimate } : {}),
       ...(raw.quote?.estimate_basis !== undefined ? { estimate_basis: raw.quote.estimate_basis } : {}),
       ...(raw.quote?.estimate_note !== undefined ? { estimate_note: raw.quote.estimate_note } : {}),
     },

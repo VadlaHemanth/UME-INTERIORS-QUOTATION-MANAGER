@@ -15,13 +15,16 @@ test('legacy quotations do not claim that a site measurement happened', () => {
   assert.equal(validateQuotationDraftV2(VIDYA_SAGAR_REDDY_DRAFT).readyForPublish, true);
 });
 
-test('a floor-plan notice is always shown and custom notes only supplement it', () => {
-  const floorPlan = { ...quote, estimate_basis: 'floor_plan' as const };
+test('the floor-plan checkbox always shows its notice and an unchecked quote has no note', () => {
+  const floorPlan = { ...quote, is_floor_plan_estimate: true };
   const notice = getQuotationEstimateNote(floorPlan);
   assert.equal(getQuotationBasisLabel(floorPlan), 'Based on floor plan');
   for (const required of ['preliminary estimate', 'On-site measurements', 'scope of work', 'requirements', 'material specifications', 'prices', 'site visit', 'revised quotation', 'written approval']) assert.ok(notice.includes(required));
   assert.equal(getQuotationEstimateNote({ ...floorPlan, estimate_note: '   ' }), notice);
   assert.equal(getQuotationEstimateNote({ ...floorPlan, estimate_note: '  Confirm the kitchen layout during the visit.  ' }), `${notice}\n\nConfirm the kitchen layout during the visit.`);
+  const unchecked = { ...floorPlan, is_floor_plan_estimate: false, estimate_basis: 'floor_plan' as const, estimate_note: 'Legacy note must not appear.' };
+  assert.equal(getQuotationBasisLabel(unchecked), '');
+  assert.equal(getQuotationEstimateNote(unchecked), '');
 });
 
 test('site-measured and unspecified quotations show only their confirmed basis and owner note', () => {
@@ -33,8 +36,7 @@ test('site-measured and unspecified quotations show only their confirmed basis a
 
 test('estimate metadata survives legacy migration and a JSON round trip', () => {
   const input = structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
-  input.quote.estimate_basis = 'floor_plan';
-  input.quote.estimate_note = 'Confirm appliance positions during the visit.';
+  input.quote.is_floor_plan_estimate = true;
   const migrated = migrateV1ToV2Draft(input);
   assert.deepEqual(migrated.quote, input.quote);
   assert.deepEqual(JSON.parse(JSON.stringify(migrated)).quote, input.quote);
@@ -43,6 +45,11 @@ test('estimate metadata survives legacy migration and a JSON round trip', () => 
 
 test('estimate metadata rejects invalid bases, excessive notes and non-English text', () => {
   const input = structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
+  for (const invalid of ['true', 1, null]) {
+    const result = validateQuotationDraftV2({ ...input, quote: { ...quote, is_floor_plan_estimate: invalid } });
+    assert.equal(result.validForDraft, false);
+    assert.ok(result.issues.some((issue) => issue.path === '/quote/is_floor_plan_estimate'));
+  }
   for (const invalid of ['plan', null, 42]) {
     const result = validateQuotationDraftV2({ ...input, quote: { ...quote, estimate_basis: invalid } });
     assert.equal(result.validForDraft, false);

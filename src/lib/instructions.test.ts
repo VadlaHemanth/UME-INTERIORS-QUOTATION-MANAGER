@@ -46,15 +46,15 @@ test('assistant output includes catalogue PVC scope, real-job status and JSON re
 });
 
 
-test('assistant instructions preserve optional estimate metadata without assuming a site visit', () => {
+test('assistant instructions use the floor-plan checkbox without assuming a site visit', () => {
   const instructions = buildDynamicGemInstructions();
-  assert.match(instructions, /quote\.estimate_basis/);
-  assert.match(instructions, /never assume a site visit took place/);
-  assert.match(instructions, /1,000 characters/);
-  assert.match(instructions, /custom note supplements this notice and cannot replace it/);
+  assert.match(instructions, /quote\.is_floor_plan_estimate/);
+  assert.match(instructions, /otherwise false/);
+  assert.match(instructions, /never imply that a site visit has happened/);
   assert.equal((instructions.match(/```json/g) || []).length, 1);
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
-  assert.equal(example.quote.estimate_basis, 'floor_plan');
-  assert.equal(example.quote.estimate_note, null);
+  assert.equal(example.quote.is_floor_plan_estimate, false);
+  assert.equal(example.quote.estimate_basis, undefined);
+  assert.equal(example.quote.estimate_note, undefined);
   assert.equal(validateQuotationDraftV2(example).validForDraft, true);
 });
