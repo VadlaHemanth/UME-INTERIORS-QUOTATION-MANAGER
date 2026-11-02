@@ -2,6 +2,16 @@
 
 This app includes a Cloudflare Worker, static frontend and D1 storage. The commands explicitly select this app’s config so a parent folder’s Wrangler project cannot be selected accidentally. Deploy the Worker project in this repository. Uploading only `dist/` to Pages would leave login, saving and publishing without an API.
 
+## Current deployment
+
+Live app: https://ume-interiors-quotation-studio.umeinteriors.workers.dev
+
+Owner login: https://ume-interiors-quotation-studio.umeinteriors.workers.dev/owner
+
+This checkout is already configured for the business Cloudflare account and its D1 database. Both migrations and owner secrets are configured. For updates to this deployment, use **Future updates** below; do not create another database. For a separate account, replace `account_id` and create your own database.
+
+If your terminal has an old `CLOUDFLARE_ACCOUNT_ID`, remove that override or set it to the account in `wrangler.toml`. `npx wrangler whoami` confirms the signed-in account. A failed new OAuth attempt does not necessarily invalidate an existing session; check `whoami` before retrying.
+
 ## 1. Install and check
 
 Use Node.js 22.12+ (or a current supported Node.js LTS) and open a terminal in this checkout.
@@ -20,7 +30,7 @@ npx wrangler --config ./wrangler.toml login
 npx wrangler --config ./wrangler.toml d1 create ume-interiors-studio
 ```
 
-Copy the returned database UUID into `database_id` under `[[d1_databases]]` in `wrangler.toml`, replacing the all-zero placeholder. Keep the binding named `DB`. Then run:
+Copy the returned database UUID into `database_id` under `[[d1_databases]]` in `wrangler.toml`, replacing the existing deployment’s UUID only when creating a separate deployment. Keep the binding named `DB`. Then run:
 
 ```powershell
 npx wrangler --config ./wrangler.toml d1 migrations apply DB --remote

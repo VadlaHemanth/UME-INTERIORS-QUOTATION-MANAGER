@@ -223,7 +223,13 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(
     Boolean(initialSelection.acceptedTermsAt)
   );
-  const [utrInput, setUtrInput] = useState<string>('');
+  const [paymentImage, setPaymentImage] = useState<File | null>(null);
+  const [paymentImagePreview, setPaymentImagePreview] = useState('');
+  useEffect(() => {
+    if (!paymentImage) {setPaymentImagePreview(''); return;}
+    const url=URL.createObjectURL(paymentImage); setPaymentImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  },[paymentImage]);
   const [paymentMethod, setPaymentMethod] = useState<
     'UPI / PhonePe' | 'NEFT / RTGS / IMPS'
   >('UPI / PhonePe');
@@ -489,65 +495,22 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPaymentFeedback(null);
-    if (milestones.requiresOwnerSmallOrderRule) {
-      setPaymentFeedback({ type: 'error', message: 'Please ask UME to confirm the booking schedule for this small project before paying.' });
-      return;
+    e.preventDefault(); setPaymentFeedback(null);
+    if (!paymentImage) {setPaymentFeedback({type:'error',message:'Choose a payment screenshot first.'});return;}
+    if (!acceptedTerms || paymentAmount<=0 || !Number.isFinite(paymentAmount) || milestones.requiresOwnerSmallOrderRule) {
+      setPaymentFeedback({type:'error',message:'Confirm the payment amount, package and terms before sharing.'});return;
     }
-    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
-      setPaymentFeedback({ type: 'error', message: 'Enter the amount you paid before submitting your reference.' });
-      return;
+    const text=`Payment screenshot for ${draft.quote.number} — ${draft.customer.name}. Amount: ${formatINR(paymentAmount)}. Method: ${paymentMethod}. Selection: ${activePackageSummaryText}. Please verify against your bank statement. ${window.location.origin}/q/${publicId}`;
+    if (navigator.canShare?.({files:[paymentImage]}) && navigator.share) {
+      try {await navigator.share({files:[paymentImage],title:'UME payment screenshot',text});
+        setPaymentFeedback({type:'success',message:'Share flow completed. Payment is confirmed only after bank verification.'});
+      } catch(error) {if((error as DOMException).name!=='AbortError') setPaymentFeedback({type:'error',message:'Sharing is unavailable. Open WhatsApp below and attach your selected screenshot.'});}
+    } else {
+      window.open(`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(text)}`,'_blank','noopener,noreferrer');
+      setPaymentFeedback({type:'success',message:'WhatsApp opened with your details. Attach the selected screenshot there and tap Send. This browser cannot attach it automatically.'});
     }
-    if (!acceptedTerms) {
-      setPaymentFeedback({
-        type: 'error',
-        message:
-          'Please tick the confirmation checkbox accepting the quotation scope and milestone terms before submitting your UTR reference.',
-      });
-      return;
-    }
-    setSubmittingPayment(true);
-    try {
-      // The ledger must refer to the same checked selection and terms shown here.
-      // A failed selection save aborts the payment request.
-      await onSaveSelection({
-        wholeHomeSelection,
-        mixByRoom,
-        roomSelections,
-        selectedOptionalPointers,
-        acceptedTerms: true,
-        explicitCustomerSave: true,
-      });
-      setSavedByCustomer(true);
-      setHasUnsavedChanges(false);
-      const pkgLabel = mixByRoom
-        ? 'Custom Room-Wise Package Mix'
-        : `${getPackageDisplayName(wholeHomeSelection.grade)} · ${wholeHomeSelection.protection}`;
-      const res = await onSubmitPayment({
-        utrReference: utrInput,
-        method: paymentMethod,
-        amountRupees: paymentAmount,
-        selectedPackageLabel: pkgLabel,
-      });
-      if (res.ok) {
-        setUtrInput('');
-        setPaymentFeedback({
-          type: 'success',
-          message:
-            `Your ${formatINR(paymentAmount)} payment reference has been submitted. UME will verify it against the bank statement before crediting it to your quotation.`,
-        });
-      } else {
-        setPaymentFeedback({
-          type: 'error',
-          message: res.error || 'Could not submit payment reference.',
-        });
-      }
-    } catch (error) {
-      setPaymentFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Could not save your selection and payment reference. Please check your connection and try again.' });
-    } finally {
-      setSubmittingPayment(false);
-    }
+    try {await onSaveSelection({wholeHomeSelection,mixByRoom,roomSelections,selectedOptionalPointers,acceptedTerms:true,explicitCustomerSave:true});setSavedByCustomer(true);setHasUnsavedChanges(false);}
+    catch {setSelectionSaveError('Please save your package again; its latest changes could not be saved.');}
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -2012,7 +1975,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 className="lg:col-span-5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl p-5 space-y-4 text-[13px]"
               >
                 <h3 className="text-base font-bold text-[#18221D]">
-                  Submit Booking Payment Reference (UTR)
+                  Share payment screenshot
                 </h3>
                 {milestones.requiresOwnerSmallOrderRule && (
                   <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900 leading-relaxed">
@@ -2053,22 +2016,17 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <label
-                    htmlFor="customer-utr-input"
-                    className="block font-bold text-[#18221D] mb-1"
-                  >
-                    12-Digit UPI Reference / Bank UTR Number
-                  </label>
-                  <input
-                    id="customer-utr-input"
-                    disabled={submittingPayment}
-                    type="text"
-                    value={utrInput}
-                    onChange={(e) => setUtrInput(e.target.value)}
-                    placeholder="e.g., 430518294012"
-                    className="w-full px-3 py-2 bg-white border border-[#D8D0C2] rounded-lg font-sans tabular-nums"
-                  />
+                <div className="payment-image-upload">
+                  <label htmlFor="customer-payment-image" className="block font-bold mb-2">Payment screenshot</label>
+                  <input id="customer-payment-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{
+                    const file=e.target.files?.[0];setPaymentFeedback(null);
+                    if(!file){setPaymentImage(null);return;}
+                    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024){setPaymentImage(null);e.target.value='';setPaymentFeedback({type:'error',message:'Choose a JPG, PNG or WebP image smaller than 10 MB.'});return;}
+                    setPaymentImage(file);
+                  }}/>
+                  {paymentImagePreview&&<div className="payment-image-preview"><img src={paymentImagePreview} alt="Selected payment screenshot"/><button type="button" onClick={()=>{setPaymentImage(null);const input=document.getElementById('customer-payment-image') as HTMLInputElement;if(input)input.value='';}}>Remove image</button></div>}
+                  <p className="mt-2 text-xs text-[#5C645F]">Choose WhatsApp and the proprietor from your device’s share options, then review and Send. Images stay on your device until shared.</p>
+                  <a className="block mt-2 underline" target="_blank" rel="noreferrer" href={`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(`Payment for ${draft.quote.number}: ${formatINR(paymentAmount)}. Please verify my attached screenshot. ${window.location.origin}/q/${publicId}`)}`}>Open WhatsApp to {catalogue.company.phone}</a>
                 </div>
 
                 <label className="flex items-start gap-2.5 cursor-pointer pt-1">
@@ -2104,9 +2062,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   <Send className="w-4 h-4" />
                   <span>
                     {submittingPayment
-                      ? 'Submitting UTR...'
+                      ? 'Opening share options…'
                       : milestones.requiresOwnerSmallOrderRule ? 'Owner confirmation required'
-                      : 'Submit Booking Payment Reference'}
+                      : 'Share image on WhatsApp'}
                   </span>
                 </button>
               </form>
@@ -2156,7 +2114,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
             <form
               onSubmit={handleFeedbackSubmit}
-              className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end text-[13px]"
+              className="feedback-form text-[13px]"
             >
               <div className="md:col-span-3">
                 <label htmlFor="customer-feedback-topic" className="block font-bold text-[#18221D] mb-1">Topic</label>
@@ -2186,7 +2144,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 </label>
                 <textarea
                   id="customer-feedback-message"
-                  rows={2}
+                  rows={3}
                   value={feedbackMessage}
                   onChange={(e) => setFeedbackMessage(e.target.value)}
                   placeholder="e.g., Please use Premium BWP in Kitchen and Standard in Guest Bedroom..."

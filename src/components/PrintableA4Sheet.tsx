@@ -64,6 +64,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
       measurementHost.setAttribute('aria-hidden', 'true');
       measurementHost.inert = true;
       document.body.append(measurementHost);
+      const letterhead = source.querySelector('.pdf-letterhead');
       const created: HTMLElement[] = [];
       let body!: HTMLDivElement;
       let sectionHeading: HTMLElement | undefined;
@@ -77,6 +78,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
         page.append(body);
         measurementHost.append(page);
         created.push(page);
+        if (letterhead) body.append(letterhead.cloneNode(true));
         if (continued && sectionHeading) {
           const heading = sectionHeading.cloneNode(true) as HTMLElement;
           body.append(heading);
@@ -147,7 +149,18 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
           body.append(shell);
         };
         addShell();
-        if (overflows()) { shell.remove(); appendLongText(block); return true; }
+        // A table heading may not fit in the space left on this page. Move the
+        // intact table shell to a fresh page; flattening it would lose columns.
+        if (overflows()) {
+          shell.remove();
+          newPage(true);
+          addShell();
+          if (overflows()) {
+            shell.remove();
+            newPage(false);
+            addShell();
+          }
+        }
         for (const row of rows) {
           const copy = row.cloneNode(true);
           tableBody.append(copy);
@@ -206,7 +219,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
         if (!overflows()) return;
         copy.remove();
         if (block.querySelector('tbody') && appendTable(block)) return;
-        if (body.children.length) newPage(true);
+        if (body.children.length > 1) newPage(true);
         body.append(copy);
         if (overflows()) { copy.remove(); appendLongText(block); }
       };
@@ -215,9 +228,9 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
       for (const section of Array.from(source.children) as HTMLElement[]) {
         const blocks = (Array.from(section.children) as HTMLElement[]).flatMap((block) =>
           block.hasAttribute('data-pdf-flow-group') ? Array.from(block.children) as HTMLElement[] : [block]
-        );
+        ).filter(block => !block.classList.contains('pdf-letterhead'));
         if (!blocks.length) continue;
-        sectionHeading = blocks[0];
+        sectionHeading = blocks[0].classList.contains('pdf-section-heading') ? blocks[0] : undefined;
         sectionLabel = section.dataset.pageLabel || 'Quotation';
         if (!started) {
           newPage();
@@ -608,7 +621,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       <div className="pdf-flow-section" data-page-label="Furniture scope & rates">
         <div className="pdf-section-heading flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
-            <UmeLogoMark size="md" />
+
             <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
               <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F]">
                 UMAMAHESHWARA INTERIORS · Umamaheshwara Enterprises
@@ -747,7 +760,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       <div className="pdf-flow-section" data-page-label="Payment schedule & terms">
         <div className="pdf-section-heading flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
-            <UmeLogoMark size="md" />
+
             <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
               <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F]">
                 UMAMAHESHWARA INTERIORS · Umamaheshwara Enterprises
@@ -789,7 +802,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   Stage Instalment
                 </th>
                 <th className="py-2.5 px-3 text-right font-semibold">
-                  Total Paid So Far (Cumulative)
+                  Cumulative Target
                 </th>
                 <th className="py-2.5 px-3.5 text-right font-semibold text-[#E6CBA8]">
                   Due After Verified Receipts

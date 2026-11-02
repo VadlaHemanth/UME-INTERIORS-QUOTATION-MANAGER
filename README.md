@@ -24,7 +24,7 @@ Customer quotations open at `/q/<private-token>`. `/studio` remains a legacy own
 3. Review customer details, measurements, work types, optional items, PVC eligibility, rates and open questions. No missing measurements are guessed. `Base` is the schema name for the customer-facing **Standard** package.
 4. Review **Suggested for this home** recommendations returned in `suggested_addons`. Add useful ideas as optional items or dismiss them. Unaccepted suggestions never enter the scope or totals; accepted ideas still need confirmed measurements and prices.
 5. Choose a default package using the clickable package cards or dropdown. Select **Save & publish quotation** for a private link; use revision mode when replacing an earlier quotation.
-6. Review saved customer selections and messages in **Quotations & selections**. Verify payment references against the bank statement in **Payments**. A submitted UTR never counts as verified payment by itself.
+6. Review saved customer selections and messages in **Quotations & selections**. Verify payment screenshots received on WhatsApp against the bank statement, then record confirmed receipts in **Payments**. A screenshot never counts as verified payment by itself.
 
 Customers can compare three packages, mix room grades, add eligible PVC, select optional work, save choices, request changes, and print/save a quotation PDF. Contact-request saving is labelled **Save**.
 
@@ -36,7 +36,7 @@ For projects below the app's booking threshold, online booking is disabled until
 
 ## Production hosting
 
-Use [the Cloudflare deployment guide](docs/CLOUDFLARE_DEPLOYMENT.md). This is a full-stack Worker + D1 app; a static-only `dist` upload cannot process sign-ins or save quotations. Configure the D1 database UUID and owner secrets before use. Cloudflare production starts with an empty quotation list; local customer records and credentials are never bundled into the deployment.
+Use [the Cloudflare deployment guide](docs/CLOUDFLARE_DEPLOYMENT.md). This is a full-stack Worker + D1 app; a static-only `dist` upload cannot process sign-ins or save quotations. The business deployment is live at [UME Interiors](https://ume-interiors-quotation-studio.umeinteriors.workers.dev), with [owner access](https://ume-interiors-quotation-studio.umeinteriors.workers.dev/owner). Its D1 database and owner secrets are configured. Configure your own account, D1 database UUID and owner secrets for a separate deployment. Cloudflare production starts with an empty quotation list; local customer records and credentials are never bundled into the deployment.
 
 ```powershell
 npm run deploy
@@ -62,3 +62,5 @@ Generated package photographs are illustrative material compositions, not produc
 The external Gemini Gem or Custom GPT can now suggest relevant optional work from the actual home brief, rooms, storage priorities, household needs and budget. Copy the updated Assistant instructions into your assistant before requesting new JSON. The app does not require an AI API key or send customer data to an AI service itself.
 
 Recommendations use the optional root `suggested_addons` array, each containing `room_index`, a tailored `reason`, and an `item` using the existing item schema with `optional: true`. Unknown measurements/quantities stay null. The owner reviews them before inclusion. Confirmed customer-requested optional work continues to go directly into `rooms[].items`.
+
+Payment evidence: customers select a JPG/PNG/WebP screenshot and share it through the device share sheet. Where file sharing is unavailable, WhatsApp opens with payment details and the customer attaches the image manually. No screenshot is uploaded to app storage or automatically credited.

@@ -100,3 +100,8 @@
   .customer-quotation .package-choice { padding: 12px; gap: 10px; }
   .customer-quotation .package-choice-image { width: 72px; height: 76px; }
 }
+
+.payment-image-upload input[type=file]{display:block;width:100%;padding:12px;background:white;border:1px dashed #c8cfc0;border-radius:8px;font-size:12px}
+.payment-image-preview{margin-top:12px;display:flex;align-items:center;gap:12px}.payment-image-preview img{width:100px;height:100px;object-fit:contain;border:1px solid #dedbd1;border-radius:8px;background:white}.payment-image-preview button{font-size:12px;text-decoration:underline}
+.feedback-form{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(0,1.5fr);gap:16px;align-items:start}.feedback-form>div{grid-column:auto!important}.feedback-form>div:last-child{grid-column:1/-1!important;justify-content:flex-end}.feedback-form textarea{min-height:100px!important;width:100%;resize:vertical;line-height:1.6}.feedback-form select{min-height:46px}
+@media(max-width:650px){.feedback-form{grid-template-columns:1fr}.feedback-form>div:last-child{justify-content:stretch;flex-wrap:wrap}.feedback-form>div:last-child>*{flex:1}}

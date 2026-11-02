@@ -20,12 +20,18 @@ Correct repository migrations were applied to a local D1 database. An actual Wra
 
 ## Scope and limits
 
-Cloudflare production deployment and a live bank transaction were not performed. Software checks and Chromium viewport tests do not cover every physical device or possible input. Use the deployment guide to configure your own D1 database and owner secrets.
+Cloudflare production is deployed at https://ume-interiors-quotation-studio.umeinteriors.workers.dev. Live checks returned 401 for unauthorized bootstrap and 200 for owner login, authorized bootstrap and logout. Both production migrations are applied; the cloud quotation list starts empty. No live bank transaction was performed. Software checks and Chromium viewport tests do not cover every physical device or possible input. The deployment guide covers updates and separate-account setup.
 
 ## PDF preview and print design
 
-The PDF preview uses measured 210×297mm page nodes with the same fixed padding, typography and table geometry used by browser printing. Logical blocks and table rows are paginated, section/table headings repeat, and pages are numbered. The reference quote now previews five pages. The reference quote was checked as a five-page preview; measured page bodies showed no vertical overflow before continuous packing. Print preparation waits for fonts and layout; direct Download PDF uses the same preview pages.
+The PDF preview uses measured 210×297mm page nodes with the same fixed padding, typography and table geometry used by browser printing. Logical blocks and table rows are paginated, section/table headings repeat, and pages are numbered. After the Kitchen table fix, the reference quotation previews six pages, preserves all 22 furniture rows in tables, has zero plain-text fallback fragments, one letterhead per page, no page-body overflow and no dimension-cell overflow. Print preparation waits for fonts and layout; direct Download PDF uses the same preview pages.
 
 Actual native Save as PDF visual verification was interrupted by the computer-use safety check because the active native browser URL could not be confirmed. The saved native PDF has therefore not been independently rendered in this session. Use A4 with the default 100% scale and no browser-added headers/footers. This is a verification limit, not a claim that native export was tested successfully.
 
 The AI add-on review panel was browser-tested with a practice JSON: a tailored folding-desk recommendation could be added as optional, its missing measurements remained under review, and the base price stayed unchanged. No live quotation was published during that check.
+
+## Follow-up layout and payment changes
+
+Owner quotation cards reserve space for prices and place actions in their own row. The customer payment form accepts JPG/PNG/WebP screenshots and uses native file sharing when available, with a manual WhatsApp attachment fallback. No image is automatically sent or credited. The change-request textarea and actions use a consistent grid.
+
+The reference PDF previously flattened the Kitchen schedule into text when its table heading did not fit the remaining page space. The paginator now moves the intact table to a fresh page and splits rows with repeated column headings. Every room schedule has cell borders. Each page carries one company letterhead; section headings do not duplicate the logo.

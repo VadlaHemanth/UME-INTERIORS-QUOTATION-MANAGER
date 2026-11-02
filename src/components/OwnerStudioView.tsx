@@ -1594,7 +1594,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     key={q.publicId}
                     className="border border-[#E5DFD3] rounded-xl overflow-hidden bg-[#FAF8F4]"
                   >
-                    <div className="p-4 sm:p-5 bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="owner-quote-card p-4 sm:p-5 bg-white">
                       {/* Left: Customer & Quote Identity */}
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -1623,7 +1623,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </div>
 
                       {/* Middle: Default Sent Option vs Customer Saved Selection & Final Price */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-[420px] lg:max-w-full">
+                      <div className="owner-quote-prices grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl space-y-1.5">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
