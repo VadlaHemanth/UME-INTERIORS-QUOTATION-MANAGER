@@ -4,6 +4,7 @@ export interface OwnerAccount {
   passwordHash: string;
   sessionSecret: string;
   version: number;
+  environmentCredentials?: { username: string; salt: string; passwordHash: string };
 }
 
 const encoder = new TextEncoder();
@@ -40,13 +41,38 @@ export async function createOwner(username: string, password: string, version = 
   return { username, salt, passwordHash: await passwordHash(password, salt), sessionSecret: randomHex(), version };
 }
 
-export async function verifyPassword(owner: OwnerAccount, password: unknown): Promise<boolean> {
+export async function verifyPassword(owner: Pick<OwnerAccount, 'salt' | 'passwordHash'>, password: unknown): Promise<boolean> {
   if (typeof password !== 'string' || password.length > 256) return false;
   const actual = bytesFromHex(await passwordHash(password, owner.salt));
   const expected = bytesFromHex(owner.passwordHash);
   let different = actual.length ^ expected.length;
   for (let i = 0; i < actual.length; i++) different |= actual[i] ^ (expected[i] || 0);
   return different === 0;
+}
+
+// Cache only the last slow PBKDF2 comparison in this process/isolate. The
+// persisted environment baseline remains salted and stretched like the login hash.
+let checkedEnvironment: { username: string; password: string; salt: string; passwordHash: string; result: Promise<boolean> } | undefined;
+
+export function rememberEnvironmentCredentials(owner: OwnerAccount): OwnerAccount {
+  return { ...owner, environmentCredentials: { username: owner.username, salt: owner.salt, passwordHash: owner.passwordHash } };
+}
+
+export async function reconcileEnvironmentCredentials(owner: OwnerAccount, username: string, password: string): Promise<OwnerAccount> {
+  const baseline = owner.environmentCredentials || owner;
+  let matches = false;
+  if (username === baseline.username) {
+    const cached = checkedEnvironment;
+    if (cached && cached.username === username && cached.password === password && cached.salt === baseline.salt && cached.passwordHash === baseline.passwordHash) {
+      matches = await cached.result;
+    } else {
+      const result = verifyPassword(baseline, password);
+      checkedEnvironment = { username, password, salt: baseline.salt, passwordHash: baseline.passwordHash, result };
+      matches = await result;
+    }
+  }
+  if (matches) return owner.environmentCredentials ? owner : rememberEnvironmentCredentials(owner);
+  return rememberEnvironmentCredentials(await createOwner(username, password, owner.version + 1));
 }
 
 async function hmacKey(secret: string) {

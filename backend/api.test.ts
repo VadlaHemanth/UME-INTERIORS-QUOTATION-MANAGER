@@ -212,3 +212,66 @@ test('owner publication, customer save and immutable revision work through the s
   assert.equal(changed.status,200);
   assert.equal((await changed.json() as any).quote.defaultSentPackage.grade,'Normal');
 });
+
+
+test('Cloudflare secret changes replace saved login, revoke sessions immediately, and preserve Account edits until secrets change', async () => {
+  const store = memoryStore();
+  const login = await handleApi(request('/api/studio/auth', 'POST', { username: 'owner', password: environment.OWNER_PASSWORD }), store, environment);
+  const originalCookie = cookieFrom(login);
+  const changed = await handleApi(request('/api/studio/credentials', 'PUT', {
+    currentPassword: environment.OWNER_PASSWORD, newUsername: 'subhash', newPassword: 'Private-account-password-789',
+  }, originalCookie), store, environment);
+  const accountCookie = cookieFrom(changed);
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, accountCookie), store, { ...environment })).status, 200);
+  const rotated = { OWNER_USERNAME: 'studio-admin', OWNER_PASSWORD: 'Rotated-cloud-secret-456' };
+  const session = await handleApi(request('/api/studio/session', 'GET', undefined, accountCookie), store, rotated);
+  assert.deepEqual(await session.json(), { authenticated: false, username: null });
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, accountCookie), store, rotated)).status, 401);
+  assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: 'subhash', password: 'Private-account-password-789' }), store, rotated)).status, 401);
+  const renewed = await handleApi(request('/api/studio/auth', 'POST', { username: rotated.OWNER_USERNAME, password: rotated.OWNER_PASSWORD }), store, rotated);
+  assert.equal(renewed.status, 200);
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, cookieFrom(renewed)), store, rotated)).status, 200);
+  const saved = (await store.load()).state;
+  assert.equal(saved.owner!.username, rotated.OWNER_USERNAME);
+  assert.ok(saved.owner!.environmentCredentials?.salt);
+  assert.ok(!JSON.stringify(saved).includes(rotated.OWNER_PASSWORD));
+  assert.ok(!JSON.stringify(saved).includes(environment.OWNER_PASSWORD));
+});
+
+test('username-only and password-only secret rotation both apply without deleting stored quotations', async () => {
+  const state = paymentFixture();
+  const originalQuotes = structuredClone(state.quotes);
+  const store = memoryStore(state);
+  await handleApi(request('/api/studio/auth', 'POST', { username: 'owner', password: environment.OWNER_PASSWORD }), store, environment);
+  const usernameOnly = { ...environment, OWNER_USERNAME: 'new-owner' };
+  const login = await handleApi(request('/api/studio/auth', 'POST', { username: usernameOnly.OWNER_USERNAME, password: usernameOnly.OWNER_PASSWORD }), store, usernameOnly);
+  assert.equal(login.status, 200);
+  const passwordOnly = { ...usernameOnly, OWNER_PASSWORD: 'Another-cloud-secret-890' };
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, cookieFrom(login)), store, passwordOnly)).status, 401);
+  assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: passwordOnly.OWNER_USERNAME, password: passwordOnly.OWNER_PASSWORD }), store, passwordOnly)).status, 200);
+  assert.deepEqual((await store.load()).state.quotes, originalQuotes);
+});
+
+test('legacy accounts reconcile existing Cloudflare secrets and invalid secret values fail closed', async () => {
+  const state = emptyState();
+  state.owner = await createOwner('legacy-owner', 'Legacy-password-12345');
+  const legacyCookie = 'ume_owner=' + await issueSession(state.owner);
+  const store = memoryStore(state);
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, legacyCookie), store, environment)).status, 401);
+  assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, environment)).status, 200);
+  const invalidEnvironment = { ...environment, OWNER_PASSWORD: 'short' };
+  assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, invalidEnvironment)).status, 503);
+});
+
+
+test('secret rotation also strips owner-only quote data from an old session on a public read', async () => {
+  const state = paymentFixture();
+  state.quotes[0].draft.owner_requests = [{ path: '/quote', text: 'Private proprietor note' }];
+  const store = memoryStore(state);
+  const login = await handleApi(request('/api/studio/auth', 'POST', { username: 'owner', password: environment.OWNER_PASSWORD }), store, environment);
+  const rotated = { ...environment, OWNER_PASSWORD: 'New-private-cloud-secret-2026' };
+  const response = await handleApi(request('/api/quotes/ume-test-api', 'GET', undefined, cookieFrom(login)), store, rotated);
+  assert.equal(response.status, 200);
+  assert.deepEqual(((await response.json()) as any).quote.draft.owner_requests, []);
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, cookieFrom(login)), store, rotated)).status, 401);
+});

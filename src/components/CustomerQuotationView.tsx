@@ -2056,15 +2056,16 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   )}
                 </div>
 
-                <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+                <label className="payment-consent" htmlFor="customer-payment-consent">
                   <input
+                    id="customer-payment-consent"
                     type="checkbox"
                     checked={acceptedTerms}
                     disabled={submittingPayment}
                     onChange={(e) => setAcceptedTerms(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 accent-[#1C3A2F] rounded"
+                    className="payment-consent-checkbox"
                   />
-                  <span className="text-[#4A524D] leading-snug">
+                  <span className="payment-consent-copy">
                     I confirm the selected package (<strong>{activePackageSummaryText}</strong>) and agree to the UME Interiors execution terms and milestone schedule.
                   </span>
                 </label>

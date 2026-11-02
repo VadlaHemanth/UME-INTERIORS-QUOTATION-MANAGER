@@ -2,7 +2,7 @@
 
 ## Automated verification
 
-All 30 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
+All 39 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
 
 Pricing/import/review gates, current assistant instruction snapshot, actual rendered payment/link QR scan decoding, sessions and credential changes, owner API access, full-phone lookup, public payload minimization, payment validation, and real SQLite optimistic-transaction checks pass. Add-on tests verify that recommendations do not affect base pricing, accepted work remains optional, missing confirmed details block publication, and malformed/duplicate suggestions are rejected.
 
@@ -41,3 +41,12 @@ The reference PDF previously flattened the Kitchen schedule into text when its t
 Customer and owner native checkboxes have fixed 22×22px geometry with no flex shrinking and label tap areas of at least 44px high. Customer optional-item prices wrap onto a separate line on narrow screens. Chromium viewport checks at 320, 390 and 768 CSS pixels showed 22px controls and no page-wide overflow; the optional checkbox was checked and unchecked without saving the quotation. No execution terms were accepted during verification.
 
 Three new sharing regression tests check actual image bytes, correct MIME/filename, file-only share payload, invocation within the original tap, unsupported/insecure contexts, target-app failures and cancellation. The direct text-only WhatsApp link was removed from the screenshot picker. Native image sharing requires HTTPS and a supporting browser/installed share target. Real Android-to-WhatsApp delivery cannot be verified from this Windows session; the user chooses the recipient and sends the image on their device.
+
+
+## Payment consent, assistant output and secret rotation
+
+The payment-consent checkbox uses its own 22px grid column and a bordered, full-width label. Chromium checks at 390px and 320px kept the control at 22px with no horizontal overflow. No execution terms were accepted during testing.
+
+Regression coverage verifies fenced/raw JSON import, complete catalogue PVC scope in instructions, mandatory JSON recommendation guidance, real-job defaults in legacy imports, explicit practice flags, and an owner-triggered bulk repair that preserves custom PVC scope and unresolved measurements. Downloadable instructions match the app’s generated instructions.
+
+Secret-rotation tests cover username-only, password-only and combined changes; immediate old-session rejection on owner APIs and public quote reads; preserved Account-page changes when environment values do not change; older saved-account migration; invalid configuration; and preserved quotation records. The environment comparison baseline is stored as a salted PBKDF2 digest, never plaintext. No user credential value is printed or changed by these tests.

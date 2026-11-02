@@ -64,3 +64,12 @@ The external Gemini Gem or Custom GPT can now suggest relevant optional work fro
 Recommendations use the optional root `suggested_addons` array, each containing `room_index`, a tailored `reason`, and an `item` using the existing item schema with `optional: true`. Unknown measurements/quantities stay null. The owner reviews them before inclusion. Confirmed customer-requested optional work continues to go directly into `rooms[].items`.
 
 Payment evidence: customers select a JPG/PNG/WebP screenshot and tap **Share screenshot**. On supported Android Chrome/other browsers, the actual image file opens in the device share sheet; choose WhatsApp, select the proprietor and tap Send. Sharing requires HTTPS (or localhost). No text-only chat opens automatically. If file sharing is unavailable, explicit Download screenshot and Open WhatsApp chat controls guide manual attachment. Cancellation does not save acceptance or report delivery. No screenshot is uploaded to app storage or automatically credited.
+
+
+## Assistant JSON and owner credentials
+
+Copy the refreshed **Assistant instructions** into your Gemini Gem or Custom GPT after this update. Final responses use one copyable json code block, always include suggested_addons, and include the catalogue’s standard PVC contact parts for eligible work types. The JSON loader accepts raw JSON or one complete fenced block. Suggestions stay outside the agreed scope until reviewed and added as optional.
+
+For an existing draft with missing standard PVC parts, review the contact-area list and choose **Use reviewed standard PVC scope**. Explicit practice records still require real-customer confirmation before publication; new legacy imports no longer become demo jobs merely because is_demo was omitted.
+
+Runtime Cloudflare owner secret updates now replace the saved login and revoke existing sessions. Account-page changes persist until the environment secret values change again. See the deployment guide for the exact update steps.

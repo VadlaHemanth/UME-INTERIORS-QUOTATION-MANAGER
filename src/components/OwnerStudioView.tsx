@@ -1,3 +1,5 @@
+import { parseStudioJson } from '../lib/studio-json';
+import { applyStandardPvcScopes, getMissingStandardPvcScopes } from '../lib/pvc-scope';
 import React, { useEffect, useMemo, useState } from 'react';
 import './pdf-owner.css';
 import './addon-suggestions.css';
@@ -245,6 +247,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   }, [workingDraft, editableCatalogue.workTypes]);
 
   const addonSuggestions = useMemo(() => getAddonSuggestions(workingDraft), [workingDraft]);
+  const missingPvcScopes = useMemo(() => getMissingStandardPvcScopes(workingDraft, editableCatalogue), [workingDraft, editableCatalogue]);
 
   const validation = useMemo(
     () => validateQuotationDraftV2(workingDraft, { reviewedOwnerRequests }),
@@ -268,7 +271,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
    */
   const processUnifiedJsonText = async (jsonString: string, sourceLabel = 'JSON') => {
     try {
-      const parsed = JSON.parse(jsonString);
+      const parsed = parseStudioJson(jsonString) as Record<string, any>;
 
       // Case A: Pure Rate Card JSON (`quotation-studio.ratecard.v2` without `rooms`)
       if (
@@ -285,7 +288,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         return;
       }
 
-      const v2 = parsed.schema_version === 'quotation-studio.draft.v2' ? parsed : migrateV1ToV2Draft(parsed);
+      const v2 = (parsed.schema_version === 'quotation-studio.draft.v2' ? parsed : migrateV1ToV2Draft(parsed)) as QuotationDraftV2;
       if (!v2.customer || !v2.quote || !Array.isArray(v2.rooms) ||
         !Array.isArray(v2.owner_requests) || !Array.isArray(v2.needs_clarification) ||
         v2.rooms.some((room: any) => !room || !Array.isArray(room.items) || room.items.some((item: any) =>
@@ -736,13 +739,27 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         key={idx}
                         className="p-3 bg-[#FFFBEB] border border-[#B45309]/40 rounded-xl text-xs space-y-1"
                       >
-                        <div className="flex items-center justify-between text-[11px] font-mono text-[#92400E]">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-[#92400E]">
                           <span>Field: {issue.path || '/'}</span>
                           <span>{issue.code}</span>
                         </div>
                         <p className="text-[#18221D] font-medium">{issue.message}</p>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {missingPvcScopes.length > 0 && (
+                  <div className="p-3 rounded-xl border border-[#C5D6C9] bg-[#F6FAF7] space-y-2">
+                    <p className="text-xs font-bold text-[#1C3A2F]">Standard PVC scope is available for {missingPvcScopes.length} item(s)</p>
+                    <p className="text-xs text-[#5C645F]">Review your rate card’s contact areas below, then apply them to the empty fields.</p>
+                    <ul className="text-xs text-[#4A524D] space-y-1 max-h-40 overflow-y-auto">
+                      {missingPvcScopes.map(entry => <li key={`${entry.roomIndex}-${entry.itemIndex}`}><strong>{entry.name}:</strong> {entry.parts.join(', ')}</li>)}
+                    </ul>
+                    <button type="button" onClick={() => syncDraft(applyStandardPvcScopes(workingDraft, editableCatalogue))}
+                      className="w-full py-2.5 px-3 bg-[#1C3A2F] text-white rounded-lg text-xs font-bold">
+                      Use reviewed standard PVC scope
+                    </button>
                   </div>
                 )}
 

@@ -1,4 +1,4 @@
-import { createOwner, issueSession, readSession, sessionCookie, validPassword, validSession, validUsername, verifyPassword } from './auth';
+import { createOwner, rememberEnvironmentCredentials, reconcileEnvironmentCredentials, issueSession, readSession, sessionCookie, validPassword, validSession, validUsername, verifyPassword } from './auth';
 import { registerDataRoutes, type ApiContext, type ApiReply, type ApiRouter, type StudioState } from './routes';
 import { publicCatalogue, publicQuote } from './public-quote';
 
@@ -41,16 +41,31 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
   }
   for (let attempt = 0; attempt < 6; attempt++) {
     const { state, version } = await store.load();
+    // Reconcile configured secrets before checking any owner session. Persist
+    // atomically and reload so early 401/session responses cannot lose rotation.
+    if (state.owner) {
+      if (validUsername(env.OWNER_USERNAME) && validPassword(env.OWNER_PASSWORD)) {
+        const reconciled = await reconcileEnvironmentCredentials(state.owner, env.OWNER_USERNAME, env.OWNER_PASSWORD);
+        if (reconciled !== state.owner) {
+          if (reconciled.version !== state.owner.version) state.loginAttempts = {};
+          state.owner = reconciled;
+          if (!await store.save(state, version)) continue;
+          continue;
+        }
+      } else if (ownerRoute(path)) {
+        return json({ error: 'Owner login configuration is invalid. Set OWNER_USERNAME (3–64 characters) and OWNER_PASSWORD (12–256 characters) on the server.' }, 503);
+      }
+    }
     let changed = false;
     const markChanged = () => { changed = true; };
     const secure = url.protocol === 'https:';
-    const isOwner = await validSession(state.owner, readSession(request));
+    const isOwner = validUsername(env.OWNER_USERNAME) && validPassword(env.OWNER_PASSWORD) && await validSession(state.owner, readSession(request));
     let response: Response | undefined;
 
     if (path === '/api/studio/auth' && method === 'POST') {
       if (!state.owner) {
         if (!validUsername(env.OWNER_USERNAME) || !validPassword(env.OWNER_PASSWORD)) return json({ error: 'Owner login is not configured. Set OWNER_USERNAME and OWNER_PASSWORD on the server.' }, 503);
-        state.owner = await createOwner(env.OWNER_USERNAME, env.OWNER_PASSWORD);
+        state.owner = rememberEnvironmentCredentials(await createOwner(env.OWNER_USERNAME, env.OWNER_PASSWORD));
         changed = true;
       }
       const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-ume-client-ip') || 'local';
@@ -82,7 +97,8 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
     } else if (path === '/api/studio/credentials' && method === 'PUT') {
       if (!await verifyPassword(state.owner!, body.currentPassword)) return json({ error: 'Current password is incorrect.' }, 403);
       if (!validUsername(body.newUsername) || !validPassword(body.newPassword)) return json({ error: 'Use a username of 3–64 letters, numbers, dots, underscores or hyphens, and a password of at least 12 characters.' }, 400);
-      state.owner = await createOwner(body.newUsername, body.newPassword, state.owner!.version + 1);
+      const baseline = state.owner!.environmentCredentials;
+      state.owner = { ...await createOwner(body.newUsername, body.newPassword, state.owner!.version + 1), environmentCredentials: baseline };
       changed = true;
       response = json({ ok: true, username: state.owner.username }, 200, { 'Set-Cookie': sessionCookie(await issueSession(state.owner), secure) });
     } else {

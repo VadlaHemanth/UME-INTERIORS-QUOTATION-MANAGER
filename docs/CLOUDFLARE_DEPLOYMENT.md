@@ -98,13 +98,18 @@ Worker local D1 data stays in ignored `.wrangler/`, separately from the Express 
 
 ## Account recovery
 
-Environment secrets only initialize a missing account; they do not overwrite a password changed in the app. If you forget the production password, update `OWNER_USERNAME` and `OWNER_PASSWORD` with Wrangler, then reset only the authentication record:
+Update OWNER_USERNAME and OWNER_PASSWORD in **Workers & Pages → ume-interiors-quotation-studio → Settings → Variables and Secrets**, then deploy the changes. These must be runtime Worker secrets, not build variables or secrets on a different Worker/environment. Wrangler can also prompt for each value:
 
 ```powershell
-npx wrangler --config ./wrangler.toml d1 execute DB --remote --command "DELETE FROM studio_runtime_records WHERE record_key = 'auth';"
+npx wrangler --config ./wrangler.toml secret put OWNER_USERNAME
+npx wrangler --config ./wrangler.toml secret put OWNER_PASSWORD
 ```
 
-The next login initializes the account from the new secrets. Quotations and payments remain in the database. This command invalidates all owner sessions.
+A changed runtime username or password replaces the saved account on the next API request and revokes prior owner sessions. Sign in again with the configured values. No database deletion or reset is needed. Usernames need 3–64 letters, numbers, dots, underscores or hyphens; passwords need 12–256 characters. Invalid configuration produces a clear configuration error instead of silently accepting the previous password.
+
+Changes made through the app’s Account page persist across requests and deployments while the Cloudflare secret values stay unchanged. A later Cloudflare secret change takes precedence. The app stores a salted PBKDF2 baseline to detect that change, with no plaintext credentials in D1. This release also reconciles older accounts that have no baseline to the currently configured secrets. Quotations, payments and rate cards are retained.
+
+For local Express development, restart the server after editing .env. Production Worker secret updates and local .env values are independent.
 
 ## Cloudflare references
 

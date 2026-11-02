@@ -114,3 +114,8 @@
   .customer-quotation .optional-item-choice { display: grid; grid-template-columns: minmax(0,1fr); gap: 6px; }
   .customer-quotation .optional-item-amount { margin-left: 34px; }
 }
+
+/* Payment consent has its own fixed column, independent of the text length. */
+.customer-quotation .payment-consent { display: grid; grid-template-columns: 22px minmax(0,1fr); align-items: start; gap: 12px; width: 100%; padding: 12px; background: #fff; border: 1px solid #d8d0c2; border-radius: 10px; cursor: pointer; }
+.customer-quotation .payment-consent-checkbox { width: 22px; height: 22px; min-width: 22px; min-height: 22px; max-width: 22px; margin: 1px 0 0; justify-self: start; }
+.customer-quotation .payment-consent-copy { min-width: 0; color: #4a524d; font-size: 13px; line-height: 1.6; overflow-wrap: break-word; }

@@ -577,7 +577,8 @@ export function migrateV1ToV2Draft(raw: Record<string, any>): QuotationDraftV2 {
   return {
     schema_version: 'quotation-studio.draft.v2',
     output_language: 'en',
-    is_demo: Boolean(raw.is_demo ?? true),
+    // Real customer work is the default; explicit legacy practice flags remain practice.
+    is_demo: raw.is_demo === true || raw.is_demo === 'true',
     languages: Array.isArray(raw.languages) && raw.languages.length > 0 ? raw.languages : ['en'],
     customer: {
       name: raw.customer?.name ?? null,
