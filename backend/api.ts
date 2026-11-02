@@ -8,6 +8,15 @@ export interface StateStore {
   save(state: StudioState, expectedVersion: number): Promise<boolean>;
 }
 
+function ownerConfigurationError(env: ApiEnvironment): string {
+  const issues: string[] = [];
+  if (!env.OWNER_USERNAME) issues.push('OWNER_USERNAME is missing from the deployed Worker');
+  else if (!validUsername(env.OWNER_USERNAME)) issues.push('OWNER_USERNAME must be 3–64 characters, start with a letter or number, and use only letters, numbers, dots, underscores or hyphens');
+  if (!env.OWNER_PASSWORD) issues.push('OWNER_PASSWORD is missing from the deployed Worker');
+  else if (!validPassword(env.OWNER_PASSWORD)) issues.push('OWNER_PASSWORD must be 12–256 characters');
+  return `Owner login configuration needs attention: ${issues.join('. ')}. Update these runtime Worker secrets in Cloudflare and deploy the changes.`;
+}
+
 function json(body: unknown, status = 200, headers: HeadersInit = {}): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...headers } });
 }
@@ -53,7 +62,7 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
           continue;
         }
       } else if (ownerRoute(path)) {
-        return json({ error: 'Owner login configuration is invalid. Set OWNER_USERNAME (3–64 characters) and OWNER_PASSWORD (12–256 characters) on the server.' }, 503);
+        return json({ error: ownerConfigurationError(env) }, 503);
       }
     }
     let changed = false;
@@ -64,7 +73,7 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
 
     if (path === '/api/studio/auth' && method === 'POST') {
       if (!state.owner) {
-        if (!validUsername(env.OWNER_USERNAME) || !validPassword(env.OWNER_PASSWORD)) return json({ error: 'Owner login is not configured. Set OWNER_USERNAME and OWNER_PASSWORD on the server.' }, 503);
+        if (!validUsername(env.OWNER_USERNAME) || !validPassword(env.OWNER_PASSWORD)) return json({ error: ownerConfigurationError(env) }, 503);
         state.owner = rememberEnvironmentCredentials(await createOwner(env.OWNER_USERNAME, env.OWNER_PASSWORD));
         changed = true;
       }

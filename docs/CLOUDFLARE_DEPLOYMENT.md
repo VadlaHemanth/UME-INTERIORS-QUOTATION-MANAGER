@@ -98,7 +98,7 @@ Worker local D1 data stays in ignored `.wrangler/`, separately from the Express 
 
 ## Account recovery
 
-Update OWNER_USERNAME and OWNER_PASSWORD in **Workers & Pages → ume-interiors-quotation-studio → Settings → Variables and Secrets**, then deploy the changes. These must be runtime Worker secrets, not build variables or secrets on a different Worker/environment. Wrangler can also prompt for each value:
+Update OWNER_USERNAME and OWNER_PASSWORD in **Workers & Pages → ume-interiors-quotation-studio → Settings → Variables and Secrets**, then deploy the changes. Choose **Secret** as the type for both values. These must be runtime Worker secrets, not build variables or secrets on a different Worker/environment. This repository sets keep_vars=true so code deployments preserve dashboard runtime variables; encrypted credentials should remain Secret bindings. Wrangler can also prompt for each value:
 
 ```powershell
 npx wrangler --config ./wrangler.toml secret put OWNER_USERNAME

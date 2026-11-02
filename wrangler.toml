@@ -3,6 +3,7 @@ name = "ume-interiors-quotation-studio"
 main = "worker/index.ts"
 compatibility_date = "2026-11-01"
 workers_dev = true
+keep_vars = true # Preserve runtime values entered in the Cloudflare dashboard.
 
 [assets]
 directory = "./dist"

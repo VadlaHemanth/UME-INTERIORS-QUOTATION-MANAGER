@@ -260,7 +260,17 @@ test('legacy accounts reconcile existing Cloudflare secrets and invalid secret v
   assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, legacyCookie), store, environment)).status, 401);
   assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, environment)).status, 200);
   const invalidEnvironment = { ...environment, OWNER_PASSWORD: 'short' };
-  assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, invalidEnvironment)).status, 503);
+  const invalid = await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, invalidEnvironment);
+  assert.equal(invalid.status, 503);
+  const message = (await invalid.json() as any).error;
+  assert.ok(message.includes('OWNER_PASSWORD must be 12–256 characters'));
+  assert.ok(!message.includes('OWNER_USERNAME must'));
+  assert.ok(!message.includes(invalidEnvironment.OWNER_PASSWORD));
+  const absent = await handleApi(request('/api/studio/session'), store, {});
+  assert.equal(absent.status, 503);
+  const missingMessage = (await absent.json() as any).error;
+  assert.ok(missingMessage.includes('OWNER_USERNAME is missing'));
+  assert.ok(missingMessage.includes('OWNER_PASSWORD is missing'));
 });
 
 
