@@ -14,7 +14,7 @@ If your terminal has an old `CLOUDFLARE_ACCOUNT_ID`, remove that override or set
 
 ## 1. Install and check
 
-Use Node.js 22.12+ (or a current supported Node.js LTS) and open a terminal in this checkout.
+Use Node.js 22.15+ (or a current supported Node.js LTS) and open a terminal in this checkout. The QR regression test uses the Node module-loader hook introduced in Node 22.15.
 
 ```powershell
 npm ci
@@ -48,15 +48,29 @@ npx wrangler --config ./wrangler.toml secret put OWNER_PASSWORD
 
 Enter a username with 3–64 characters starting with a letter or number; email addresses and business names with spaces, dots, underscores, plus signs or hyphens are accepted, and a unique password of at least 12 characters. Wrangler prompts for these values; keep them out of source files and GitHub. Login stays unavailable until both secrets are configured.
 
-Open the HTTPS Worker URL returned by deployment. Customers use `/` or their private `/q/<token>` link. The owner signs in at `/owner`. After login, use the account settings to change the username and password. The password is stored as a salted PBKDF2 hash; saved account changes survive restarts and deployments. Changing credentials or signing out invalidates existing owner sessions.
+Open the HTTPS Worker URL returned by deployment. Customers use `/` or their private `/q/<token>` link. The owner signs in at `/owner`. After login, open **Settings → Account** to change your username and password yourself. Enter the current password, enter and confirm a new password of at least 12 characters, then select **Save sign-in details**. The password is stored as a salted PBKDF2 hash; saved account changes survive restarts and deployments. Changing credentials or signing out invalidates existing owner sessions.
 
 The public customer portal does not expose the owner form. Customer links remain bearer access links: share each private link only with its intended customer.
+
+## Business and payment configuration
+
+After sign-in, use **Settings → Business** for business identity, address and contact details, and **Settings → Payment details** for the bank account, IFSC, UPI ID, account holder name and UPI payment limit. Review the recipient details against your bank records and select **Save details**. These settings are stored in the app database; they are independent of the owner login secrets and are retained during ordinary code deployments.
+
+Subsequent quotation loads and PDF previews use saved business/payment details. Payment QR codes encode the saved UPI recipient and account holder name, with the entered customer amount or the PDF booking amount. Format validation does not verify the account. Regenerate a PDF when you need it to reflect changed details; an already downloaded PDF is a static file.
+
+Each quotation also supports optional `quote.estimate_basis` (`floor_plan` or `site_measurement`) and a customer-visible English `quote.estimate_note` of up to 1,000 characters. Missing legacy metadata remains unspecified. Floor-plan estimates retain the preliminary estimate notice in both customer and PDF views even when custom notes are added.
+
+Deploy over HTTPS for native screenshot file sharing. The mobile **Pay with UPI** action requires a compatible installed UPI app; desktop users use bank details or scan the QR with a phone. Screenshot sharing depends on browser/device file-share support. When unavailable, the customer downloads the image, opens WhatsApp and attaches it manually. No delivery or payment verification is implied by opening the share sheet.
+
+After a release that changes assistant guidance or the reusable rate card, copy the app's current **Assistant instructions** into the saved Gem/Custom GPT configuration. Final JSON uses one complete copyable fenced block and includes tailored `suggested_addons`; those suggestions require owner review before entering the quotation scope.
 
 ## 4. Add your domain
 
 In Cloudflare, select **Workers & Pages → quotation → Settings → Domains & Routes → Add → Custom Domain**. Select a hostname managed by your Cloudflare account, such as `quotes.umeinteriors.com`. Open it and test one fresh owner publication and a customer Save operation. The app generates new share links using the current hostname.
 
 ## Future updates
+
+Local source changes are not live until this deployment procedure completes. The QA notes distinguish local checks from previously deployed behavior.
 
 ```powershell
 git pull

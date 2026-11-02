@@ -31,10 +31,14 @@ export interface CustomerInfo {
   phone: string | null;
 }
 
+export const MAX_QUOTATION_ESTIMATE_NOTE_LENGTH = 1000;
+
 export interface QuoteMeta {
   number: string | null;
   date: string | null;
   valid_until: string | null;
+  estimate_basis?: 'floor_plan' | 'site_measurement';
+  estimate_note?: string | null;
 }
 
 export interface ItemMeasure {
@@ -352,6 +356,28 @@ export function validateQuotationDraftV2(
 
   // Quote meta checks
   if (d.quote) {
+    if (d.quote.estimate_basis !== undefined && !['floor_plan', 'site_measurement'].includes(d.quote.estimate_basis)) {
+      issues.push({
+        path: '/quote/estimate_basis', severity: 'error', code: 'SCHEMA_MISMATCH',
+        message: 'Choose floor_plan or site_measurement for the quotation basis, or omit the field when it is unknown.',
+      });
+    }
+    if (d.quote.estimate_note !== undefined && d.quote.estimate_note !== null) {
+      if (typeof d.quote.estimate_note !== 'string') {
+        issues.push({
+          path: '/quote/estimate_note', severity: 'error', code: 'SCHEMA_MISMATCH',
+          message: 'The quotation note must be English text or null.',
+        });
+      } else {
+        checkStringField(d.quote.estimate_note, '/quote/estimate_note', false);
+        if (d.quote.estimate_note.length > MAX_QUOTATION_ESTIMATE_NOTE_LENGTH) {
+          issues.push({
+            path: '/quote/estimate_note', severity: 'error', code: 'SCHEMA_MISMATCH',
+            message: `Keep the quotation note within ${MAX_QUOTATION_ESTIMATE_NOTE_LENGTH} characters.`,
+          });
+        }
+      }
+    }
     if (d.quote.date && !isValidCalendarDate(d.quote.date)) {
       issues.push({
         path: '/quote/date',
@@ -589,6 +615,8 @@ export function migrateV1ToV2Draft(raw: Record<string, any>): QuotationDraftV2 {
       number: raw.quote?.number ?? null,
       date: raw.quote?.date ?? null,
       valid_until: raw.quote?.valid_until ?? null,
+      ...(raw.quote?.estimate_basis !== undefined ? { estimate_basis: raw.quote.estimate_basis } : {}),
+      ...(raw.quote?.estimate_note !== undefined ? { estimate_note: raw.quote.estimate_note } : {}),
     },
     recommended: raw.recommended
       ? {

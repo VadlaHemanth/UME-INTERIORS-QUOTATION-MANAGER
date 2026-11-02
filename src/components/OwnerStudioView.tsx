@@ -1,6 +1,7 @@
 import { parseStudioJson } from '../lib/studio-json';
 import { applyStandardPvcScopes, getMissingStandardPvcScopes } from '../lib/pvc-scope';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { syncCatalogueDraft } from '../lib/company-settings';
 import './pdf-owner.css';
 import './addon-suggestions.css';
 import { acceptAddonSuggestion, rejectAddonSuggestion, getAddonSuggestions, validateAddonSuggestions } from '../lib/addon-suggestions';
@@ -45,6 +46,7 @@ import {
 } from '../lib/pricing';
 import {
   FinishOption,
+  MAX_QUOTATION_ESTIMATE_NOTE_LENGTH,
   migrateV1ToV2Draft,
   PlywoodGrade,
   ProtectionOption,
@@ -52,6 +54,7 @@ import {
   ResolvedPackageSelection,
   validateQuotationDraftV2,
 } from '../lib/schema';
+import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
 
 export interface PublishedQuoteSummary {
   publicId: string;
@@ -207,8 +210,11 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
   const [copiedImagePromptId, setCopiedImagePromptId] = useState<string | null>(null);
 
+  const previousCatalogue = useRef(catalogue);
   useEffect(() => {
-    setEditableCatalogue(structuredClone(catalogue));
+    const previous = previousCatalogue.current;
+    previousCatalogue.current = catalogue;
+    setEditableCatalogue(local => syncCatalogueDraft(previous, catalogue, local));
   }, [catalogue]);
 
   // Dynamic Master Gem Instructions (Always includes all current Rate Card items!)
@@ -940,6 +946,44 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     />
                   </div>
                 </div>
+
+                <fieldset className="space-y-3 border-t border-[#E5DFD3] pt-4">
+                  <legend className="text-sm font-bold text-[#18221D] px-0 pt-4">Quotation basis and notes</legend>
+                  <div>
+                    <label htmlFor="quotation-estimate-basis" className="block text-xs font-bold text-[#18221D] mb-1">Estimate based on</label>
+                    <select
+                      id="quotation-estimate-basis"
+                      aria-describedby="quotation-estimate-help"
+                      value={workingDraft.quote.estimate_basis || ''}
+                      onChange={(e) => syncDraft({ ...workingDraft, quote: { ...workingDraft.quote, estimate_basis: e.target.value ? e.target.value as QuotationDraftV2['quote']['estimate_basis'] : undefined } })}
+                      className="w-full px-3 py-2 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl"
+                    >
+                      <option value="">Not specified</option>
+                      <option value="floor_plan">Floor-plan estimate</option>
+                      <option value="site_measurement">Based on site measurements</option>
+                    </select>
+                    <p id="quotation-estimate-help" className="text-xs text-[#5C645F] mt-1.5 leading-relaxed">Choose only the basis confirmed for this quotation. A floor-plan estimate includes a notice that measurements, scope, requirements, materials and prices may change after the site visit.</p>
+                  </div>
+                  <div>
+                    <label htmlFor="quotation-estimate-note" className="block text-xs font-bold text-[#18221D] mb-1">Customer-visible note (optional)</label>
+                    <textarea
+                      id="quotation-estimate-note"
+                      aria-describedby="quotation-estimate-note-help"
+                      rows={3}
+                      maxLength={MAX_QUOTATION_ESTIMATE_NOTE_LENGTH}
+                      value={workingDraft.quote.estimate_note || ''}
+                      onChange={(e) => syncDraft({ ...workingDraft, quote: { ...workingDraft.quote, estimate_note: e.target.value || null } })}
+                      className="w-full px-3 py-2 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl resize-y"
+                    />
+                    <p id="quotation-estimate-note-help" className="text-xs text-[#5C645F] mt-1.5">Use clear English, up to {MAX_QUOTATION_ESTIMATE_NOTE_LENGTH.toLocaleString('en-IN')} characters. This note appears in the customer quotation and PDF alongside the estimate notice.</p>
+                  </div>
+                  {(getQuotationBasisLabel(workingDraft.quote) || getQuotationEstimateNote(workingDraft.quote)) && (
+                    <div className="text-xs leading-relaxed text-[#18221D] bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl p-3">
+                      <p className="font-bold">Customer preview · {getQuotationBasisLabel(workingDraft.quote) || 'Quotation note'}</p>
+                      {getQuotationEstimateNote(workingDraft.quote) && <p className="mt-1.5 whitespace-pre-line break-words">{getQuotationEstimateNote(workingDraft.quote)}</p>}
+                    </div>
+                  )}
+                </fieldset>
 
                 {/* Default Sending Package Option */}
                 <div className="p-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl space-y-3">

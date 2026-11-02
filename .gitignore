@@ -21,3 +21,7 @@ output/
 data/owner-auth.json
 
 .aistudio/
+
+# Local design-skill working artifacts.
+.taste-skill/
+.impeccable/

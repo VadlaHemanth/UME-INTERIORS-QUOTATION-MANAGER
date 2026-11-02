@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { sharePaymentImage } from '../lib/payment-image-share';
+import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
 import {
+  ArrowRight,
   Check,
   CheckCircle2,
+  ChevronDown,
+  Copy,
   Download,
   Edit3,
   FileText,
@@ -17,6 +21,7 @@ import {
   Save,
   Send,
   ShieldCheck,
+  Smartphone,
   Trash2,
 } from 'lucide-react';
 import {
@@ -192,6 +197,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const [savingPackage, setSavingPackage] = useState<boolean>(false);
   const [saveToastMessage, setSaveToastMessage] = useState<string | null>(null);
   const [selectionSaveError, setSelectionSaveError] = useState<string | null>(null);
+  const selectionSaveInFlight = useRef(false);
+  const [reviewingPayment, setReviewingPayment] = useState(false);
+  const [showPaymentSchedule, setShowPaymentSchedule] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  const selectionActionsRef = useRef<HTMLDivElement>(null);
+  const [endActionsVisible, setEndActionsVisible] = useState(false);
 
   // Inline Line Editing Mode (Flexibility to change any line or sub-line anywhere in the quotation)
   const [isEditingLines, setIsEditingLines] = useState<boolean>(false);
@@ -214,6 +224,14 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
   // View mode: Interactive vs Printable A4 PDF Sheet
   const [showPrintSheet, setShowPrintSheet] = useState<boolean>(false);
+  useEffect(() => {
+    if (showPrintSheet || !selectionActionsRef.current || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(([entry]) => setEndActionsVisible(entry.isIntersecting), {
+      rootMargin: '0px 0px -120px 0px', threshold: 0.2,
+    });
+    observer.observe(selectionActionsRef.current);
+    return () => observer.disconnect();
+  }, [showPrintSheet]);
   useEffect(() => {
     const prepare = () => setShowPrintSheet(true);
     window.addEventListener('ume:prepare-print', prepare);
@@ -242,7 +260,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     message: string;
   } | null>(null);
   const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
-  const selectionIsBusy = savingPackage || submittingPayment;
+  const [bankCopyError, setBankCopyError] = useState<string | null>(null);
+  const selectionIsBusy = savingPackage || submittingPayment || reviewingPayment;
 
   // Customer Change Request / Feedback Box State
   const [feedbackTopic, setFeedbackTopic] = useState<string>(
@@ -341,6 +360,21 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     [calc.grandTotal, verifiedPaidRupees]
   );
 
+  const upiLimit = Number(catalogue.company.bank.upiLimitRupees);
+  const paymentAmountIsValid = Number.isFinite(paymentAmount) && paymentAmount > 0;
+  const upiAmountWithinLimit = paymentAmountIsValid && Number.isFinite(upiLimit) && upiLimit > 0 && paymentAmount <= upiLimit;
+  const upiId = catalogue.company.bank.upiId.trim();
+  const canPayWithUpi = !milestones.requiresOwnerSmallOrderRule && upiAmountWithinLimit && Boolean(upiId);
+  const upiPaymentUrl = canPayWithUpi ? `upi://pay?${new URLSearchParams({
+    pa: upiId,
+    pn: catalogue.company.bank.accountName,
+    am: paymentAmount.toFixed(2),
+    cu: 'INR',
+    tn: `Quotation ${draft.quote.number || publicId}`,
+  }).toString()}` : null;
+  const estimateNote = getQuotationEstimateNote(draft.quote);
+  const estimateBasisLabel = getQuotationBasisLabel(draft.quote);
+
   useEffect(() => {
     setPaymentAmount(milestones.bookingRequired);
   }, [publicId, milestones.bookingRequired]);
@@ -433,7 +467,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     setSaveToastMessage(null);
   };
 
-  const handleCustomerFinalSave = async () => {
+  const handleCustomerFinalSave = async (): Promise<boolean> => {
+    if (selectionSaveInFlight.current || submittingPayment) return false;
+    selectionSaveInFlight.current = true;
     setSavingPackage(true);
     setSaveToastMessage(null);
     setSelectionSaveError(null);
@@ -456,15 +492,29 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
             : `${dispName} Package (${
                 wholeHomeSelection.protection === 'With PVC'
                   ? 'With Optional 6mm PVC'
-                  : 'Standard Without PVC'
+                  : 'Without optional PVC'
               })`
         } at ${formatINR(calc.grandTotal)} is saved. You can adjust your choices and save again.`
       );
+      return true;
     } catch (error) {
       setSelectionSaveError(error instanceof Error ? error.message : 'Could not save your selection. Please try again.');
+      return false;
     } finally {
+      selectionSaveInFlight.current = false;
       setSavingPackage(false);
     }
+  };
+
+  const handleReviewAndPay = async () => {
+    if (selectionIsBusy) return;
+    setReviewingPayment(true);
+    const saved = await handleCustomerFinalSave();
+    setReviewingPayment(false);
+    if (!saved) return;
+    const checkout = document.getElementById('booking-checkout');
+    checkout?.scrollIntoView({ block: 'start', behavior: 'instant' });
+    checkout?.focus({ preventScroll: true });
   };
 
   const handleSaveEditedLines = async () => {
@@ -487,26 +537,36 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   };
 
   const handleCopyText = async (label: string, text: string) => {
+    setBankCopyError(null);
     try {
       await navigator.clipboard.writeText(text);
       setCopiedBankField(label);
       setTimeout(() => setCopiedBankField(null), 1800);
     } catch {
-      setSelectionSaveError('Your browser could not copy this detail. Please select and copy the displayed value.');
+      setBankCopyError('Your browser could not copy this detail. Please select and copy the displayed value.');
     }
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPaymentFeedback(null);
-    setShowManualPaymentShare(false);
     if (submittingPayment) return;
     if (!paymentImage) {
       setPaymentFeedback({ type: 'error', message: 'Choose a payment screenshot first.' });
       return;
     }
-    if (!acceptedTerms || paymentAmount <= 0 || !Number.isFinite(paymentAmount) || milestones.requiresOwnerSmallOrderRule) {
+    if (!acceptedTerms || !paymentAmountIsValid || milestones.requiresOwnerSmallOrderRule) {
       setPaymentFeedback({ type: 'error', message: 'Confirm the payment amount, package and terms before sharing.' });
+      return;
+    }
+    if (paymentMethod === 'UPI / PhonePe' && !upiAmountWithinLimit) {
+      setPaymentFeedback({ type: 'error', message: `The UPI limit is ${formatINR(upiLimit)} per payment. For a larger payment, select NEFT / RTGS / IMPS and use the bank details.` });
+      return;
+    }
+    if (showManualPaymentShare) {
+      const text = `Payment for ${draft.quote.number}: ${formatINR(paymentAmount)}. I will attach my payment screenshot. ${window.location.origin}/q/${publicId}`;
+      window.open(`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+      setPaymentFeedback({ type: 'success', message: 'Attach the downloaded screenshot in WhatsApp and tap Send. UME will confirm payment after checking the bank credit.' });
       return;
     }
     setSubmittingPayment(true);
@@ -518,10 +578,10 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
         setShowManualPaymentShare(true);
         setPaymentFeedback({ type: 'error', message: result === 'insecure'
           ? 'Open this quotation using its secure HTTPS link to share the screenshot. You can also use the attachment steps below.'
-          : 'This browser could not open image sharing. Download the screenshot below, then attach it in the WhatsApp chat.' });
+          : 'This browser could not open image sharing. Download the screenshot, then use the button below to open WhatsApp and attach it.' });
         return;
       }
-      setPaymentFeedback({ type: 'success', message: 'Image handed to your share app. In WhatsApp, choose V. SUBHASH (' + catalogue.company.phone + ') and tap Send. Payment is confirmed only after bank verification.' });
+      setPaymentFeedback({ type: 'success', message: `Your screenshot is ready in your share app. Choose WhatsApp, select ${catalogue.company.proprietor} (${catalogue.company.phone}) and tap Send. UME will confirm payment after checking the bank credit.` });
       try {
         await onSaveSelection({ wholeHomeSelection, mixByRoom, roomSelections, selectedOptionalPointers, acceptedTerms: true, explicitCustomerSave: true });
         setSavedByCustomer(true);
@@ -561,7 +621,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
         setFeedbackStatus({
           ok: true,
           message:
-            'Your change request has been saved directly to UME Interiors Studio for Proprietor V. Subhash to review.',
+            `Your change request has been saved for ${catalogue.company.proprietor} to review.`,
         });
       } else {
         setFeedbackStatus({
@@ -713,17 +773,15 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
             className="quote-introduction bg-[#EAE3D5] border border-[#DDD4C3] rounded-2xl p-6 sm:p-8 shadow-xs space-y-6"
           >
             {/* Top Client Header Row */}
-            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-[#D8CEBC] pb-5">
+            <div className="quote-client-header flex flex-col lg:flex-row lg:items-start justify-between gap-4 border-b border-[#D8CEBC] pb-5">
               <div className="space-y-2 max-w-3xl">
-                <div className="flex flex-wrap items-center gap-2 text-[13px] font-bold tracking-[0.12em] uppercase text-[#1C3A2F]">
-                  <span>QUOTATION</span>
+                <div className="quote-reference flex flex-wrap items-center gap-2 text-[13px] font-bold text-[#1C3A2F]">
+                  <span className="font-sans">{draft.quote.number || 'Quotation'}</span>
                   <span>·</span>
-                  <span className="font-sans">{draft.quote.number || 'UME-2026-1024'}</span>
-                  <span>·</span>
-                  <span>REV 0{revision}</span>
+                  <span>Revision {String(revision).padStart(2, '0')}</span>
                   {savedByCustomer && !hasUnsavedChanges && (
-                    <span className="px-2.5 py-0.5 rounded-md bg-[#1C3A2F] text-[#E6CBA8] text-[10px] tracking-wider">
-                      ✓ PACKAGE SAVED
+                    <span className="quote-saved-status">
+                      <CheckCircle2 size={14} aria-hidden="true" /> Selection saved
                     </span>
                   )}
                 </div>
@@ -732,26 +790,22 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   Prepared for {draft.customer.name || 'Valued Client'}
                 </h1>
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#4A524D]">
+                <div className="quote-client-meta flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[#4A524D]">
                   <span className="inline-flex items-center gap-1.5 font-medium text-[#18221D]">
                     <MapPin className="w-3.5 h-3.5 text-[#1C3A2F] shrink-0" />
                     {draft.customer.site}
                   </span>
                   {draft.customer.phone && (
                     <span className="font-sans tabular-nums">
-                      · Mobile: <strong>+91 {draft.customer.phone}</strong>
+                      Mobile: <strong>{draft.customer.phone}</strong>
                     </span>
                   )}
-                  <span className="font-sans tabular-nums">
-                    · Issued: <strong>{draft.quote.date || '2026-10-24'}</strong>
-                  </span>
-                  <span className="font-sans tabular-nums">
-                    · Valid Until: <strong>{draft.quote.valid_until || '2026-11-23'}</strong>
-                  </span>
+                  {draft.quote.date && <span className="font-sans tabular-nums">Issued: <strong>{draft.quote.date}</strong></span>}
+                  {draft.quote.valid_until && <span className="font-sans tabular-nums">Valid until: <strong>{draft.quote.valid_until}</strong></span>}
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <div className="quote-header-actions flex flex-wrap items-center gap-2 shrink-0">
                 {canEditLines && (
                   <button
                     type="button"
@@ -769,27 +823,34 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowPrintSheet(true)}
-                  className="px-4 py-2 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-[13px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="quote-pdf-button px-4 py-2 bg-white border border-[#C9BFA8] text-[#1C3A2F] rounded-xl text-[13px] font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
-                  <span>Printable A4 PDF</span>
+                  <span>View PDF</span>
                 </button>
               </div>
             </div>
+
+            {estimateNote && (
+              <div className="quote-estimate-note" role="note">
+                <FileText size={18} aria-hidden="true" />
+                <p>{estimateBasisLabel && <strong>{estimateBasisLabel}. </strong>}{estimateNote}</p>
+              </div>
+            )}
 
             {/* Choose Your Package (Shown ONCE right here in the Hero Section) */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="text-base sm:text-lg font-bold text-[#18221D]">
-                    Choose a Package (Standard · Normal · Premium)
+                    Choose your package
                   </h2>
                   <p className="text-[13px] text-[#4A524D]">
-                    Select a package below to update all prices instantly, or customize room-by-room in the table below.
+                    Compare packages for your home, then refine each room below. Prices update as you choose.
                   </p>
                 </div>
                 <span className="text-[13px] font-semibold text-[#1C3A2F]">
-                  Includes Inside Liner Laminate & Outside 1.0mm Laminate Finish
+                  Inside liner and outside 1.0 mm laminate included
                 </span>
               </div>
 
@@ -814,9 +875,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       }
                       aria-pressed={isActive}
                       disabled={selectionIsBusy}
-                      className={`package-choice p-4 rounded-2xl border text-left transition-all flex items-center gap-4 cursor-pointer ${
+                      className={`package-choice p-4 rounded-2xl border text-left flex items-center gap-4 cursor-pointer ${
                         isActive
-                          ? 'bg-[#1C3A2F] text-white border-2 border-[#1C3A2F] shadow-sm'
+                          ? 'bg-[#1C3A2F] text-white border-2 border-[#1C3A2F]'
                           : 'bg-[#FAF8F4] hover:bg-white text-[#18221D] border-[#D8CEBC]'
                       }`}
                     >
@@ -902,7 +963,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 href="#booking-checkout"
                 className="px-4 py-2 bg-[#1C3A2F] text-[#E6CBA8] rounded-lg font-bold hover:bg-[#22493A] transition-colors"
               >
-                Proceed to {formatINR(milestones.bookingRequired)} booking →
+                Review payment details
               </a>
             </div>
           )}
@@ -922,11 +983,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-lg font-bold text-[#18221D]">
-                      Room-by-Room Selection & 3-Package Comparison
+                      Tailor each room
                     </h2>
                     <p className="text-[13px] text-[#5C645F] mt-0.5">
-                      Compare <strong>Standard</strong>, <strong>Normal</strong> &{' '}
-                      <strong>Premium</strong> rates side-by-side, or select a different package and optional <strong>+6mm PVC</strong> add-on for each room.
+                      Compare <strong>Standard</strong>, <strong>Normal</strong> and{' '}
+                      <strong>Premium</strong>. Choose a package and optional <strong>6 mm PVC</strong> protection for each room.
                     </p>
                   </div>
 
@@ -991,12 +1052,12 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                   setActiveBreakdownRoomIdx(room.roomIndex);
                                   document
                                     .getElementById('room-breakdown')
-                                    ?.scrollIntoView({ behavior: 'smooth' });
+                                    ?.scrollIntoView({ behavior: 'instant' });
                                 }}
                                 className="text-left group cursor-pointer"
                               >
                                 <p className="font-bold text-[#18221D] group-hover:text-[#1C3A2F] leading-tight text-[13px]">
-                                  0{room.roomIndex + 1}. {room.name}
+                                  {room.name}
                                 </p>
                                 <p className="text-[11px] text-[#5C645F] mt-0.5">
                                   {baseItemCount} {baseItemCount === 1 ? 'Unit' : 'Units'} · View Items →
@@ -1226,7 +1287,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-[#18221D]">
-                      Detailed Room Breakdown
+                      Furniture & specifications
                     </h2>
                     <p className="text-[13px] text-[#5C645F] mt-0.5">
                       Furniture specifications, dimensions, billable area, and side-by-side package prices.
@@ -1234,13 +1295,14 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   </div>
 
                   {/* Room Filter Pill Tabs */}
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="breakdown-room-tabs flex flex-wrap items-center gap-1.5" role="group" aria-label="Show room specifications">
                     {snapshot.rooms.map((r) => {
                       const isActive = activeBreakdownRoomIdx === r.roomIndex;
                       return (
                         <button
                           key={r.roomIndex}
                           type="button"
+                          aria-pressed={isActive}
                           onClick={() => setActiveBreakdownRoomIdx(r.roomIndex)}
                           className={`px-3.5 py-2 rounded-lg text-[13px] font-bold transition-colors cursor-pointer ${
                             isActive
@@ -1254,6 +1316,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     })}
                     <button
                       type="button"
+                      aria-pressed={activeBreakdownRoomIdx === 'ALL'}
                       onClick={() => setActiveBreakdownRoomIdx('ALL')}
                       className={`px-3.5 py-2 rounded-lg text-[13px] font-bold transition-colors cursor-pointer ${
                         activeBreakdownRoomIdx === 'ALL'
@@ -1261,7 +1324,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                           : 'bg-[#FAF8F4] hover:bg-[#EAE3D5] text-[#4A524D] border border-[#E5DFD3]'
                       }`}
                     >
-                      All Rooms ({totalUnitsCount})
+                      All rooms
                     </button>
                   </div>
                 </div>
@@ -1325,7 +1388,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                         <div className="bg-[#FAF8F4] px-4 py-3 border-b border-[#E5DFD3] flex flex-wrap items-center justify-between gap-2 text-[13px]">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-bold text-[#18221D] text-sm">
-                              0{room.roomIndex + 1}. {room.name}
+                              {room.name}
                             </span>
                             <span className="px-2.5 py-0.5 rounded-md bg-[#E4EFE7] text-[#1C3A2F] font-bold">
                               Selected: {activeGradeLabel}
@@ -1576,12 +1639,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
             {/* RIGHT STICKY SIDEBAR: YOUR QUOTATION + OPTIONAL 6MM PVC ON RIGHT SIDE + SAVE & LOCK CTA */}
             <div className="quotation-summary space-y-4 xl:sticky xl:top-24">
               {/* Dark Forest Green Card */}
-              <div className="bg-[#1C3A2F] text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-4 border border-[#2A5243]">
+              <div className="selection-overview bg-[#1C3A2F] text-white rounded-2xl p-5 sm:p-6 space-y-4 border border-[#2A5243]">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#D8B892]">
-                    YOUR QUOTATION
-                  </p>
-                  <p className="text-sm text-white/85 mt-1">Total Estimated Cost</p>
+                  <h2 className="text-sm font-semibold text-white/85">Your selected estimate</h2>
                   <p aria-live="polite" className="quotation-total text-3xl sm:text-4xl font-sans font-bold text-[#EED6B5] tabular-nums mt-1">
                     {formatINR(calc.grandTotal)}
                   </p>
@@ -1618,7 +1678,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-bold text-white">
-                          Add 6mm PVC to all rooms
+                          Add 6 mm PVC to all rooms
                         </span>
                         <span className="px-1.5 py-0.5 bg-white/15 text-white/90 rounded text-[9px] font-bold uppercase">
                           Optional
@@ -1640,22 +1700,23 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   type="button"
                   disabled={selectionIsBusy}
                   onClick={handleCustomerFinalSave}
-                  className="w-full py-3.5 px-4 rounded-xl bg-[#E6CBA8] hover:bg-[#DFC099] text-[#142920] text-[13px] sm:text-sm font-bold inline-flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#E6CBA8] hover:bg-[#DFC099] text-[#142920] text-[13px] sm:text-sm font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <Save className="w-4 h-4 shrink-0" />
                   <span>
                     {savingPackage
-                      ? 'Saving Package...'
-                      : savedByCustomer && !hasUnsavedChanges
-                      ? 'Selection saved'
-                      : 'Save my selection'}
+                      ? 'Saving selection…'
+                      : 'Save selection'}
                   </span>
                 </button>
+                <p className="selection-save-caption text-xs text-white/85">
+                  {hasUnsavedChanges ? 'Your changes are ready to save.' : savedByCustomer ? 'Your selection is saved. You can save it again anytime.' : 'Save your selection before reviewing payment.'}
+                </p>
               </div>
 
               {/* White Quotation Summary Card */}
               <div className="bg-white border border-[#E5DFD3] rounded-2xl p-5 shadow-xs space-y-3 text-[13px]">
-                <h3 className="text-sm font-bold text-[#18221D]">Quotation Summary</h3>
+                <h3 className="text-sm font-bold text-[#18221D]">Quotation summary</h3>
 
                 <div className="space-y-2 pt-1 border-t border-[#EAE4D8]">
                   <div className="flex items-center justify-between text-[#4A524D]">
@@ -1728,16 +1789,16 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
           {/* 3. EASY-TO-UNDERSTAND MILESTONE PAYMENT SCHEDULE, OFFICIAL SBI BANK ACCOUNT & ₹50,000 BOOKING */}
           <section
             id="booking-checkout"
-            className="bg-white border border-[#E5DFD3] rounded-2xl p-6 sm:p-7 shadow-xs space-y-6"
+            tabIndex={-1}
+            aria-labelledby="booking-checkout-heading"
+            className="bg-white border border-[#E5DFD3] rounded-2xl p-6 sm:p-7 space-y-6"
           >
             <div className="border-b border-[#EAE4D8] pb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#1C3A2F]">
-                  EASY-TO-UNDERSTAND MILESTONE PAYMENT SCHEDULE
-                </p>
-                <h2 className="text-xl font-bold text-[#18221D] mt-0.5">
-                  How Your Project Payments Work (5 Simple Stages)
+                <h2 id="booking-checkout-heading" className="text-xl font-bold text-[#18221D]">
+                  Review & pay
                 </h2>
+                <p className="text-[13px] text-[#5C645F] mt-1">{activePackageSummaryText} · {snapshot.rooms.length} rooms</p>
               </div>
               <div className="text-right">
                 <p className="text-[13px] text-[#5C645F]">Selected Project Grand Total</p>
@@ -1754,12 +1815,12 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   Your {formatINR(milestones.bookingRequired)} booking counts toward the 50% advance
                 </p>
                 <p className="text-[#3D4741] leading-relaxed">
-                  The <strong>{formatINR(milestones.bookingRequired)} booking payment</strong> is <strong>NOT an extra charge</strong> added on top of your quotation total ({formatINR(calc.grandTotal)}). Once verified, your {formatINR(milestones.bookingRequired)} booking is deducted directly from your 50% work-start advance ({formatINR(milestones.advance50PercentTotal)}), leaving only <strong>{formatINR(Math.max(0, milestones.advance50PercentTotal - milestones.bookingRequired))}</strong> due before plywood dispatch.
+                  After bank verification, your <strong>{formatINR(milestones.bookingRequired)} booking</strong> is credited toward the <strong>{formatINR(milestones.advance50PercentTotal)} work-start advance</strong>. The remaining <strong>{formatINR(Math.max(0, milestones.advance50PercentTotal - milestones.bookingRequired))}</strong> is due before plywood dispatch. The booking is part of your quotation total.
                 </p>
               </div>
               <div className="shrink-0 bg-white border border-[#C5DEC9] rounded-xl px-4 py-2.5 text-right font-sans tabular-nums">
-                <p className="text-[10px] font-sans font-bold uppercase tracking-wider text-[#5C645F]">
-                  50% Advance Breakdown
+                <p className="text-xs font-sans font-semibold text-[#5C645F]">
+                  50% advance breakdown
                 </p>
                 <p className="text-[13px] text-[#18221D] mt-0.5">
                   {formatINR(milestones.bookingRequired)} Booking +{' '}
@@ -1773,7 +1834,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Left 7 Cols: 5-Stage Milestone Table + Official Bank Account */}
-              <div className="lg:col-span-7 space-y-4">
+              <div className="payment-schedule-column lg:col-span-7 space-y-4">
+                <details className="payment-schedule" open={showPaymentSchedule} onToggle={(event) => setShowPaymentSchedule(event.currentTarget.open)}>
+                  <summary>Payment schedule <span>5 stages</span><ChevronDown size={18} aria-hidden="true" /></summary>
                 <div className="border border-[#E5DFD3] rounded-xl overflow-hidden overflow-x-auto">
                   <table className="milestone-table w-full text-left border-collapse text-[13px]">
                     <thead>
@@ -1932,83 +1995,28 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     </tbody>
                   </table>
                 </div>
-
-                {/* Official SBI Bank Account + UPI QR (9491661555@oksbi) */}
-                <div className="p-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px]">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#1C3A2F]">
-                      OFFICIAL BANK REMITTANCE ACCOUNT
-                    </p>
-                    <p className="font-bold text-sm text-[#18221D]">
-                      {catalogue.company.bank.bankName} — {catalogue.company.bank.branch}
-                    </p>
-                    <p className="text-[#4A524D]">
-                      Account Name:{' '}
-                      <strong className="text-[#18221D]">
-                        {catalogue.company.bank.accountName}
-                      </strong>
-                    </p>
-                    <div className="flex flex-wrap items-center gap-2 pt-1 font-sans">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleCopyText('acc', catalogue.company.bank.accountNumber)
-                        }
-                        className="px-2.5 py-1 bg-white border border-[#D8D0C2] rounded-md font-bold cursor-pointer"
-                      >
-                        Acc: {catalogue.company.bank.accountNumber}{' '}
-                        {copiedBankField === 'acc' ? '✓' : '📋'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText('ifsc', catalogue.company.bank.ifsc)}
-                        className="px-2.5 py-1 bg-white border border-[#D8D0C2] rounded-md font-bold cursor-pointer"
-                      >
-                        IFSC: {catalogue.company.bank.ifsc}{' '}
-                        {copiedBankField === 'ifsc' ? '✓' : '📋'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyText('upi', catalogue.company.bank.upiId)}
-                        className="px-2.5 py-1 bg-[#E4EFE7] border border-[#C5DEC9] text-[#1C3A2F] rounded-md font-bold cursor-pointer"
-                      >
-                        UPI: {catalogue.company.bank.upiId}{' '}
-                        {copiedBankField === 'upi' ? '✓' : '📋'}
-                      </button>
-                    </div>
-                  </div>
-                  {!milestones.requiresOwnerSmallOrderRule && paymentAmount > 0 && <DeterministicQrCode
-                    value={`upi://pay?${new URLSearchParams({
-                      pa: catalogue.company.bank.upiId,
-                      pn: catalogue.company.bank.accountName,
-                      am: String(Math.max(0, paymentAmount)),
-                      cu: 'INR',
-                    }).toString()}`}
-                    size={84}
-                    label={`Pay ${formatINR(paymentAmount)}`}
-                  />}
-                </div>
+                </details>
               </div>
 
               {/* Payment screenshot file sharing */}
               <form
                 onSubmit={handlePaymentSubmit}
-                className="lg:col-span-5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl p-5 space-y-4 text-[13px]"
+                className="payment-evidence-form lg:col-span-5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl p-5 space-y-4 text-[13px]"
               >
                 <h3 className="text-base font-bold text-[#18221D]">
-                  Share payment screenshot
+                  Pay & share your screenshot
                 </h3>
                 {milestones.requiresOwnerSmallOrderRule && (
                   <div role="status" className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900 leading-relaxed">
                     <strong>Booking schedule needs owner confirmation.</strong> This project's 50% advance is below the usual booking amount. Please contact UME before paying; online payment submission is unavailable until the owner confirms the arrangement.
-                    <a className="mt-2 block font-bold underline" href={`tel:${catalogue.company.phone}`}>Call {catalogue.company.proprietor}</a>
+                    <a className="customer-action customer-action-secondary mt-2" href={`tel:${catalogue.company.phone}`}>Call {catalogue.company.proprietor}</a>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label htmlFor="customer-payment-method" className="block font-bold text-[#18221D] mb-1">
-                      Payment Method
+                      Payment method
                     </label>
                     <select
                       id="customer-payment-method"
@@ -2023,13 +2031,16 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   </div>
                   <div>
                     <label htmlFor="customer-payment-amount" className="block font-bold text-[#18221D] mb-1">
-                      Amount Paid (₹)
+                      Payment amount (₹)
                     </label>
                     <input
                       id="customer-payment-amount"
                       disabled={submittingPayment}
                       type="number"
+                      inputMode="decimal"
                       min={1}
+                      step="0.01"
+                      aria-describedby="payment-amount-help"
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(Number(e.target.value) || 0)}
                       className="w-full px-3 py-2 bg-white border border-[#D8D0C2] rounded-lg font-sans tabular-nums"
@@ -2037,21 +2048,97 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   </div>
                 </div>
 
+                <p id="payment-amount-help" className="payment-field-help">
+                  UPI limit: {formatINR(upiLimit)} per payment. Use NEFT / RTGS / IMPS for larger amounts.
+                </p>
+                {paymentMethod === 'UPI / PhonePe' && (
+                  <div className="mobile-upi-payment">
+                    {upiPaymentUrl ? (
+                      <a className="customer-action customer-action-primary" href={upiPaymentUrl}>
+                        <Smartphone size={18} aria-hidden="true" /> Pay with UPI <ArrowRight size={16} aria-hidden="true" />
+                      </a>
+                    ) : (
+                      <button type="button" className="customer-action customer-action-primary" disabled>Pay with UPI</button>
+                    )}
+                    <p className="payment-field-help">
+                      {milestones.requiresOwnerSmallOrderRule ? 'Contact UME to confirm the booking arrangement before paying.'
+                        : !paymentAmountIsValid ? 'Enter a payment amount to open your UPI app.'
+                        : !upiAmountWithinLimit ? `This amount exceeds the ${formatINR(upiLimit)} UPI limit. Select a bank transfer instead.`
+                        : !upiId ? 'UPI is unavailable. Please use the bank details below.'
+                        : `Opens your UPI app for ${formatINR(paymentAmount)}. Check the payee before confirming.`}
+                    </p>
+                  </div>
+                )}
+                <details className="bank-details">
+                  <summary>Bank details & QR <ChevronDown size={16} aria-hidden="true" /></summary>
+                  <div className="bank-details-body">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-[#1C3A2F]">
+                      Official remittance account
+                    </p>
+                    <p className="font-bold text-sm text-[#18221D]">
+                      {catalogue.company.bank.bankName} — {catalogue.company.bank.branch}
+                    </p>
+                    <p className="text-[#4A524D]">
+                      Account Name:{' '}
+                      <strong className="text-[#18221D]">
+                        {catalogue.company.bank.accountName}
+                      </strong>
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 pt-1 font-sans">
+                      <button
+                        type="button"
+                        aria-label={copiedBankField === 'acc' ? 'Account number copied' : 'Copy account number'}
+                        onClick={() =>
+                          handleCopyText('acc', catalogue.company.bank.accountNumber)
+                        }
+                        className="px-2.5 py-1 bg-white border border-[#D8D0C2] rounded-md font-bold cursor-pointer"
+                      >
+                        Acc: {catalogue.company.bank.accountNumber}{' '}
+                        {copiedBankField === 'acc' ? <Check size={14} aria-label="Copied" /> : <Copy size={14} aria-hidden="true" />}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={copiedBankField === 'ifsc' ? 'IFSC copied' : 'Copy IFSC'}
+                        onClick={() => handleCopyText('ifsc', catalogue.company.bank.ifsc)}
+                        className="px-2.5 py-1 bg-white border border-[#D8D0C2] rounded-md font-bold cursor-pointer"
+                      >
+                        IFSC: {catalogue.company.bank.ifsc}{' '}
+                        {copiedBankField === 'ifsc' ? <Check size={14} aria-label="Copied" /> : <Copy size={14} aria-hidden="true" />}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={copiedBankField === 'upi' ? 'UPI ID copied' : 'Copy UPI ID'}
+                        onClick={() => handleCopyText('upi', catalogue.company.bank.upiId)}
+                        className="px-2.5 py-1 bg-[#E4EFE7] border border-[#C5DEC9] text-[#1C3A2F] rounded-md font-bold cursor-pointer"
+                      >
+                        UPI: {catalogue.company.bank.upiId}{' '}
+                        {copiedBankField === 'upi' ? <Check size={14} aria-label="Copied" /> : <Copy size={14} aria-hidden="true" />}
+                      </button>
+                    </div>
+                    {bankCopyError && <p role="status" className="payment-field-help">{bankCopyError}</p>}
+                  </div>
+                  {upiPaymentUrl && <div className="payment-qr">
+                    <DeterministicQrCode value={upiPaymentUrl} size={112} label={`Pay ${formatINR(paymentAmount)}`} />
+                    <p>Scan with a UPI app to pay {formatINR(paymentAmount)}.</p>
+                  </div>}
+                  </div>
+                </details>
+
                 <div className="payment-image-upload">
                   <label htmlFor="customer-payment-image" className="block font-bold mb-2">Payment screenshot</label>
-                  <input id="customer-payment-image" type="file" accept="image/png,image/jpeg,image/webp" disabled={submittingPayment} onChange={e=>{
+                  <input id="customer-payment-image" type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="payment-image-help" disabled={submittingPayment} onChange={e=>{
                     const file=e.target.files?.[0];setPaymentFeedback(null);setShowManualPaymentShare(false);
                     if(!file){setPaymentImage(null);return;}
                     if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024){setPaymentImage(null);e.target.value='';setPaymentFeedback({type:'error',message:'Choose a JPG, PNG or WebP image smaller than 10 MB.'});return;}
                     setPaymentImage(file);
                   }}/>
-                  {paymentImagePreview&&<div className="payment-image-preview"><img src={paymentImagePreview} alt="Selected payment screenshot"/><button type="button" onClick={()=>{setPaymentImage(null);const input=document.getElementById('customer-payment-image') as HTMLInputElement;if(input)input.value='';}}>Remove image</button></div>}
-                  <p className="mt-2 text-xs text-[#5C645F]">Tap Share screenshot below, choose WhatsApp, then select V. SUBHASH ({catalogue.company.phone}) and Send. The actual image is attached through your phone’s share sheet.</p>
+                  {paymentImagePreview&&<div className="payment-image-preview"><img src={paymentImagePreview} alt="Selected payment screenshot"/><button type="button" onClick={()=>{setPaymentImage(null);setShowManualPaymentShare(false);setPaymentFeedback(null);const input=document.getElementById('customer-payment-image') as HTMLInputElement;if(input)input.value='';}}>Remove image</button></div>}
+                  <p id="payment-image-help" className="payment-field-help">JPG, PNG or WebP, up to 10 MB. After attaching your screenshot, tap “I’ve made the payment”, choose WhatsApp, select {catalogue.company.proprietor} ({catalogue.company.phone}) and tap Send.</p>
                   {showManualPaymentShare && paymentImagePreview && (
                     <div className="payment-share-fallback" aria-label="Manual screenshot attachment">
-                      <p>1. Download the screenshot. 2. Open the chat and attach it using WhatsApp’s paperclip.</p>
+                      <p>Download the screenshot first. Then use the button below to open WhatsApp and attach it using the paperclip.</p>
                       <a href={paymentImagePreview} download={paymentImage?.name || 'payment-screenshot.png'}>Download screenshot</a>
-                      <a target="_blank" rel="noreferrer" href={`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(`Payment for ${draft.quote.number}: ${formatINR(paymentAmount)}. I will attach my payment screenshot. ${window.location.origin}/q/${publicId}`)}`}>Open WhatsApp chat</a>
                     </div>
                   )}
                 </div>
@@ -2092,16 +2179,18 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     {submittingPayment
                       ? 'Opening share options…'
                       : milestones.requiresOwnerSmallOrderRule ? 'Owner confirmation required'
-                      : 'Share screenshot'}
+                      : showManualPaymentShare ? 'Open WhatsApp to attach screenshot'
+                      : 'I’ve made the payment'}
                   </span>
                 </button>
+                <p className="payment-field-help payment-verification-note">Your screenshot is shared as an image. Payment is confirmed only after UME checks the bank credit.</p>
               </form>
             </div>
 
             {/* Terms, Notes & 0.8mm (0.72mm–0.80mm Nominal Gauge) Laminate Note */}
             <div className="pt-4 border-t border-[#EAE4D8] space-y-3 text-[13px]">
-              <p className="font-bold uppercase tracking-wider text-[#18221D]">
-                Notes, Laminate Thickness Standard & Execution Terms
+              <p className="font-semibold text-[#18221D]">
+                Materials & execution terms
               </p>
               <div className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl text-[#18221D] leading-relaxed">
                 <strong>Laminate Thickness & Finish Note:</strong> All internal balancing/liner laminate is industry-standard <strong>0.8 mm</strong> category (actual factory sheet gauge ranges from <strong>0.72 mm to 0.80 mm</strong> as per standard ISI/market tolerance). All visible outside laminate is <strong>1.0 mm</strong> thickness in the customer’s chosen finish (SF Matte or High-Gloss at the same price).
@@ -2126,16 +2215,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[#1C3A2F]">
-                  REQUEST QUOTATION CHANGES OR SITE VISIT
-                </p>
                 <h2 className="text-xl font-bold text-[#18221D] mt-0.5">
-                  Want Any Changes in Room Measurements, Items, or Package?
+                  Request a change or site visit
                 </h2>
                 <p className="text-[13px] text-[#5C645F] mt-0.5">
-                  Type your requested changes below and send directly to Proprietor{' '}
-                  <strong>{catalogue.company.proprietor}</strong> on WhatsApp (
-                  <strong>{catalogue.company.phone}</strong>) or save your request.
+                  Tell <strong>{catalogue.company.proprietor}</strong> what you would like to adjust. Save your request here or send it on WhatsApp.
                 </p>
               </div>
             </div>
@@ -2168,14 +2252,14 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
               </div>
               <div className="md:col-span-5">
                 <label htmlFor="customer-feedback-message" className="block font-bold text-[#18221D] mb-1">
-                  Your Message or Change Request
+                  Your message
                 </label>
                 <textarea
                   id="customer-feedback-message"
                   rows={3}
                   value={feedbackMessage}
                   onChange={(e) => setFeedbackMessage(e.target.value)}
-                  placeholder="e.g., Please use Premium BWP in Kitchen and Standard in Guest Bedroom..."
+                  placeholder="For example: Premium in the kitchen and Standard in the guest bedroom."
                   className="w-full px-3.5 py-2.5 bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl resize-y"
                 />
               </div>
@@ -2195,7 +2279,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   className="py-2.5 px-4 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] font-bold rounded-xl inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>{submittingFeedback ? 'Saving...' : 'Save'}</span>
+                  <span>{submittingFeedback ? 'Saving…' : 'Save request'}</span>
                 </button>
               </div>
             </form>
@@ -2215,7 +2299,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
             {feedbackList.length > 0 && (
               <div className="pt-2 space-y-2">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-[#5C645F]">
-                  Saved Change Requests ({feedbackList.length})
+                  Saved requests ({feedbackList.length})
                 </p>
                 <div className="space-y-1.5">
                   {feedbackList.map((fb) => (
@@ -2236,6 +2320,42 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
               </div>
             )}
           </section>
+
+          <div ref={selectionActionsRef} className="selection-end-actions" aria-label="Save your quotation selection">
+            <div>
+              <h2>Your selected quotation</h2>
+              <p>{activePackageSummaryText}</p>
+              <strong className="selection-end-total">{formatINR(calc.grandTotal)}</strong>
+              <p className="selection-action-status">
+                {savingPackage ? 'Saving selection…' : selectionSaveError ? selectionSaveError : hasUnsavedChanges ? 'You have changes to save.' : savedByCustomer ? 'Your selection is saved.' : 'Save your choices, then review the payment details.'}
+              </p>
+            </div>
+            <div className="selection-action-buttons">
+              <button type="button" className="customer-action customer-action-secondary" disabled={selectionIsBusy} onClick={() => void handleCustomerFinalSave()}>
+                <Save size={17} aria-hidden="true" />{savingPackage && !reviewingPayment ? 'Saving…' : 'Save selection'}
+              </button>
+              <button type="button" className="customer-action customer-action-primary" disabled={selectionIsBusy} onClick={() => void handleReviewAndPay()}>
+                {reviewingPayment ? 'Saving…' : 'Review & pay'}<ArrowRight size={17} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          {!endActionsVisible && (
+            <div className="selection-mobile-bar" aria-label="Quotation selection actions">
+              <div className="selection-mobile-context">
+                <div><span>Selected estimate</span><strong>{formatINR(calc.grandTotal)}</strong></div>
+                <p>{selectionSaveError ? 'Save failed. Try again.' : savingPackage ? 'Saving…' : hasUnsavedChanges ? 'Unsaved changes' : savedByCustomer ? 'Selection saved' : 'Ready to save'}</p>
+              </div>
+              <div className="selection-action-buttons">
+                <button type="button" className="customer-action customer-action-secondary" disabled={selectionIsBusy} onClick={() => void handleCustomerFinalSave()}>
+                  <Save size={16} aria-hidden="true" />{savingPackage && !reviewingPayment ? 'Saving…' : 'Save selection'}
+                </button>
+                <button type="button" className="customer-action customer-action-primary" disabled={selectionIsBusy} onClick={() => void handleReviewAndPay()}>
+                  {reviewingPayment ? 'Saving…' : 'Review & pay'}<ArrowRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

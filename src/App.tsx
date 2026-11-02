@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import {
   Lock,
   ArrowRight,
@@ -20,16 +20,30 @@ import {
 } from 'lucide-react';
 import { printQuotation } from './lib/print-quotation';
 import { UmeLogoMark } from './components/BrandMark';
-import { CustomerQuotationView } from './components/CustomerQuotationView';
-import {
+import type { CredentialUpdate } from './components/BusinessSettings';
+import type {
   LedgerEntrySummary,
-  OwnerStudioView,
   PublishedQuoteSummary,
 } from './components/OwnerStudioView';
+import './components/BusinessSettings.css';
 import { DEFAULT_UME_CATALOGUE, StudioCatalogue } from './lib/catalogue';
 import { QuotationDraftV2, ResolvedPackageSelection } from './lib/schema';
+import { CompanySettings, companyWebsiteUrl, validateCompanySettings } from './lib/company-settings';
 
 type AppMode = 'portal' | 'customer_quote' | 'studio' | 'owner_login';
+
+const CustomerQuotationView = lazy(() => import('./components/CustomerQuotationView').then(module => ({ default: module.CustomerQuotationView })));
+const OwnerStudioView = lazy(() => import('./components/OwnerStudioView').then(module => ({ default: module.OwnerStudioView })));
+const BusinessSettings = lazy(() => import('./components/BusinessSettings').then(module => ({ default: module.BusinessSettings })));
+
+function ViewLoading({ children }: { children: React.ReactNode }) {
+  return <div role="status" aria-live="polite" className="quote-loading"><span className="loading-dot" aria-hidden="true"/>{children}</div>;
+}
+
+function CustomerViewMounted({ children, onReady }: { children: React.ReactNode; onReady: (ready: boolean) => void }) {
+  useEffect(() => { onReady(true); return () => onReady(false); }, [onReady]);
+  return <>{children}</>;
+}
 
 function detectInitialRoute(): { mode: AppMode; tokenFromUrl: string | null } {
   if (typeof window === 'undefined') {
@@ -55,6 +69,7 @@ export default function App() {
   const [mode, setMode] = useState<AppMode>(initialRoute.mode);
   const [catalogue, setCatalogue] = useState<StudioCatalogue>(DEFAULT_UME_CATALOGUE);
   const [copiedShareToast, setCopiedShareToast] = useState<boolean>(false);
+  const [customerViewReady, setCustomerViewReady] = useState(false);
 
   // Isolated single-customer quote state when a customer opens their private /q/ link or unlocks their quote
   const [customerQuoteRecord, setCustomerQuoteRecord] =
@@ -75,7 +90,6 @@ export default function App() {
   const [ownerBusy, setOwnerBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [credentialMessage, setCredentialMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [ownerAuthError, setOwnerAuthError] = useState<string | null>(null);
   const [quotes, setQuotes] = useState<PublishedQuoteSummary[]>([]);
@@ -83,6 +97,15 @@ export default function App() {
 
   // If opened via /q/<token> URL, fetch ONLY that single customer quotation
   useEffect(() => {
+    if (initialRoute.mode === 'portal' || initialRoute.mode === 'owner_login') {
+      fetch('/api/company').then(response => response.ok ? response.json() : null).then(data => {
+        if (!data?.company || typeof data.company !== 'object') return;
+        const company = data.company;
+        setCatalogue(previous => previous === DEFAULT_UME_CATALOGUE
+          ? { ...previous, company: { ...previous.company, ...company, bank: previous.company.bank } }
+          : previous);
+      }).catch(() => {});
+    }
     if (initialRoute.tokenFromUrl) {
       fetchSingleCustomerQuote(initialRoute.tokenFromUrl);
     }
@@ -111,23 +134,6 @@ export default function App() {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
-
-  useEffect(() => {
-    if (!settingsOpen) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
-    document.getElementById('newUsername')?.focus();
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSettingsOpen(false);
-      if (event.key === 'Tab') {
-        const controls = Array.from(document.querySelectorAll<HTMLElement>('.settings-card button, .settings-card input')).filter(e => !(e as HTMLInputElement).disabled);
-        const first = controls[0], last = controls[controls.length - 1];
-        if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
-        else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
-      }
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => {document.removeEventListener('keydown', handleKey); previousFocus?.focus();};
-  }, [settingsOpen]);
 
   const fetchSingleCustomerQuote = async (publicId: string) => {
     setLookupLoading(true);
@@ -233,28 +239,34 @@ export default function App() {
       const res = await fetch('/api/studio/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       if (!res.ok) throw new Error('Unable to sign out. Please try again.');
       setOwnerAuthenticated(false);
+      setSettingsOpen(false);
       setQuotes([]); setLedger([]); setCustomerQuoteRecord(null);
       setMode('owner_login');
       window.history.replaceState({}, '', '/owner');
     } catch (err) { setActionError(String(err)); }
   };
 
-  const handleCredentialChange = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const fields = new FormData(form);
-    setOwnerBusy(true); setCredentialMessage('');
-    try {
-      const res = await fetch('/api/studio/credentials', {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({currentPassword: fields.get('currentPassword'), newUsername: fields.get('newUsername'), newPassword: fields.get('newPassword')}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not update sign-in details.');
-      setOwnerUsername(String(fields.get('newUsername')));
-      form.reset(); setCredentialMessage('Your sign-in details have been updated.');
-    } catch (err) { setCredentialMessage(err instanceof Error ? err.message : 'Update failed.'); }
-    finally { setOwnerBusy(false); }
+  const handleCredentialChange = async (values: CredentialUpdate) => {
+    const res = await fetch('/api/studio/credentials', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not update sign-in details.');
+    setOwnerUsername(values.newUsername);
+  };
+
+  const handleSaveCompany = async (company: CompanySettings): Promise<CompanySettings> => {
+    const res = await fetch('/api/studio/company', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw Object.assign(new Error(data.error || 'Could not save business details.'), { fieldErrors: data.errors });
+    const saved = validateCompanySettings(data.company);
+    if (!saved.company) throw new Error('The server returned incomplete business details. Please reload and try again.');
+    setCatalogue(previous => ({ ...previous, company: saved.company! }));
+    return saved.company;
   };
 
   const handleSaveSelection = async (selection: {
@@ -466,10 +478,8 @@ export default function App() {
         ) : (
           <div className="hidden md:flex items-center gap-3 text-xs font-bold text-[#5C645E]">
             <span className="text-[#1B241E]">
-              UMAMAHESHWARA INTERIORS · Residential and Commercial Interior Designers
+              {catalogue.company.brandName}{catalogue.company.subtitle && ` · ${catalogue.company.subtitle}`}
             </span>
-            <span>·</span>
-            <span>Chengicherla, Hyderabad</span>
           </div>
         )}
 
@@ -491,6 +501,7 @@ export default function App() {
               )}
               <button
                 type="button"
+                disabled={!customerViewReady}
                 onClick={() => void printQuotation()}
                 className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#1B241E] bg-white hover:bg-[#FAF8F3] border border-[#D4CEC2] inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
               >
@@ -526,7 +537,7 @@ export default function App() {
           )}
 
           {mode === 'studio' && ownerAuthenticated && <>
-            <button type="button" onClick={() => {setSettingsOpen(true); setCredentialMessage('');}} className="header-secondary"><Settings size={15}/> Account</button>
+            <button id="studio-settings-trigger" type="button" onClick={() => {setSettingsOpen(true); window.scrollTo({ top: 0 });}} className="header-secondary" aria-current={settingsOpen ? 'page' : undefined}><Settings size={15}/> Settings</button>
             <button type="button" onClick={handleOwnerLogout} className="header-primary"><LogOut size={15}/> Sign out</button>
           </>}
           {mode === 'portal' && (
@@ -549,7 +560,7 @@ export default function App() {
           <div className="portal-page">
             <section className="portal-hero">
               <div className="portal-hero-copy">
-                <p className="eyebrow">UME INTERIORS · HYDERABAD</p>
+                <p className="eyebrow">{catalogue.company.brandName}</p>
                 <h1>Your space.<br/><em>Beautifully considered.</em></h1>
                 <p>A thoughtful home begins with the details. Explore your personalised interior proposal, compare materials, and make it yours.</p>
                 <a href="#quotation-access" className="hero-link">Open your quotation <ArrowRight size={18}/></a>
@@ -569,7 +580,7 @@ export default function App() {
                   {lookupError && <p role="alert" className="form-error">{lookupError}</p>}
                   <button type="submit" className="form-submit" disabled={lookupLoading}>{lookupLoading ? 'Opening your quotation…' : 'Open my quotation'}<ArrowRight size={17}/></button>
                 </form>
-                <p className="access-help">Need your link? <a href={`https://wa.me/${catalogue.company.whatsapp}`}>Message UME Interiors</a></p>
+                <p className="access-help">Need your link? <a href={`https://wa.me/${catalogue.company.whatsapp.replace(/\D/g, '')}`}>Message {catalogue.company.brandName}</a></p>
               </div>
             </section>
           </div>
@@ -592,7 +603,7 @@ export default function App() {
         {mode === 'customer_quote' && !customerQuoteRecord && <div role="status" className="quote-loading"><span className="loading-dot"/> Opening your private quotation…</div>}
         {/* MODE 2: PRIVATE SINGLE-CUSTOMER QUOTATION VIEW (Strictly isolated to their own quote) */}
         {mode === 'customer_quote' && customerQuoteRecord && (
-          <CustomerQuotationView
+          <Suspense fallback={<ViewLoading>Opening your private quotation…</ViewLoading>}><CustomerViewMounted onReady={setCustomerViewReady}><CustomerQuotationView
             key={`${customerQuoteRecord.publicId}-${customerQuoteRecord.revision}`}
             isOwner={ownerAuthenticated}
             publicId={customerQuoteRecord.publicId}
@@ -614,12 +625,21 @@ export default function App() {
             }
             onSubmitPayment={handleSubmitPayment}
             onSwitchQuote={(pid) => fetchSingleCustomerQuote(pid)}
-          />
+          /></CustomerViewMounted></Suspense>
         )}
 
         {/* MODE 3: AUTHENTICATED OWNER STUDIO */}
+        {mode === 'studio' && ownerAuthenticated && settingsOpen && (
+          <Suspense fallback={<ViewLoading>Opening settings…</ViewLoading>}><BusinessSettings
+            company={catalogue.company}
+            ownerUsername={ownerUsername}
+            onSaveCompany={handleSaveCompany}
+            onSaveCredentials={handleCredentialChange}
+            onClose={() => { setSettingsOpen(false); requestAnimationFrame(() => document.getElementById('studio-settings-trigger')?.focus()); }}
+          /></Suspense>
+        )}
         {mode === 'studio' && ownerAuthenticated && (
-          <OwnerStudioView
+          <div hidden={settingsOpen}><Suspense fallback={<ViewLoading>Opening your studio…</ViewLoading>}><OwnerStudioView
             catalogue={catalogue}
             quotes={quotes}
             ledger={ledger}
@@ -646,27 +666,21 @@ export default function App() {
             onUpdateQuoteDraft={handleUpdateQuoteDraft}
             onUpdateCatalogue={handleUpdateCatalogue}
             onVerifyOrRejectPayment={handleVerifyOrRejectPayment}
-          />
+          /></Suspense></div>
         )}
       </main>
 
-      {settingsOpen && ownerAuthenticated && <div className="settings-backdrop" onClick={e => {if(e.target === e.currentTarget) setSettingsOpen(false);}}><section role="dialog" aria-modal="true" aria-labelledby="account-title" className="settings-card"><button className="settings-close" type="button" aria-label="Close account settings" onClick={() => setSettingsOpen(false)}><X size={20}/></button><p className="eyebrow">YOUR ACCOUNT</p><h2 id="account-title">Sign-in details</h2><p className="form-intro">Update your studio username and password.</p><form onSubmit={handleCredentialChange}><label htmlFor="newUsername">Username</label><input id="newUsername" name="newUsername" defaultValue={ownerUsername} autoComplete="username" required minLength={3}/><label htmlFor="currentPassword">Current password</label><input id="currentPassword" name="currentPassword" type="password" autoComplete="current-password" required/><label htmlFor="newPassword">New password</label><input id="newPassword" name="newPassword" type="password" autoComplete="new-password" minLength={12} placeholder="At least 12 characters" required/>{credentialMessage && <p role="status" className="credential-message">{credentialMessage}</p>}<button type="submit" disabled={ownerBusy} className="form-submit">{ownerBusy ? 'Updating…' : 'Save sign-in details'}<Check size={17}/></button></form></section></div>}
       {/* Quiet Architectural Footer */}
-      <footer className="bg-white border-t border-[#E5DFD3] py-6 px-6 text-xs text-[#5C645E] no-print">
-        <div className="max-w-[1380px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-center sm:text-left">
+      <footer className="company-footer no-print">
+        <div className="company-footer-inner">
+          <div className="company-footer-identity">
             <UmeLogoMark size="sm" />
-            <span>
-              <strong className="text-[#1B241E]">{catalogue.company.legalName}</strong> ·{' '}
-              {catalogue.company.address}
-            </span>
+            <div><strong>{catalogue.company.legalName}</strong><p>{catalogue.company.address}</p></div>
           </div>
-          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-x-4 gap-y-1 font-mono tabular-nums">
+          <div className="company-footer-contact">
             <span>Proprietor: {catalogue.company.proprietor}</span>
-            <span>·</span>
-            <span>{catalogue.company.phone}</span>
-            <span>·</span>
-            <span>{catalogue.company.domain}</span>
+            <div><a href={`tel:${catalogue.company.phone.replace(/[^\d+]/g, '')}`}>{catalogue.company.phone}</a>
+            {catalogue.company.domain && (companyWebsiteUrl(catalogue.company.domain) ? <a href={companyWebsiteUrl(catalogue.company.domain)}>{catalogue.company.domain.replace(/^https?:\/\//i, '').replace(/\/$/, '')}</a> : <span>{catalogue.company.domain}</span>)}</div>
           </div>
         </div>
       </footer>

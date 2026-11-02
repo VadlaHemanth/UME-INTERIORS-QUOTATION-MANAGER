@@ -1,3 +1,4 @@
+import { validateCompanySettings } from '../src/lib/company-settings';
 import { KARTHIK_HISTORICAL_RATE_OVERRIDES } from '../src/lib/historicalData';
 import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, getPackageDisplayName, mergeRateCardJsonIntoCatalogue, type StudioCatalogue } from '../src/lib/catalogue';
 import { calculateMilestoneSchedule, calculateQuotationPricing, computeCustomerSelectionTotal, type PricedQuotationSnapshot } from '../src/lib/pricing';
@@ -115,8 +116,6 @@ function buildSelectionSummaryLabel(
 
 export function registerDataRoutes(app: ApiRouter, state: StudioState, markChanged: () => void) {
   let activeCatalogue = state.catalogue;
-  // Payment coordinates are canonical app configuration, never stale imported DB values.
-  activeCatalogue.company.bank.upiId = DEFAULT_UME_CATALOGUE.company.bank.upiId;
   const quotesStore = new Map(state.quotes.map((record) => [record.publicId, record]));
   const paymentLedger = state.ledger;
   function saveDbToDisk() {
@@ -205,6 +204,24 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     });
   });
 
+  // Public shell branding contains no bank, rate-card or owner-session data.
+  app.get('/api/company', (_req, res) => {
+    const { bank: _bank, ...company } = activeCatalogue.company;
+    res.json({ company });
+  });
+
+  // Company edits merge into the latest state without replacing the rate card.
+  app.put('/api/studio/company', (req, res) => {
+    const result = validateCompanySettings(req.body.company);
+    if (!result.valid || !result.company) {
+      res.status(400).json({ error: 'Review the highlighted business and payment details.', errors: result.errors });
+      return;
+    }
+    activeCatalogue = { ...activeCatalogue, company: result.company };
+    saveDbToDisk();
+    res.json({ company: activeCatalogue.company });
+  });
+
   // Update Studio Catalogue & Rate Card (previously published revisions retain their immutable snapshot!)
   app.put('/api/studio/catalogue', (req, res) => {
     const updated = req.body as StudioCatalogue;
@@ -212,7 +229,9 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       res.status(400).json({ error: 'Invalid catalogue payload.' });
       return;
     }
-    activeCatalogue = updated;
+    // Business/payment details have their own validated endpoint; stale rate-card
+    // tabs must not restore an old payment recipient or business address.
+    activeCatalogue = { ...updated, company: activeCatalogue.company };
     saveDbToDisk();
     res.json({ catalogue: activeCatalogue });
   });

@@ -7,7 +7,8 @@ import { handleApi, type StateStore } from './backend/api';
 import { emptyState, type StudioState } from './backend/routes';
 
 dotenv.config();
-const dataDirectory = path.resolve(process.cwd(), 'data');
+// Optional isolated data path supports local previews without touching real records.
+const dataDirectory = path.resolve(process.env.UME_DATA_DIR || path.join(process.cwd(), 'data'));
 const dataFile = path.join(dataDirectory, 'ume-studio-db.json');
 let state: StudioState = emptyState();
 if (fs.existsSync(dataFile)) {

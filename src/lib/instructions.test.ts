@@ -44,3 +44,17 @@ test('assistant output includes catalogue PVC scope, real-job status and JSON re
   example.needs_clarification = [];
   assert.equal(validateQuotationDraftV2(example).readyForPublish, true, 'confirming the client should leave no artificial demo or PVC blockers');
 });
+
+
+test('assistant instructions preserve optional estimate metadata without assuming a site visit', () => {
+  const instructions = buildDynamicGemInstructions();
+  assert.match(instructions, /quote\.estimate_basis/);
+  assert.match(instructions, /never assume a site visit took place/);
+  assert.match(instructions, /1,000 characters/);
+  assert.match(instructions, /custom note supplements this notice and cannot replace it/);
+  assert.equal((instructions.match(/```json/g) || []).length, 1);
+  const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
+  assert.equal(example.quote.estimate_basis, 'floor_plan');
+  assert.equal(example.quote.estimate_note, null);
+  assert.equal(validateQuotationDraftV2(example).validForDraft, true);
+});

@@ -18,6 +18,7 @@ import {
   QuotationDraftV2,
   ResolvedPackageSelection,
 } from '../lib/schema';
+import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
 import {
   DeterministicQrCode,
   UmeLogoMark,
@@ -327,7 +328,9 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   const milestones = calculateMilestoneSchedule(calc.grandTotal, verifiedPaidRupees);
   const activeGradeInfo = catalogue.grades[wholeHomeSelection.grade];
   const activeGradeDisplayName = getPackageDisplayName(wholeHomeSelection.grade);
-  const quoteRef = draft.quote.number || 'UME-2026-1024';
+  const quoteRef = draft.quote.number || 'Quotation draft';
+  const estimateBasisLabel = getQuotationBasisLabel(draft.quote);
+  const estimateNote = getQuotationEstimateNote(draft.quote);
   const revCode = String(revision).padStart(2, '0');
   const origin = typeof window !== 'undefined' ? window.location.origin : `https://${catalogue.company.domain}`;
   const shareUrl = `${origin}/q/${publicId}`;
@@ -363,11 +366,11 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <UmeLogoMark size="pdf" />
           <div className="pdf-company">
             <div className="pdf-company-title">
-              <p>UMAMAHESHWARA INTERIORS</p>
+              <p>{catalogue.company.brandName}</p>
               <span>QUOTATION</span>
             </div>
-            <p className="pdf-enterprise">Umamaheshwara Enterprises</p>
-            <p className="pdf-designers">Residential and Commercial Interior Designers</p>
+            <p className="pdf-enterprise">{catalogue.company.legalName}</p>
+            <p className="pdf-designers">{catalogue.company.subtitle}</p>
           </div>
           <div className="pdf-contact">
             <p>{catalogue.company.address}<br /><strong>Phone:</strong> {catalogue.company.phone}</p>
@@ -398,7 +401,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               Issue Date
             </p>
             <p className="font-mono font-bold text-[#18221D] mt-0.5">
-              {draft.quote.date || '2026-10-24'}
+              {draft.quote.date || 'Not set'}
             </p>
           </div>
           <div className="min-w-0">
@@ -406,7 +409,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               Valid Until
             </p>
             <p className="font-mono font-bold text-[#1C3A2F] mt-0.5">
-              {draft.quote.valid_until || '2026-11-23'}
+              {draft.quote.valid_until || 'Not set'}
             </p>
           </div>
         </div>
@@ -415,7 +418,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         <div className="pdf-client-summary grid grid-cols-12 gap-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-5">
           <div className="col-span-7 space-y-1 pr-4 border-r border-[#E5DFD3] min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#1C3A2F]">
-              Prepared For (Client & Site Address)
+              Prepared for
             </p>
             <h1 className="text-lg font-bold text-[#18221D] break-words">
               {draft.customer.name || 'Valued Client'}
@@ -433,11 +436,11 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <div className="col-span-5 flex flex-col justify-between pl-2 min-w-0">
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
-                Selected Package Configuration
+                Selected package
               </p>
               <p className="text-sm font-bold text-[#18221D] mt-0.5">
                 {mixByRoom
-                  ? 'Custom Room-Wise Package Selection'
+                  ? 'Packages selected by room'
                   : `${activeGradeDisplayName} Package${
                       wholeHomeSelection.protection === 'With PVC'
                         ? ' (+6mm PVC Board at Contact Areas)'
@@ -450,7 +453,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </div>
 
             <div className="pt-3 border-t border-[#E5DFD3] flex items-baseline justify-between gap-2">
-              <span className="text-xs font-bold text-[#1C3A2F]">Selected Grand Total</span>
+              <span className="text-xs font-bold text-[#1C3A2F]">Quotation total</span>
               <span className="text-xl font-bold text-[#18221D] font-mono tabular-nums">
                 {formatINR(calc.grandTotal, true)}
               </span>
@@ -458,10 +461,17 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
         </div>
 
+        {(estimateBasisLabel || estimateNote) && (
+          <section className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[11px] leading-relaxed print-avoid-break" aria-label="Quotation basis and notes">
+            <h2 className="font-bold text-[#18221D]">{estimateBasisLabel || 'Quotation note'}</h2>
+            {estimateNote && <p className="mt-1 text-[#4A524D] whitespace-pre-line break-words">{estimateNote}</p>}
+          </section>
+        )}
+
         {/* All 3 Packages Side-by-Side Executive Comparison Strip */}
         <div className="space-y-2 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
-            Package comparison · Base scope before optional work and discount
+            Package comparison · Included work before optional work and discount
           </p>
           <div className="grid grid-cols-3 gap-3">
             {ALL_GRADES.map((g) => {
@@ -498,11 +508,11 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   </p>
                   <div className="mt-2 pt-2 border-t border-[#E5DFD3] space-y-1 font-mono tabular-nums">
                     <div className="flex items-center justify-between">
-                      <span>Package Total:</span>
+                      <span>Without PVC:</span>
                       <strong className="text-sm text-[#18221D]">{formatINR(stdTotal)}</strong>
                     </div>
                     <div className="flex items-center justify-between text-[10px] text-[#5C645F]">
-                      <span>Optional +6mm PVC:</span>
+                      <span>With 6 mm PVC:</span>
                       <strong>{formatINR(pvcTotal)}</strong>
                     </div>
                   </div>
@@ -522,14 +532,14 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <colgroup><col style={{ width: '25%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '15%' }} /><col style={{ width: '18%' }} /></colgroup>
               <thead>
                 <tr className="bg-[#1C3A2F] text-white">
-                  <th className="py-2.5 px-3 font-semibold">Room & Units</th>
+                  <th className="py-2.5 px-3 font-semibold">Room and items</th>
                   <th className="py-2.5 px-2.5 text-right font-semibold">Standard</th>
                   <th className="py-2.5 px-2.5 text-right font-semibold">Normal</th>
                   <th className="py-2.5 px-2.5 text-right font-semibold text-[#E6CBA8]">
                     Premium (BWP)
                   </th>
-                  <th className="py-2.5 px-2.5 font-semibold">Chosen Spec</th>
-                  <th className="py-2.5 px-3 text-right font-semibold">Chosen Subtotal</th>
+                  <th className="py-2.5 px-2.5 font-semibold">Selected package</th>
+                  <th className="py-2.5 px-3 text-right font-semibold">Room total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5DFD3]">
@@ -572,7 +582,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 })}
                 <tr className="bg-[#FAF8F4] font-bold">
                   <td className="py-2.5 px-3 text-[#18221D]">
-                    Base scope totals
+                    Included work totals
                   </td>
                   <td className="py-2.5 px-2.5 text-right font-mono tabular-nums">
                     {formatINR(stdWholeHomeTotal)}
@@ -584,7 +594,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                     {formatINR(premWholeHomeTotal)}
                   </td>
                   <td className="py-2.5 px-2.5 text-right text-[#1C3A2F]">
-                    Selected Total →
+                    Quotation total
                   </td>
                   <td className="py-2.5 px-3 text-right text-sm text-[#1C3A2F] font-mono tabular-nums">
                     {formatINR(calc.grandTotal, true)}
@@ -605,7 +615,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         {/* Material & Laminate Specifications */}
         <div className="bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-4 text-[11px] space-y-1.5 print-avoid-break">
           <p className="font-bold uppercase tracking-wider text-[#1C3A2F] text-[10px]">
-            Included Material, Laminate & Hardware Specifications
+            Included materials, laminate and hardware
           </p>
           <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-[#4A524D] list-disc list-inside">
             {catalogue.commonMaterials.map((m, idx) => (
@@ -623,11 +633,8 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <div className="flex items-center gap-3.5 min-w-0">
 
             <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F]">
-                UMAMAHESHWARA INTERIORS · Umamaheshwara Enterprises
-              </p>
               <h2 className="text-[15px] font-bold leading-none text-[#18221D]">
-                01 · Furniture scope & package rates
+                Furniture scope and package rates
               </h2>
             </div>
           </div>
@@ -669,10 +676,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   <thead>
                     <tr className="bg-[#1C3A2F] text-white">
                       <th className="py-2 px-3 font-semibold w-[40%]">
-                        Furniture Unit & Specification
+                        Furniture and specification
                       </th>
                       <th className="py-2 px-2 font-semibold">Dimensions</th>
-                      <th className="py-2 px-2 text-right font-semibold">Area / Qty</th>
+                      <th className="py-2 px-2 text-right font-semibold">Area / quantity</th>
                       <th className="py-2 px-2 text-right font-semibold">Standard</th>
                       <th className="py-2 px-2 text-right font-semibold">Normal</th>
                       <th className="py-2 px-3 text-right font-semibold text-[#E6CBA8]">
@@ -698,9 +705,9 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
 
                         const uLabel =
                           item.unit === 'sq_ft'
-                            ? 'sq.ft'
+                            ? 'sq ft'
                             : item.unit === 'running_ft'
-                            ? 'rft'
+                            ? 'running ft'
                             : item.unit;
 
                         const cleanTitle = standardizeCompetitorItemName(
@@ -728,7 +735,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                             </td>
                             <td className="py-2 px-2 text-right font-mono tabular-nums whitespace-nowrap">
                               {item.unit === 'each'
-                                ? `${item.quantity} nos`
+                                ? `${item.quantity} ${item.quantity === 1 ? 'item' : 'items'}`
                                 : `${item.totalMeasure.toFixed(2)} ${uLabel}`}
                             </td>
                             <td className="py-2 px-2 text-right font-mono tabular-nums whitespace-nowrap">
@@ -762,11 +769,8 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <div className="flex items-center gap-3.5 min-w-0">
 
             <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F]">
-                UMAMAHESHWARA INTERIORS · Umamaheshwara Enterprises
-              </p>
               <h2 className="text-[15px] font-bold leading-none text-[#18221D]">
-                02 · Payment schedule & terms
+                Payment schedule and terms
               </h2>
             </div>
           </div>
@@ -778,13 +782,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         {/* Crystal-Clear Milestone Explanation Banner */}
         <div className="p-3.5 bg-[#E4EFE7] border border-[#1C3A2F]/30 rounded-lg text-xs text-[#18221D] space-y-1 print-avoid-break">
           <p className="font-bold text-[#1C3A2F]">
-            How Your 5-Step Payment Schedule Works (100% Transparent):
+            How the payment schedule works
           </p>
           <p className="text-[11px] text-[#3D4741] leading-relaxed">
             {milestones.requiresOwnerSmallOrderRule ? (
               <>This order requires proprietor confirmation of booking and work-start terms. The milestone amounts below are indicative. Contact {catalogue.company.proprietor} before making a payment.</>
             ) : (
-              <>The <strong>{formatINR(milestones.bookingRequired, true)} order booking payment</strong> is <strong>included inside your first 50% advance</strong>. It counts toward your project price ({formatINR(calc.grandTotal, true)}). Payments follow the stages below.</>
+              <>The <strong>{formatINR(milestones.bookingRequired, true)} order booking payment</strong> is <strong>part of your first 50% advance</strong>. It counts toward your project price ({formatINR(calc.grandTotal, true)}). The balances below deduct verified payments and show the amount needed to reach each stage.</>
             )}
           </p>
         </div>
@@ -796,16 +800,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             <thead>
               <tr className="bg-[#1C3A2F] text-white">
                 <th className="py-2.5 px-3.5 font-semibold w-[44%]">
-                  Milestone Stage & What Happens at Site
+                  Payment stage
                 </th>
                 <th className="py-2.5 px-3 text-right font-semibold">
-                  Stage Instalment
+                  Stage amount
                 </th>
                 <th className="py-2.5 px-3 text-right font-semibold">
-                  Cumulative Target
+                  Total due by stage
                 </th>
                 <th className="py-2.5 px-3.5 text-right font-semibold text-[#E6CBA8]">
-                  Due After Verified Receipts
+                  Balance due
                 </th>
               </tr>
             </thead>
@@ -820,10 +824,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <tr className="bg-[#FAF8F4]">
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
-                    Step 1 · Order Confirmation Booking
+                    Step 1 · Booking payment
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    Locks your package rates & schedules site measurement. Part of the 50% advance.
+                    Confirms the work order for the agreed scope. Counts toward the 50% advance.
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -831,7 +835,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(milestones.bookingRequired, true)}
-                  <div className="text-[9.5px] text-[#5C645F]">Booking Token</div>
+                  <div className="text-[9.5px] text-[#5C645F]">Booking payment</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#1C3A2F]">
                   {formatINR(
@@ -846,7 +850,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <tr>
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
-                    Step 2 · Balance of 50% Work-Start Advance
+                    Step 2 · Balance of the 50% advance
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
                     {milestones.requiresOwnerSmallOrderRule ? 'Work-start terms and booking credit require proprietor confirmation.' : `50% advance (${formatINR(milestones.advance50PercentTotal)}) less the ${formatINR(milestones.bookingRequired)} booking. Due before plywood dispatch to site.`}
@@ -857,7 +861,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(milestones.advance50PercentTotal, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">50% Reached</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">50% of quotation total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#18221D]">
                   {formatINR(milestones.advanceRemainingToStartWork, true)}
@@ -868,10 +872,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <tr className="bg-[#FAF8F4]">
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
-                    Step 3 · 35% Plywood Structure Completion
+                    Step 3 · 35% after the plywood structure
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    Due after all plywood boxes, frames, and loft structures are erected at site.
+                    Due when all plywood cabinet bodies, frames and loft structures are complete on site.
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -879,7 +883,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(stage3Cumulative, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">85% Reached</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">85% of quotation total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#18221D]">
                   {formatINR(
@@ -893,10 +897,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <tr>
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
-                    Step 4 · 10% Outside Laminate Completion
+                    Step 4 · 10% after external laminate
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    Due upon completion of outside 1.0mm decorative laminate pressing & edge-banding.
+                    Due when the 1.0 mm external laminate is applied and the doors are fitted.
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -904,7 +908,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(stage4Cumulative, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">95% Reached</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">95% of quotation total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#18221D]">
                   {formatINR(
@@ -918,10 +922,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <tr className="bg-[#FAF8F4]">
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
-                    Step 5 · 5% Final Handover Balance
+                    Step 5 · 5% before handover
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    Due upon hardware alignment, cleaning, and final project handover.
+                    Due before final hardware alignment and site handover.
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -929,7 +933,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#1C3A2F]">
                   {formatINR(calc.grandTotal, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">100% Complete</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">100% of quotation total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#1C3A2F]">
                   {formatINR(Math.max(0, calc.grandTotal - verifiedPaidRupees), true)}
@@ -941,7 +945,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
 
         <section className="pdf-bank print-avoid-break" aria-label="Bank account and payment QR codes">
           <div className="pdf-bank-info">
-            <p className="pdf-eyebrow">Official bank remittance account</p>
+            <p className="pdf-eyebrow">Bank account for payments</p>
             <h3>{catalogue.company.bank.bankName}</h3>
             <p className="pdf-bank-branch">{catalogue.company.bank.branch}</p>
             <p className="pdf-bank-account-name">{catalogue.company.bank.accountName}</p>
@@ -964,10 +968,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         {/* Notes & Terms and Conditions (Includes 0.8mm / 0.72mm Laminate Gauge Note) */}
         <div className="space-y-2.5 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
-            Notes, Laminate Gauge Standard & Terms and Conditions
+            Specifications and terms
           </p>
           <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[10.5px] text-[#18221D] leading-snug">
-            <strong>Technical Note on Laminate Thickness & Finish:</strong> Internal balancing/liner laminate is industry-standard <strong>0.8 mm</strong> category (actual factory sheet gauge ranges from <strong>0.72 mm to 0.80 mm</strong> as per standard ISI/manufacturer tolerance). External decorative laminate is <strong>1.0 mm</strong> thickness in the customer’s chosen finish (SF Matte or High-Gloss at the same price).
+            <strong>Laminate thickness and finish:</strong> Internal liner laminate is <strong>0.8 mm nominal thickness</strong> (manufacturer sheet gauge: <strong>0.72–0.80 mm</strong>). External decorative laminate is <strong>1.0 mm</strong>, in the selected SF matte or high-gloss finish at the same quoted price.
           </div>
           <div className="pdf-terms grid grid-cols-2 gap-x-6 gap-y-2 text-[10.5px] text-[#5C645F] leading-snug">
             {catalogue.termsAndConditions.map((t) => (
@@ -985,16 +989,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         <div className="pt-8 border-t border-[#E5DFD3] grid grid-cols-2 gap-8 text-xs print-avoid-break">
           <div>
             <p className="font-bold text-[#18221D]">
-              For UMAMAHESHWARA INTERIORS (Umamaheshwara Enterprises)
+              For {catalogue.company.brandName} ({catalogue.company.legalName})
             </p>
             <p className="text-[#5C645F] mt-6">
               <strong>{catalogue.company.proprietor}</strong> · Proprietor ({catalogue.company.phone})
             </p>
           </div>
           <div className="text-right">
-            <p className="font-bold text-[#18221D]">Client Acceptance & Confirmation</p>
+            <p className="font-bold text-[#18221D]">Customer acceptance</p>
             <p className="text-[#5C645F] mt-6">
-              <strong>{draft.customer.name || 'Client Signature'}</strong> · Date: ________________
+              <strong>{draft.customer.name || 'Customer signature'}</strong> · Date: ________________
             </p>
           </div>
         </div>

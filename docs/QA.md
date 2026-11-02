@@ -2,11 +2,25 @@
 
 ## Automated verification
 
-All 42 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
+The latest full regression run passed **59/59 tests**, including owner publication, customer saving and immutable revisions.
 
 Pricing/import/review gates, current assistant instruction snapshot, actual rendered payment/link QR scan decoding, sessions and credential changes, owner API access, full-phone lookup, public payload minimization, payment validation, and real SQLite optimistic-transaction checks pass. Add-on tests verify that recommendations do not affect base pricing, accepted work remains optional, missing confirmed details block publication, and malformed/duplicate suggestions are rejected.
 
 TypeScript, production Vite build, Cloudflare Worker dry-run and the dependency audit are checked for the release. The audit reported zero known vulnerabilities after removing unused packages and updating Wrangler/esbuild.
+
+## Current local follow-up
+
+This release adds optional quotation basis/notes, editable business/payment settings, a mobile UPI handoff and updated customer copy.
+
+Estimate regression tests verify that old drafts never imply completed site measurements, floor-plan notices cannot be replaced by custom notes, optional metadata survives migration/JSON round trips, and invalid or overlong/non-English notes are rejected. Pricing tests retain the historical totals and confirm that display formatting does not invent cabinet depth, stainless-steel grade or full-height construction. Assistant instruction tests verify the generated/downloaded snapshot, one copyable JSON block, `suggested_addons`, catalogue PVC scope and optional estimate fields.
+
+The rendered-PDF integration test uses a real priced quotation and edited bank settings, extracts the actual **UPI booking** QR SVG, and decodes it with jsQR. It verifies the edited recipient/account holder, ₹50,000 booking amount, INR and current quotation reference, rather than a default recipient constant. This test renders the source markup; physical scanning and a live bank transfer were not performed.
+
+Current Chromium checks at **320 and 390 CSS pixels** found no document overflow and retained **22 px checkboxes**. The mobile UPI action was available at ₹50,000 and unavailable at ₹1,25,000 under the configured limit; unchanged quotation selections could still be saved. These checks validate layout and browser behavior, not physical Android UPI-app handoff or WhatsApp delivery. Current desktop/settings/PDF visual checks are recorded separately when completed.
+
+Business/account settings are intended for owner-controlled edits. The user enters the current and replacement password in **Settings → Account**; the agent has not changed the user's password during this follow-up.
+
+Native screenshot sharing sends the selected image file through the browser's share API in a secure context. The customer chooses WhatsApp, recipient and Send. Unsupported/insecure/failed sharing offers download plus manual attachment; cancellation does not report delivery or record accepted terms. No screenshot is stored by the app or credited automatically.
 
 ## Browser verification
 
@@ -16,11 +30,11 @@ Customer views without a valid owner session do not show quotation editing contr
 
 ## Cloudflare runtime
 
-Correct repository migrations were applied to a local D1 database. An actual Wrangler dev Worker verified unauthorized bootstrap 401, owner login/session, canonical UPI, catalogue write/reload, cross-origin rejection and logout revocation. Fresh cloud storage starts with no customer quotations. Local credentials and customer runtime data are excluded from Git and the deployment bundle.
+Correct repository migrations were applied to a local D1 database. An actual Wrangler dev Worker verified unauthorized bootstrap 401, owner login/session, the then-configured UPI recipient, catalogue write/reload, cross-origin rejection and logout revocation. Fresh cloud storage starts with no customer quotations. Local credentials and customer runtime data are excluded from Git and the deployment bundle.
 
 ## Scope and limits
 
-Cloudflare production is deployed at https://ume-interiors-quotation-studio.umeinteriors.workers.dev. Live checks returned 401 for unauthorized bootstrap and 200 for owner login, authorized bootstrap and logout. Both production migrations are applied; the cloud quotation list starts empty. No live bank transaction was performed. Software checks and Chromium viewport tests do not cover every physical device or possible input. The deployment guide covers updates and separate-account setup.
+Earlier deployment checks used the legacy https://ume-interiors-quotation-studio.umeinteriors.workers.dev hostname. The configured primary deployment is now https://quotation.umeinteriors.workers.dev; the rename history is recorded below. Live checks returned 401 for unauthorized bootstrap and 200 for owner login, authorized bootstrap and logout. Both production migrations are applied; the cloud quotation list starts empty. No live bank transaction was performed. Software checks and Chromium viewport tests do not cover every physical device or possible input. The deployment guide covers updates and separate-account setup.
 
 ## PDF preview and print design
 

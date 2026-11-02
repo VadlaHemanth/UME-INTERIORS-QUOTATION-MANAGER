@@ -4,7 +4,7 @@ A private owner workspace and customer quotation portal for Umamaheshwara Enterp
 
 ## Run locally
 
-Requires Node.js 22.12 or newer.
+Requires Node.js 22.15 or newer.
 
 ```powershell
 npm ci
@@ -13,7 +13,7 @@ Copy-Item .env.example .env
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000/** for the client portal and **http://127.0.0.1:3000/owner** for owner sign-in. This prepared workspace already has a private `.env`; its initial local login is saved in `LOCAL-LOGIN.txt`. Both are excluded from Git. Use **Account** after sign-in to update your username and password. Changed credentials persist in your local database and invalidate earlier sessions.
+Open **http://127.0.0.1:3000/** for the client portal and **http://127.0.0.1:3000/owner** for owner sign-in. This prepared workspace already has a private `.env`; its initial local login is saved in `LOCAL-LOGIN.txt`. Both are excluded from Git. Use **Settings → Account** after sign-in to update your username and password yourself. Enter your current password, choose a new password of at least 12 characters, confirm it, and select **Save sign-in details**. Changed credentials persist in your local database and invalidate earlier sessions.
 
 Customer quotations open at `/q/<private-token>`. `/studio` remains a legacy owner-route alias. The homepage contains no owner sign-in form.
 
@@ -21,18 +21,36 @@ Customer quotations open at `/q/<private-token>`. `/studio` remains a legacy own
 
 1. Copy the current **Assistant instructions** into one Gemini Gem or Custom GPT. They include the current reusable rate card. Copy them again after changing reusable rates.
 2. Paste/upload the assistant's `quotation-studio.draft.v2` JSON, or start a blank quotation.
-3. Review customer details, measurements, work types, optional items, PVC eligibility, rates and open questions. No missing measurements are guessed. `Base` is the schema name for the customer-facing **Standard** package.
+3. Review customer details, measurements, work types, optional items, PVC eligibility, rates and open questions. Set **Estimate based on** only when confirmed and add an optional customer-visible note. No missing measurements are guessed. `Base` is the schema name for the customer-facing **Standard** package.
 4. Review **Suggested for this home** recommendations returned in `suggested_addons`. Add useful ideas as optional items or dismiss them. Unaccepted suggestions never enter the scope or totals; accepted ideas still need confirmed measurements and prices.
 5. Choose a default package using the clickable package cards or dropdown. Select **Save & publish quotation** for a private link; use revision mode when replacing an earlier quotation.
 6. Review saved customer selections and messages in **Quotations & selections**. Verify payment screenshots received on WhatsApp against the bank statement, then record confirmed receipts in **Payments**. A screenshot never counts as verified payment by itself.
 
 Customers can compare three packages, mix room grades, add eligible PVC, select optional work, save choices, request changes, and print/save a quotation PDF. Contact-request saving is labelled **Save**.
 
-## Payment details
+## Quotation basis and notes
 
-The canonical UPI recipient is **9177389543@oksbi**. Payment QR codes use a real offline QR encoder and the selected payment amount. Printed quotations use the current hosting origin for their online quotation QR. Bank account number, IFSC and branch remain those supplied in the app catalogue. QR decoding is tested; no live bank transaction was performed.
+Each quotation can use **Not specified**, **Floor-plan estimate**, or **Based on site measurements**. Existing drafts with no basis stay unspecified; the app does not assume that a site visit has happened. The optional customer-visible note accepts up to 1,000 characters of English text.
 
-For projects below the app's booking threshold, online booking is disabled until the owner confirms a small-order payment arrangement.
+A floor-plan estimate always carries a preliminary estimate notice in the customer view and PDF: on-site measurements, scope, requirements, material specifications and prices may change after the site visit; changes require a revised quotation and written customer approval before work proceeds. Custom notes supplement this notice. Review the customer preview before publishing.
+
+In assistant JSON, the optional fields are `quote.estimate_basis` (`floor_plan` or `site_measurement`) and `quote.estimate_note` (English text or null). Omit the basis when it is unknown.
+
+## Business, bank and account settings
+
+After owner sign-in, open **Settings → Business** to edit the display/legal names, description, proprietor, website, contact numbers and business address. Open **Payment details** for the bank, branch, account holder/name, account number, IFSC, UPI ID and UPI payment limit. Select **Save details** to persist changes. Subsequent customer quotation loads and PDF previews use the saved business and payment details.
+
+Every payment QR code is generated from the saved UPI ID and account holder name. The customer QR uses the entered payment amount; the PDF booking QR uses the quotation's booking amount. The PDF's online quotation QR uses the current hosting origin. Field-format checks do not verify a bank account or recipient; confirm the details with the bank before saving. Automated tests decode the actual PDF QR with edited recipient details. No live bank transaction was performed.
+
+Use **Settings → Account** to change your own username and password. Account changes persist while the configured owner environment secrets remain unchanged; a later secret rotation takes precedence. Password entry and changes remain with the user.
+
+## Customer payments and screenshot sharing
+
+On narrow mobile layouts, **Pay with UPI** opens a compatible installed UPI app with the entered amount and saved recipient. It is unavailable for invalid amounts, amounts above the configured UPI limit, missing UPI details or small orders requiring owner confirmation. Desktop customers can open **Bank details & QR**, scan the payment QR from a phone, or use a bank transfer. A mobile viewport alone does not guarantee an installed UPI app or successful handoff.
+
+For payment evidence, attach a JPG/PNG/WebP screenshot up to 10 MB, review the consent, and tap **I’ve made the payment**. On browsers supporting native file sharing, the image opens in the device share sheet. Choose WhatsApp, select the proprietor and tap Send. Secure HTTPS (or localhost), browser file-share support and an available share target are required.
+
+If sharing is unavailable or fails, **Download screenshot** and then **Open WhatsApp to attach screenshot** provide a manual path. Attach the saved image yourself. Cancelling the share sheet does not report delivery or save payment acceptance. Screenshots are not uploaded to app storage and never count as verified payment; the owner checks bank credit and records confirmed receipts. Physical Android-to-WhatsApp delivery and live UPI payment were not verified from this Windows session.
 
 ## Production hosting
 
@@ -57,19 +75,14 @@ Tests cover pricing, imports, review gates, current assistant instructions, rend
 
 Generated package photographs are illustrative material compositions, not product certification or proof of a particular manufacturer's construction.
 
-## Tailored AI add-ons
+## Assistant JSON and tailored recommendations
 
-The external Gemini Gem or Custom GPT can now suggest relevant optional work from the actual home brief, rooms, storage priorities, household needs and budget. Copy the updated Assistant instructions into your assistant before requesting new JSON. The app does not require an AI API key or send customer data to an AI service itself.
+Copy the current **Assistant instructions** into your Gemini Gem or Custom GPT before requesting a quotation, and refresh that saved configuration after reusable rate-card changes. The snapshot is not a live sync. The app does not require an AI API key or send customer data to an AI service itself.
 
-Recommendations use the optional root `suggested_addons` array, each containing `room_index`, a tailored `reason`, and an `item` using the existing item schema with `optional: true`. Unknown measurements/quantities stay null. The owner reviews them before inclusion. Confirmed customer-requested optional work continues to go directly into `rooms[].items`.
+The instructions require one complete JSON object inside one copyable fenced `json` block, with no surrounding prose. The loader accepts either the copied JSON contents or the complete fenced block. Final quotation output always includes `suggested_addons`, using `[]` when no useful recommendation fits the actual brief.
 
-Payment evidence: customers select a JPG/PNG/WebP screenshot and tap **Share screenshot**. On supported Android Chrome/other browsers, the actual image file opens in the device share sheet; choose WhatsApp, select the proprietor and tap Send. Sharing requires HTTPS (or localhost). No text-only chat opens automatically. If file sharing is unavailable, explicit Download screenshot and Open WhatsApp chat controls guide manual attachment. Cancellation does not save acceptance or report delivery. No screenshot is uploaded to app storage or automatically credited.
+Each recommendation contains an existing zero-based `room_index`, a tailored `reason`, and a complete `item` with `optional: true`. Unknown dimensions and quantities stay null; no rates or household facts are invented. Recommendations stay outside the quotation scope and totals until the owner adds them as optional and confirms missing measurements, quantities, PVC scope and rates. Confirmed customer-requested optional work belongs directly in `rooms[].items`.
 
+Eligible catalogue work types include the standard PVC contact parts from the current instructions. For an existing draft with missing parts, review the list and choose **Use reviewed standard PVC scope**. Explicit practice records require real-customer confirmation before publication; omitting `is_demo` from a legacy import does not itself make the job a demo.
 
-## Assistant JSON and owner credentials
-
-Copy the refreshed **Assistant instructions** into your Gemini Gem or Custom GPT after this update. Final responses use one copyable json code block, always include suggested_addons, and include the catalogue’s standard PVC contact parts for eligible work types. The JSON loader accepts raw JSON or one complete fenced block. Suggestions stay outside the agreed scope until reviewed and added as optional.
-
-For an existing draft with missing standard PVC parts, review the contact-area list and choose **Use reviewed standard PVC scope**. Explicit practice records still require real-customer confirmation before publication; new legacy imports no longer become demo jobs merely because is_demo was omitted.
-
-Runtime Cloudflare owner secret updates now replace the saved login and revoke existing sessions. Account-page changes persist until the environment secret values change again. See the deployment guide for the exact update steps.
+Account recovery and runtime secret changes are covered in the deployment guide. The user enters passwords directly in **Settings → Account** or the relevant private Cloudflare settings; no password is included in documentation.

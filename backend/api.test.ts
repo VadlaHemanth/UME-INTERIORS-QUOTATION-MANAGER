@@ -300,3 +300,77 @@ test('Cloudflare usernames support email addresses and business names with consi
   assert.equal((await store.load()).state.owner!.username, 'ume.office+owner@example.com');
   assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: 'ume.office+owner@example.com', password: email.OWNER_PASSWORD.trim() + ' ' }), store, email)).status, 401, 'password whitespace is never silently changed');
 });
+
+
+test('owner business settings persist edited payment recipient and stale rate-card tabs cannot overwrite them', async () => {
+  const store = memoryStore(paymentFixture());
+  const original = structuredClone((await store.load()).state.catalogue);
+  assert.equal((await handleApi(request('/api/studio/company', 'PUT', { company: original.company }), store, environment)).status, 401);
+  const login = await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, environment);
+  const cookie = cookieFrom(login);
+  const company = structuredClone(original.company);
+  company.brandName = 'UME Interiors Studio';
+  company.proprietor = 'Updated Proprietor';
+  company.bank.upiId = 'updated.owner@oksbi';
+  company.bank.accountName = 'UPDATED ACCOUNT HOLDER';
+  company.bank.accountNumber = '001234567890';
+  const changed = await handleApi(request('/api/studio/company', 'PUT', { company }, cookie), store, environment);
+  assert.equal(changed.status, 200);
+  assert.deepEqual((await changed.json() as any).company, company);
+  // Subsequent requests previously reset UPI to a hardcoded default.
+  const quote = await handleApi(request('/api/quotes/ume-test-api'), store, environment);
+  assert.equal((await quote.json() as any).catalogue.company.bank.upiId, company.bank.upiId);
+  const staleRateCard = structuredClone(original);
+  staleRateCard.workTypes['Box type'].rates.Base.Standard = 975;
+  const saveRates = await handleApi(request('/api/studio/catalogue', 'PUT', staleRateCard, cookie), store, environment);
+  assert.equal(saveRates.status, 200);
+  const saved = (await store.load()).state;
+  assert.deepEqual(saved.catalogue.company, company);
+  assert.equal(saved.catalogue.workTypes['Box type'].rates.Base.Standard, 975);
+  assert.deepEqual(saved.quotes[0].snapshot, paymentFixture().quotes[0].snapshot);
+  assert.equal(saved.catalogue.company.bank.accountNumber, '001234567890');
+});
+
+test('invalid owner business settings are rejected without changing stored payment details', async () => {
+  const store = memoryStore();
+  const login = await handleApi(request('/api/studio/auth', 'POST', { username: environment.OWNER_USERNAME, password: environment.OWNER_PASSWORD }), store, environment);
+  const cookie = cookieFrom(login);
+  const original = structuredClone((await store.load()).state.catalogue.company);
+  const invalid = structuredClone(original);
+  invalid.bank.upiId = 'not-a-payment-address';
+  invalid.bank.ifsc = 'invalid';
+  const response = await handleApi(request('/api/studio/company', 'PUT', { company: invalid }, cookie), store, environment);
+  assert.equal(response.status, 400);
+  const payload = await response.json() as any;
+  assert.ok(payload.errors['bank.upiId']);
+  assert.ok(payload.errors['bank.ifsc']);
+  assert.deepEqual((await store.load()).state.catalogue.company, original);
+  assert.equal((await handleApi(request('/api/studio/company', 'PUT', { company: original }, cookie, 'https://another.example'), store, environment)).status, 403);
+});
+
+
+test('public portal loads current business identity without bank, rate-card or owner authentication data', async () => {
+  const initial = emptyState();
+  initial.catalogue.company.brandName = 'UME Updated Display Name';
+  const response = await handleApi(request('/api/company'), memoryStore(initial), environment);
+  assert.equal(response.status, 200);
+  const payload = await response.json() as any;
+  assert.equal(payload.company.brandName, initial.catalogue.company.brandName);
+  assert.equal('bank' in payload.company, false);
+  assert.equal('catalogue' in payload, false);
+  assert.equal('owner' in payload, false);
+  assert.match(response.headers.get('cache-control')!, /no-store/);
+});
+
+
+test('customer quote allowlist retains estimate basis and customer-facing note while hiding private metadata', async () => {
+  const state = paymentFixture();
+  state.quotes[0].draft.quote.estimate_basis = 'floor_plan';
+  state.quotes[0].draft.quote.estimate_note = 'Confirm laminate colours after the site review.';
+  (state.quotes[0].draft.quote as any).internalOwnerNote = 'Not customer visible';
+  const response = await handleApi(request('/api/quotes/ume-test-api'), memoryStore(state), environment);
+  const payload = await response.json() as any;
+  assert.equal(payload.quote.draft.quote.estimate_basis, 'floor_plan');
+  assert.equal(payload.quote.draft.quote.estimate_note, state.quotes[0].draft.quote.estimate_note);
+  assert.equal('internalOwnerNote' in payload.quote.draft.quote, false);
+});

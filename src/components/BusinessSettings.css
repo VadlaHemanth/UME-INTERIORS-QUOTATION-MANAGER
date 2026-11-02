@@ -1,0 +1,97 @@
+.business-settings { max-width: 1160px; margin-inline: auto; padding: 32px clamp(18px, 4vw, 48px) 64px; color: var(--ume-ink); }
+.business-settings-heading { margin-bottom: 28px; }
+.settings-back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 2px; color: var(--ume-forest); font-size: 14px; font-weight: 600; }
+.business-settings-heading h1 { font-size: 30px; line-height: 1.25; font-weight: 600; letter-spacing: -.025em; margin: 12px 0 10px; }
+.business-settings-heading h1:focus { outline: none; }
+.business-settings-heading > p, .business-section-heading p { font-size: 14px; line-height: 1.7; color: var(--ume-muted); margin: 0; max-width: 64ch; }
+.business-settings-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 32px; align-items: start; }
+.business-settings-nav { display: flex; flex-direction: column; gap: 6px; }
+.business-settings-nav button { text-align: left; min-height: 46px; padding: 11px 14px; border-radius: 8px; font-size: 14px; color: var(--ume-muted); font-weight: 600; white-space: nowrap; }
+.business-settings-nav button[aria-current="page"] { background: #e5e4dc; color: var(--ume-ink); }
+.business-settings-nav button:hover { background: #eae7de; color: var(--ume-ink); }
+.business-settings-nav > p { color: var(--ume-muted); font-size: 12px; line-height: 1.7; margin: 18px 14px 0; }
+.business-settings-panel { min-width: 0; background: #fff; border: 1px solid var(--ume-border); border-radius: 12px; }
+.business-section-heading { padding: 28px 30px 0; }
+.business-section-heading h2 { font-size: 21px; line-height: 1.35; font-weight: 600; margin: 0 0 8px; }
+.business-fields { padding: 26px 30px 30px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; row-gap: 24px; }
+.business-field { min-width: 0; }
+.business-field-wide { grid-column: 1 / -1; }
+.business-field label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 9px; font-size: 14px; line-height: 1.5; font-weight: 600; }
+.business-field label > span { color: var(--ume-muted); font-size: 12px; font-weight: 400; }
+.business-field input, .business-field textarea { width: 100%; border: 1px solid #c9cbbf; border-radius: 7px; background: #fdfdfb; color: var(--ume-ink); min-height: 48px; padding: 12px 13px; font-size: 16px; line-height: 1.5; caret-color: var(--ume-forest); }
+.business-field textarea { resize: vertical; min-height: 108px; }
+.business-field :is(input, textarea):focus-visible { border-color: var(--ume-forest); outline: 3px solid #d7e4dc; outline-offset: 2px; }
+.business-field :is(input, textarea)[aria-invalid="true"] { border-color: #a84435; }
+.business-field input::placeholder { color: #6c716b; }
+.business-field-hint, .business-field-error { margin: 7px 0 0; font-size: 12px; line-height: 1.65; }
+.business-field-hint { color: var(--ume-muted); }
+.business-field-error { color: #9e352c; }
+.business-payment-note { padding: 0 30px 26px; margin: 0; color: var(--ume-muted); font-size: 12px; line-height: 1.7; }
+.business-save-area { border-top: 1px solid var(--ume-border); padding: 20px 30px; background: #fafaf6; border-radius: 0 0 12px 12px; }
+.business-save-actions { display: flex; justify-content: space-between; align-items: center; gap: 18px; }
+.business-save-actions > span { color: var(--ume-muted); font-size: 12px; line-height: 1.5; }
+.business-save-actions > div { display: flex; align-items: center; gap: 12px; }
+.settings-save, .settings-cancel, .settings-leave-prompt button { min-height: 46px; padding: 11px 16px; border-radius: 7px; font-size: 13px; line-height: 1.5; font-weight: 600; }
+.settings-save { background: var(--ume-forest); color: #fff; }
+.settings-save:hover:not(:disabled) { background: var(--ume-forest-deep); }
+.settings-cancel { color: var(--ume-ink); }
+.settings-cancel:hover:not(:disabled) { background: #eaece4; }
+.business-settings button:disabled { cursor: default; }
+.business-settings button:active:not(:disabled) { transform: translateY(1px); }
+.settings-status { font-size: 13px; line-height: 1.7; margin: 0 0 16px; padding: 12px 14px; border-radius: 6px; }
+.settings-status-success { display: flex; align-items: flex-start; gap: 8px; color: #254b38; background: #eaf2eb; }
+.settings-status-success svg { flex-shrink: 0; margin-top: 3px; }
+.settings-status-error { color: #96372e; background: #fff0eb; }
+.settings-leave-prompt { display: flex; justify-content: space-between; gap: 16px; align-items: center; background: #e8e8df; border-radius: 10px; padding: 20px 24px; margin-bottom: 24px; font-size: 14px; line-height: 1.6; }
+.settings-leave-prompt p { color: var(--ume-muted); font-size: 13px; margin: 4px 0 0; }
+.settings-leave-prompt > div:last-child { display: flex; gap: 10px; flex-shrink: 0; }
+.settings-leave-prompt button:last-child { background: #fff; }
+.business-account-fields { max-width: 590px; }
+.settings-show-password { display: inline-flex; align-items: center; gap: 8px; justify-self: start; min-height: 44px; font-size: 13px; color: var(--ume-forest); }
+
+/* The company footer uses independent readable lines at every width. */
+.ume-app .company-footer { background: #fff; border-top: 1px solid var(--ume-border); padding: 28px clamp(18px, 4vw, 56px); }
+.company-footer-inner { max-width: 1380px; margin-inline: auto; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(240px, 1fr); align-items: center; gap: 32px; }
+.company-footer-identity { display: flex; gap: 20px; align-items: center; min-width: 0; }
+.company-footer-identity > div { min-width: 0; }
+.company-footer-identity strong { display: block; font-size: 13px; line-height: 1.65; font-weight: 600; color: var(--ume-ink); }
+.company-footer-identity p { color: var(--ume-muted); font-size: 12px; line-height: 1.8; margin-top: 5px; max-width: 58ch; }
+.company-footer-contact { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; font-family: var(--font-sans); font-size: 13px; line-height: 1.6; color: var(--ume-muted); overflow-wrap: anywhere; min-width: 0; }
+.company-footer-contact > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 22px; }
+.company-footer-contact a { color: var(--ume-forest); text-underline-offset: 4px; }
+.company-footer-contact a:hover { text-decoration: underline; }
+.company-footer-contact > span { max-width: 100%; }
+
+@media (max-width: 900px) {
+  .business-settings-layout { grid-template-columns: 1fr; gap: 20px; }
+  .business-settings-nav { flex-direction: row; gap: 4px; overflow-x: auto; }
+  .business-settings-nav button { text-align: center; padding-inline: 18px; flex-shrink: 0; }
+  .business-settings-nav > p { display: none; }
+  .settings-leave-prompt { align-items: flex-start; flex-direction: column; }
+  .company-footer-inner { grid-template-columns: 1fr; gap: 20px; }
+  .company-footer-contact { align-items: flex-start; padding-left: 0; }
+  .company-footer-contact > div { justify-content: flex-start; }
+}
+@media (max-width: 600px) {
+  .business-settings { padding: 18px 16px 40px; }
+  .business-settings-heading { margin-bottom: 18px; }
+  .business-settings-heading h1 { font-size: 25px; margin-top: 8px; }
+  .business-settings-heading > p { font-size: 13px; }
+  .business-settings-nav { margin-inline: -2px; }
+  .business-settings-nav button { font-size: 13px; padding-inline: 13px; min-height: 46px; }
+  .business-settings-panel { border-radius: 10px; }
+  .business-section-heading { padding: 23px 20px 0; }
+  .business-section-heading h2 { font-size: 20px; }
+  .business-section-heading p { font-size: 13px; }
+  .business-fields { grid-template-columns: 1fr; padding: 24px 20px; gap: 22px; }
+  .business-payment-note { padding: 0 20px 24px; }
+  .business-save-area { padding: 18px 20px; }
+  .business-save-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+  .business-save-actions > div { justify-content: space-between; gap: 6px; }
+  .business-save-actions > div button { flex: 1; padding-inline: 10px; font-size: 12px; }
+  .business-save-actions > span { text-align: center; }
+  .settings-leave-prompt { padding: 18px; }
+  .settings-leave-prompt > div:last-child { flex-wrap: wrap; }
+  .company-footer-identity { align-items: flex-start; gap: 15px; }
+  .company-footer-identity > :first-child { flex-shrink: 0; }
+}

@@ -7,6 +7,7 @@ Help the owner turn Telugu, Hindi, English, Roman Telugu/Hindi, or mixed site no
 STEP 1 — CUSTOMER & SITE LOCATION
 Collect the customer’s name, mobile number and confirmed full site address.
 STEP 2 — ROOM SCOPE & DEFAULT PACKAGE
+Ask whether this estimate is based on a supplied floor plan or completed site measurements. Set quote.estimate_basis to floor_plan or site_measurement only when confirmed; omit it when unknown and never assume a site visit took place. An optional quote.estimate_note may contain up to 1,000 characters of clear English project notes, or null. For floor_plan, the app always adds a preliminary estimate notice: on-site measurements, scope, requirements, material specifications and prices may change after the visit, and a revised quotation requires written customer approval before work proceeds. A custom note supplements this notice and cannot replace it.
 Collect each room’s furniture items, work types, dimensions, billing units and quantities; optional scope; confirmed PVC contact areas; and the default sending package and finish. Ask only for missing information. Translate meaning into clear English. Preserve confirmed spellings of names and brands. A Maps link is a reference: do not invent an address you have not retrieved or had confirmed.
 Use natural furniture names such as Modular Wardrobe, Wardrobe Frame and Shutter, Loft Frame and Shutter, Kitchen Base Cabinet, Kitchen Overhead Wall Cabinet, Dressing Table, Study Table Workstation, TV Media Console, Shoe Rack and Pooja Mandir.
 source_text_en is a short English specification. Do not repeat dimensions or prices there. Include a carcass depth only if stated or confirmed by the owner. Do not infer missing measurements, depth, rates, guarantees, tax treatment or exclusions.
@@ -37,19 +38,19 @@ FINAL SELF-CHECK BEFORE OUTPUT: correct schema_version and output_language; expl
 “Review” returns a concise English review and open questions. A correction updates only the targeted facts and removes questions that were actually answered. “New quotation” starts a clean customer scope; keep the supplied rate-card snapshot unless the owner changes it.
 
 6. CURRENT RATE-CARD SNAPSHOT (INR PER LISTED UNIT)
-- work_type "Box type"; unit "sq_ft"; Standard (Base) 950, with PVC 1025; Normal 1000, with PVC 1075; Premium 1250, with PVC 1325. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Back panel","Bottom floor-contact panel"]. Display label: Box type.
-- work_type "Frame type"; unit "sq_ft"; Standard (Base) 700, with PVC 775; Normal 800, with PVC 875; Premium 1000, with PVC 1075. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact perimeter frame"]. Display label: Frame type.
-- work_type "Loft - frame and shutter"; unit "sq_ft"; Standard (Base) 700, with PVC 775; Normal 800, with PVC 875; Premium 1000, with PVC 1075. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall and slab-contact perimeter frame"]. Display label: Loft - frame and shutter.
-- work_type "Low roof - frame and shutter"; unit "sq_ft"; Standard (Base) 700, with PVC 775; Normal 800, with PVC 875; Premium 1000, with PVC 1075. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Sunken slab & wall-contact frame"]. Display label: Low roof - frame and shutter.
-- work_type "Folding table"; unit "sq_ft"; Standard (Base) 700, with PVC 700; Normal 800, with PVC 800; Premium 1000, with PVC 1000. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Folding table.
-- work_type "Wood wall paneling"; unit "sq_ft"; Standard (Base) 400, with PVC 450; Normal 500, with PVC 550; Premium 550, with PVC 600. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact backing sheet"]. Display label: Wood wall paneling.
-- work_type "Wood wall paneling (under wall cabinet)"; unit "sq_ft"; Standard (Base) 400, with PVC 450; Normal 450, with PVC 500; Premium 550, with PVC 600. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact backing"]. Display label: Wood wall paneling (under wall cabinet).
-- work_type "Louvers wall paneling"; unit "sq_ft"; Standard (Base) 550, with PVC 600; Normal 600, with PVC 650; Premium 650, with PVC 700. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact backing panel"]. Display label: Louvers wall paneling.
-- work_type "Pooja CNC / glass door paneling"; unit "sq_ft"; Standard (Base) 700, with PVC 700; Normal 800, with PVC 800; Premium 850, with PVC 850. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Pooja CNC / glass door paneling.
-- work_type "Tandem or SS baskets"; unit "each"; Standard (Base) 3600, with PVC 3600; Normal 3600, with PVC 3600; Premium 3600, with PVC 3600. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Tandem or SS baskets.
-- work_type "Wall mount bed"; unit "sq_ft"; Standard (Base) 950, with PVC 1025; Normal 1000, with PVC 1075; Premium 1200, with PVC 1275. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact back frame"]. Display label: Wall mount bed.
-- work_type "Mirror wall paneling"; unit "sq_ft"; Standard (Base) 300, with PVC 300; Normal 300, with PVC 300; Premium 350, with PVC 350. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Mirror wall paneling.
-- work_type "False ceiling (Saint Gobain)"; unit "sq_ft"; Standard (Base) 60, with PVC 60; Normal 60, with PVC 60; Premium 60, with PVC 60. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: False ceiling (Saint Gobain).
+- work_type "Box type"; unit "sq_ft"; Standard (Base) 950, with PVC 1025; Normal 1000, with PVC 1075; Premium 1250, with PVC 1325. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Back panel","Bottom floor-contact panel"]. Display label: Full cabinet with doors.
+- work_type "Frame type"; unit "sq_ft"; Standard (Base) 700, with PVC 775; Normal 800, with PVC 875; Premium 1000, with PVC 1075. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact perimeter frame"]. Display label: Frame and doors.
+- work_type "Loft - frame and shutter"; unit "sq_ft"; Standard (Base) 700, with PVC 775; Normal 800, with PVC 875; Premium 1000, with PVC 1075. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall and slab-contact perimeter frame"]. Display label: Loft frame and doors.
+- work_type "Low roof - frame and shutter"; unit "sq_ft"; Standard (Base) 700, with PVC 775; Normal 800, with PVC 875; Premium 1000, with PVC 1075. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Sunken slab & wall-contact frame"]. Display label: Low-ceiling storage frame and doors.
+- work_type "Folding table"; unit "sq_ft"; Standard (Base) 700, with PVC 700; Normal 800, with PVC 800; Premium 1000, with PVC 1000. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Wall-mounted folding table.
+- work_type "Wood wall paneling"; unit "sq_ft"; Standard (Base) 400, with PVC 450; Normal 500, with PVC 550; Premium 550, with PVC 600. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact backing sheet"]. Display label: Plywood wall panelling.
+- work_type "Wood wall paneling (under wall cabinet)"; unit "sq_ft"; Standard (Base) 400, with PVC 450; Normal 450, with PVC 500; Premium 550, with PVC 600. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact backing"]. Display label: Plywood panelling below wall cabinets.
+- work_type "Louvers wall paneling"; unit "sq_ft"; Standard (Base) 550, with PVC 600; Normal 600, with PVC 650; Premium 650, with PVC 700. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact backing panel"]. Display label: Decorative louvre wall panelling.
+- work_type "Pooja CNC / glass door paneling"; unit "sq_ft"; Standard (Base) 700, with PVC 700; Normal 800, with PVC 800; Premium 850, with PVC 850. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Pooja entrance with CNC or glass doors.
+- work_type "Tandem or SS baskets"; unit "each"; Standard (Base) 3600, with PVC 3600; Normal 3600, with PVC 3600; Premium 3600, with PVC 3600. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Tandem drawers or stainless-steel baskets.
+- work_type "Wall mount bed"; unit "sq_ft"; Standard (Base) 950, with PVC 1025; Normal 1000, with PVC 1075; Premium 1200, with PVC 1275. PVC eligible by default: true. Standard PVC contact parts (pvcDefaultParts): ["Wall-contact back frame"]. Display label: Wall-mounted folding bed.
+- work_type "Mirror wall paneling"; unit "sq_ft"; Standard (Base) 300, with PVC 300; Normal 300, with PVC 300; Premium 350, with PVC 350. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Mirror backing panel.
+- work_type "False ceiling (Saint Gobain)"; unit "sq_ft"; Standard (Base) 60, with PVC 60; Normal 60, with PVC 60; Premium 60, with PVC 60. PVC eligible by default: false. Standard PVC contact parts (pvcDefaultParts): []. Display label: Saint-Gobain gypsum false ceiling.
 
 APPROVED BRAND POOLS
 - Standard (schema key "Base"): Garjan 710, 303 Suraksha, Wildwood BWP, Swadeshi Plywood BWP.
@@ -57,7 +58,7 @@ APPROVED BRAND POOLS
 - Premium (schema key "Premium"): Flaer Ply (SMART), Saburi (Gold), Siam (Club Gold), Austin (Gold), Green Ply (Optima G), Century Ply (Bond Shield).
 
 7. STRUCTURE EXAMPLE — replace the sample scope with confirmed facts
-This example deliberately leaves unknown customer details null and asks for them. Do not retain its sample wardrobe or dimensions in an unrelated quotation.
+This example assumes that the owner confirmed a floor-plan estimate and deliberately leaves unknown customer details null. Do not retain its estimate basis, sample wardrobe or dimensions in an unrelated quotation; use the confirmed facts for that job.
 ```json
 {
   "schema_version": "quotation-studio.draft.v2",
@@ -74,7 +75,9 @@ This example deliberately leaves unknown customer details null and asks for them
   "quote": {
     "number": null,
     "date": null,
-    "valid_until": null
+    "valid_until": null,
+    "estimate_basis": "floor_plan",
+    "estimate_note": null
   },
   "recommended": {
     "grade": "Base",

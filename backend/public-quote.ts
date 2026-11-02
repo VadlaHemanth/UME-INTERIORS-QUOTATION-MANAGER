@@ -13,7 +13,11 @@ function publicDraft(draft: QuotationDraftV2): QuotationDraftV2 {
     is_demo: draft.is_demo,
     languages: [...draft.languages],
     customer: { name: draft.customer.name, phone: draft.customer.phone, site: draft.customer.site },
-    quote: { number: draft.quote.number, date: draft.quote.date, valid_until: draft.quote.valid_until },
+    quote: {
+      number: draft.quote.number, date: draft.quote.date, valid_until: draft.quote.valid_until,
+      ...(draft.quote.estimate_basis ? { estimate_basis: draft.quote.estimate_basis } : {}),
+      ...(draft.quote.estimate_note ? { estimate_note: draft.quote.estimate_note } : {}),
+    },
     recommended: draft.recommended ? selection(draft.recommended) : null,
     rooms: draft.rooms.map((room) => ({
       name: room.name,

@@ -233,13 +233,13 @@ export function standardizeCompetitorItemName(
   const wt = (workType || '').toLowerCase();
 
   if (lower === 'base cabinet unit' || lower === 'base cabinet') {
-    return 'Kitchen Base Cabinet';
+    return /kitchen/i.test(roomName) ? 'Kitchen Base Cabinet' : 'Base Cabinet';
   }
   if (lower === 'wall cabinet unit' || lower === 'wall cabinet') {
-    return 'Kitchen Overhead Wall Cabinet';
+    return /kitchen/i.test(roomName) ? 'Kitchen Overhead Wall Cabinet' : 'Wall Cabinet';
   }
   if (lower.includes('kitchen cabinet unit (opposite to base cabinet)')) {
-    return 'Kitchen Full-Height Utility Cabinet';
+    return 'Cabinet Opposite Kitchen Base Cabinets';
   }
   if (lower === 'loft frame and shutter' || lower === 'loft') {
     return 'Loft Frame and Shutter';
@@ -278,13 +278,13 @@ export function standardizeCompetitorItemName(
     return lower.includes('louver') ? 'TV Media Console with Louvers' : 'TV Media Console';
   }
   if (lower === 'tandem or ss baskets with hardware fitting' || lower === 'tandem or ss baskets') {
-    return 'Modular Tandem / SS 304 Pull-Out Baskets';
+    return 'Tandem Drawers or Stainless-Steel Baskets';
   }
   if (lower === 'pooja mandir' || (lower.includes('room') && lower.includes('pooja'))) {
     return 'Pooja Mandir Unit';
   }
   if (lower === 'pooja doors and glass or cnc doors with wall paneling') {
-    return 'Pooja Entrance Frame & CNC / Glass Double Doors';
+    return 'Pooja Entrance with CNC or Glass Doors and Wall Panelling';
   }
   if (lower === 'wood wall paneling under loft') {
     return 'Wall Panelling Under Loft';
@@ -305,7 +305,7 @@ export function standardizeCompetitorItemName(
  * Produces a clean, non-repetitive item specification sub-line:
  * - Strips redundant trailing dimensions (since Dimensions has its own column)
  * - Replaces "High Gloss or SF laminate finish" with clean "outside laminate finish"
- * - Injects the standard carcass depth in inches (e.g., 21" depth, 12" depth) directly into the item description when applicable
+ * - Preserves confirmed specifications without inferring depth, hardware or materials
  */
 export function formatCleanItemDescription(
   rawSourceText: string,
@@ -313,7 +313,6 @@ export function formatCleanItemDescription(
   workType: string,
   roomName = ''
 ): string {
-  const depthIn = resolveStandardDepthInches(itemName, workType, roomName);
   const raw = (rawSourceText || '').trim();
 
   let cleaned = raw
@@ -324,27 +323,13 @@ export function formatCleanItemDescription(
     .replace(/outside\s+(?:1\.?0?\s*mm\s+)?(?:High[-\s]*Gloss\s+or\s+SF|SF\s+(?:Matte\s+)?or\s+High[-\s]*Gloss)\s+laminate\s+finish/gi, 'outside laminate finish')
     .replace(/both\s+sides\s+(?:1\.?0?\s*mm\s+)?(?:High[-\s]*Gloss\s+or\s+SF|SF\s+(?:Matte\s+)?or\s+High[-\s]*Gloss)\s+laminate\s+finish/gi, 'both sides laminate finish')
     .replace(/High[-\s]*Gloss\s+or\s+SF\s+laminate\s+finish/gi, 'outside laminate finish')
-    // Remove "0.8mm " / "0.8 mm " / "1mm " / "1.0mm " before "inside laminate" or "outside laminate" under the unit
-    .replace(/\b0\.8\s*mm\s+inside\s+laminate\b/gi, 'inside laminate')
-    .replace(/\b1(?:\.0)?\s*mm\s+outside\s+laminate\b/gi, 'outside laminate')
     .trim();
 
   if (cleaned && !cleaned.endsWith('.')) {
     cleaned += '.';
   }
 
-  if (depthIn) {
-    const hasDepthMention = /\b\d{1,2}\s*(?:"|''|in\b|inch\b|inches\b)|\bcarcass\s+depth\b/i.test(
-      cleaned
-    );
-    if (!hasDepthMention) {
-      cleaned = `${depthIn}" carcass depth · ${
-        cleaned || 'With inside laminate and outside laminate finish.'
-      }`;
-    }
-  }
-
-  return cleaned || 'With inside laminate and outside laminate finish.';
+  return cleaned || 'See the agreed item specification.';
 }
 
 export interface StudioCatalogue {
@@ -414,10 +399,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       grade: 'Base',
       displayLabel: 'Standard',
       tagline: 'BWP 710 & 303 Grade Plywood with Laminate Finish',
-      warrantyBanner: '1.0mm Outside Laminate & Standard Hardware Included',
+      warrantyBanner: '1.0 mm external laminate and standard hardware included',
       termiteProofBadge: 'BWP 710 & Commercial 303 Grade Plywood',
       pvcRecommendationNote:
-        'Optional Add-On: 6mm PVC Board at wall, slab, and floor contact areas (+₹75/sq.ft on eligible units).',
+        'Optional 6 mm PVC board at the specified wall, slab and floor contact areas. The applicable item rate is shown in the quotation.',
       plainEnglishSummary:
         'Plywood furniture with 0.8 mm inside liner laminate and 1.0 mm outside decorative laminate. Approved brand pool: Garjan 710, 303 Suraksha, Wildwood, or Swadeshi Plywood BWP.',
       outerLaminateAllowance:
@@ -458,10 +443,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       grade: 'Normal',
       displayLabel: 'Normal',
       tagline: 'BWR 710 / 303 Grade Plywood — 20 / 15 / 10 Yrs Brand Warranty',
-      warrantyBanner: '20 / 15 / 10 Years Manufacturer Brand Warranty',
+      warrantyBanner: 'Manufacturer warranty: 20, 15 or 10 years, depending on the selected product',
       termiteProofBadge: 'BWR 710 & 303 Grade Plywood',
       pvcRecommendationNote:
-        'Optional Add-On: 6mm PVC Board at wall, slab, and floor contact areas (+₹75/sq.ft on eligible units).',
+        'Optional 6 mm PVC board at the specified wall, slab and floor contact areas. The applicable item rate is shown in the quotation.',
       plainEnglishSummary:
         'BWR 710 and 303 grade plywood with 20 / 15 / 10 years manufacturer warranty (governed by the selected brand certificate and invoice), 0.8 mm inside liner laminate, and 1.0 mm outside laminate finish.',
       outerLaminateAllowance:
@@ -495,10 +480,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       grade: 'Premium',
       displayLabel: 'Premium',
       tagline: 'BWP 710 Marine Grade Plywood — 30 / 25 / 21 Yrs Brand Warranty',
-      warrantyBanner: '30 / 25 / 21 Years Manufacturer Brand Warranty',
+      warrantyBanner: 'Manufacturer warranty: 30, 25 or 21 years, depending on the selected product',
       termiteProofBadge: 'BWP 710 Marine Grade Plywood',
       pvcRecommendationNote:
-        'Optional Add-On: 6mm PVC Board at wall, slab, and floor contact areas (+₹75/sq.ft on eligible units).',
+        'Optional 6 mm PVC board at the specified wall, slab and floor contact areas. The applicable item rate is shown in the quotation.',
       plainEnglishSummary:
         'BWP 710 marine-grade plywood across listed units with 30 / 25 / 21 years manufacturer warranty (governed by the selected product certificate and invoice), 0.8 mm inside liner laminate, and 1.0 mm outside laminate finish.',
       outerLaminateAllowance:
@@ -568,10 +553,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
   workTypes: {
     'Box type': {
       id: 'Box type',
-      label: 'Box type',
+      label: 'Full cabinet with doors',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Full 5-sided plywood carcass (top, bottom, two sides, and back panel) with internal shelves, 0.8mm inside laminate, and hinged or sliding shutters with 1mm outside laminate finish. Billed by front-face area (Height × Width).',
+        'Full plywood cabinet body (top, bottom, two sides and back) with internal shelves, 0.8mm inside laminate, and hinged or sliding shutters with 1mm outside laminate finish. Billed by front area (height × width).',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Back panel', 'Bottom floor-contact panel'],
       rates: {
@@ -583,10 +568,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Frame type': {
       id: 'Frame type',
-      label: 'Frame type',
+      label: 'Frame and doors',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Perimeter plywood frame anchored directly to existing masonry recess or granite/kadappa shelves, fitted with laminated shutters on the front face. Billed by front-face area (Height × Width).',
+        'Plywood frame fixed to an existing wall recess or stone shelves, with laminated doors at the front. Billed by front area (height × width).',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact perimeter frame'],
       rates: {
@@ -598,10 +583,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Loft - frame and shutter': {
       id: 'Loft - frame and shutter',
-      label: 'Loft - frame and shutter',
+      label: 'Loft frame and doors',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Overhead storage closure above a concrete loft slab or wardrobe top, consisting of a seasoned plywood frame and hinged shutters with 0.8mm inside laminate and 1mm outside laminate finish.',
+        'Overhead storage closure above a concrete loft slab or wardrobe top, with a plywood frame and hinged doors with 0.8mm inside laminate and 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall and slab-contact perimeter frame'],
       rates: {
@@ -613,10 +598,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Low roof - frame and shutter': {
       id: 'Low roof - frame and shutter',
-      label: 'Low roof - frame and shutter',
+      label: 'Low-ceiling storage frame and doors',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Frame and shutter storage built under a sunken slab / low-roof ledge, finished with 0.8mm inside laminate and 1mm outside laminate finish.',
+        'Storage frame and doors below a sunken slab or low-ceiling ledge, finished with 0.8mm inside laminate and 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Sunken slab & wall-contact frame'],
       rates: {
@@ -628,7 +613,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Folding table': {
       id: 'Folding table',
-      label: 'Folding table',
+      label: 'Wall-mounted folding table',
       unit: 'sq_ft',
       plainEnglishDefinition:
         '18" depth wall-mounted collapsible study or utility table finished on both top and bottom faces with 1mm outside laminate finish and heavy-duty folding brackets.',
@@ -643,7 +628,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Wood wall paneling': {
       id: 'Wood wall paneling',
-      label: 'Wood wall paneling',
+      label: 'Plywood wall panelling',
       unit: 'sq_ft',
       plainEnglishDefinition:
         'Flat plywood wall cladding installed under lofts, around pillars, main door jambs, or breakfast counters, finished on the visible face with 1mm outside laminate finish.',
@@ -658,10 +643,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Wood wall paneling (under wall cabinet)': {
       id: 'Wood wall paneling (under wall cabinet)',
-      label: 'Wood wall paneling (under wall cabinet)',
+      label: 'Plywood panelling below wall cabinets',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Slim underside or backsplash plywood panelling beneath kitchen wall cabinets finished with 1mm outside laminate finish.',
+        'Plywood panelling below kitchen wall cabinets finished with 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact backing'],
       rates: {
@@ -673,10 +658,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Louvers wall paneling': {
       id: 'Louvers wall paneling',
-      label: 'Louvers wall paneling',
+      label: 'Decorative louvre wall panelling',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Decorative fluted charcoal/wood louver and 1mm outside laminate wall panelling for TV units or above main door entrances.',
+        'Decorative fluted louvre wall panelling with 1 mm external laminate, for TV units or above the main entrance.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact backing panel'],
       rates: {
@@ -688,10 +673,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Pooja CNC / glass door paneling': {
       id: 'Pooja CNC / glass door paneling',
-      label: 'Pooja CNC / glass door paneling',
+      label: 'Pooja entrance with CNC or glass doors',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Pooja room entrance framing and double doors incorporating decorative CNC jali / glass cut-outs and 1mm outside laminate finish.',
+        'Pooja room entrance frame and double doors with CNC-cut decorative screens or glass panels and 1mm outside laminate finish.',
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
       rates: {
@@ -703,10 +688,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Tandem or SS baskets': {
       id: 'Tandem or SS baskets',
-      label: 'Tandem or SS baskets',
+      label: 'Tandem drawers or stainless-steel baskets',
       unit: 'each',
       plainEnglishDefinition:
-        'Modular kitchen pull-out Tandem drawer box or stainless-steel (SS 304) basket complete with soft-close telescopic channels and fitting.',
+        'Kitchen pull-out tandem drawer or stainless-steel basket with the specified channels and installation. Confirm the basket grade and hardware model in the agreed item specification.',
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
       rates: {
@@ -718,7 +703,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Wall mount bed': {
       id: 'Wall mount bed',
-      label: 'Wall mount bed',
+      label: 'Wall-mounted folding bed',
       unit: 'sq_ft',
       plainEnglishDefinition:
         'Space-saving wall-mounted hydraulic/folding bed frame with 0.8mm inside laminate and 1mm outside laminate finish.',
@@ -733,10 +718,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'Mirror wall paneling': {
       id: 'Mirror wall paneling',
-      label: 'Mirror wall paneling',
+      label: 'Mirror backing panel',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Plywood backing panel with polished mirror mounting for dressing zones.',
+        'Plywood backing panel for a mirror in a dressing area.',
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
       rates: {
@@ -748,10 +733,10 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     'False ceiling (Saint Gobain)': {
       id: 'False ceiling (Saint Gobain)',
-      label: 'False ceiling (Saint Gobain)',
+      label: 'Saint-Gobain gypsum false ceiling',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Gypsum false ceiling using Saint-Gobain boards and GI perimeter/intermediate channels.',
+        'Gypsum false ceiling with Saint-Gobain boards and galvanised steel support channels.',
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
       rates: {
@@ -763,82 +748,82 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
   },
   notesAndExclusions: [
-    'Laminate Thickness Standard: Internal balancing/liner laminate is industry-standard 0.8 mm class (actual manufacturer sheet gauge is 0.72 mm to 0.80 mm as per ISI/market tolerance). Outside decorative laminate is 1.0 mm thickness in the customer’s choice of finish (SF Matte or High-Gloss at same price).',
-    'For acrylic sheets, Aluminium profile doors, heavy glass, and bespoke CNC design work, additional charges are applicable as per selection.',
-    'Outside 1.0 mm decorative laminate is applied strictly on visible exterior surfaces.',
-    'If the customer selects hardware or plywood outside the listed allowance/brands, the rate difference is payable at actuals.',
-    'For any additional internal drawers beyond standard layout, ₹5,000 per drawer is charged on Premium/2026 quotes (₹4,500–₹4,000 on historical quotes as specified).',
-    'All prices shown are all-inclusive for the listed material and labour scope.',
+    'Laminate specification: 0.8 mm nominal internal liner laminate (manufacturer sheet gauge: 0.72–0.80 mm) and 1.0 mm external decorative laminate. SF matte and high-gloss finishes have the same quoted price.',
+    'Acrylic sheets, aluminium profile doors, heavy glass and custom CNC work are charged separately according to the approved selection.',
+    'The 1.0 mm decorative laminate is applied to visible external surfaces.',
+    'Hardware or plywood outside the listed brands or allowances is charged at the approved price difference.',
+    'Additional internal drawers beyond the agreed standard layout cost ₹5,000 each on Premium/2026 quotations. Historical quotations retain their specified ₹4,000–₹4,500 rates.',
+    'Quoted prices include the materials and labour listed in the agreed scope.',
   ],
   termsAndConditions: [
     {
       id: 1,
-      title: 'Order Confirmation Booking (₹50,000)',
+      title: 'Booking payment (₹50,000)',
       clause:
-        'The customer must pay ₹50,000 (or above) as booking advance to confirm the work order and freeze the quoted material rates. This verified booking payment counts once toward the 50% work-start advance.',
+        'A booking payment of ₹50,000 or more confirms the work order and reserves the quoted material rates for the agreed scope. Once verified, it counts toward the 50% advance and is not an additional charge. Changes to measurements, scope or specifications require a revised quotation and written approval.',
       source: 'Supplied PDF',
     },
     {
       id: 2,
-      title: '50% Work-Start Advance',
+      title: '50% advance before work starts',
       clause:
-        'The customer must complete 50% of the total quotation value (less the verified ₹50,000 booking already paid) prior to material dispatch and commencement of carpentry work at site.',
+        'Before material dispatch and on-site carpentry begins, pay the balance needed to reach 50% of the quotation total. Verified booking payments count toward this amount.',
       source: 'Supplied PDF',
     },
     {
       id: 3,
-      title: '35% Milestone Upon Plywood Structure Completion',
+      title: '35% after the plywood structure is complete',
       clause:
-        'The customer must pay 35% of the total quotation value immediately upon completion of all plywood carcass and framing work at site.',
+        'Pay 35% of the quotation total when all plywood cabinet bodies and frames are complete on site.',
       source: 'Supplied PDF',
     },
     {
       id: 4,
-      title: '10% Milestone After Outside Laminate Completion',
+      title: '10% after external laminate is complete',
       clause:
-        'The customer must pay 10% of the total quotation value upon completion of outside 1.0mm laminate pressing and shutter hanging.',
+        'Pay 10% of the quotation total when the 1.0 mm external laminate is applied and the doors are fitted.',
       source: 'Supplied PDF',
     },
     {
       id: 5,
-      title: '5% Final Balance Before Handover',
+      title: '5% final balance before handover',
       clause:
-        'The customer must pay the final 5% balance in full prior to final hardware alignment and formal site handover.',
+        'Pay the final 5% balance before final hardware alignment and site handover.',
       source: 'Supplied PDF',
     },
     {
       id: 6,
-      title: 'Immediate Settlement for Extra Work',
+      title: 'Approval and payment for extra work',
       clause:
-        'Any extra work, additional drawers, or scope additions requested during execution must be approved in writing and paid immediately upon completion of that item.',
+        'Extra work, additional drawers and other scope changes require written approval. Payment is due when the approved item is complete.',
       source: 'Supplied PDF',
     },
     {
       id: 7,
-      title: 'Final Site Cleaning Responsibility',
+      title: 'Site cleaning',
       clause:
-        'Carpentry debris will be stacked neatly by the execution team; final deep site cleaning after work completion is the client’s responsibility.',
+        'The carpentry team will stack work debris neatly. The customer is responsible for final deep cleaning after completion.',
       source: 'Supplied PDF',
     },
     {
       id: 8,
-      title: 'Quotation Validity & Site Measurement Reconciliation',
+      title: 'Quotation validity and site measurements',
       clause:
-        'This quotation is valid for 30 calendar days from the issue date. Where initial quantities are prepared from floor plans, final billing is reconciled against physical site laser/tape measurements before laminate stage.',
+        'This quotation is valid until its stated expiry date, or for 30 calendar days from issue if no expiry is stated. Floor-plan estimates are checked against site measurements before the laminate stage. Any changes to quantities, scope, requirements, materials or prices require a revised quotation and written customer approval before the affected work proceeds.',
       source: 'Supplied PDF',
     },
     {
       id: 9,
-      title: 'Laminate Gauge & Finish Specification (0.8mm / 0.72mm Note)',
+      title: 'Laminate thickness and finish',
       clause:
-        'Internal balancing liner laminate is standard 0.8 mm market category (actual factory sheet thickness ranges between 0.72 mm and 0.80 mm as per manufacturer tolerance). Outside laminate is 1.0 mm thickness in the customer’s selected SF Matte or High-Gloss finish at no price difference.',
+        'Internal liner laminate is 0.8 mm nominal thickness; manufacturer sheet gauge ranges from 0.72 mm to 0.80 mm. External laminate is 1.0 mm, in the selected SF matte or high-gloss finish at the same quoted price.',
       source: 'Owner-Approved Hyderabad Protection',
     },
     {
       id: 10,
-      title: 'Materials, Approved Alternatives & Manufacturer Warranties',
+      title: 'Materials, alternatives and manufacturer warranties',
       clause:
-        'Listed alternatives allow sourcing within the approved brand schedule for each package; any different product requires written customer confirmation before purchase. Manufacturer plywood warranties (30/25/21 years on Premium or 20/15/10 years on Normal) are governed by the actual selected product’s manufacturer certificate, invoice, and terms.',
+        'Materials are sourced from the selected package’s approved brand list. A product outside that list requires written customer approval before purchase. Plywood warranties depend on the selected product and its manufacturer certificate, invoice and terms: 30, 25 or 21 years for Premium; 20, 15 or 10 years for Normal.',
       source: 'Owner-Approved Hyderabad Protection',
     },
   ],
@@ -1345,7 +1330,7 @@ export function buildDynamicGemInstructions(catalogue: StudioCatalogue = DEFAULT
   const example = {
     schema_version: 'quotation-studio.draft.v2', output_language: 'en', is_demo: false,
     languages: ['en'], customer: { name: null, site: null, phone: null },
-    quote: { number: null, date: null, valid_until: null },
+    quote: { number: null, date: null, valid_until: null, estimate_basis: 'floor_plan', estimate_note: null },
     recommended: { grade: 'Base', protection: 'Standard', finish: 'SF', brand_preference: null },
     rooms: [{ name: 'Master Bedroom', recommended: null, items: [{
       name: 'Modular Wardrobe', work_type: 'Box type', size_text: '7 ft × 8 ft',
@@ -1373,6 +1358,7 @@ Help the owner turn Telugu, Hindi, English, Roman Telugu/Hindi, or mixed site no
 STEP 1 — CUSTOMER & SITE LOCATION
 Collect the customer’s name, mobile number and confirmed full site address.
 STEP 2 — ROOM SCOPE & DEFAULT PACKAGE
+Ask whether this estimate is based on a supplied floor plan or completed site measurements. Set quote.estimate_basis to floor_plan or site_measurement only when confirmed; omit it when unknown and never assume a site visit took place. An optional quote.estimate_note may contain up to 1,000 characters of clear English project notes, or null. For floor_plan, the app always adds a preliminary estimate notice: on-site measurements, scope, requirements, material specifications and prices may change after the visit, and a revised quotation requires written customer approval before work proceeds. A custom note supplements this notice and cannot replace it.
 Collect each room’s furniture items, work types, dimensions, billing units and quantities; optional scope; confirmed PVC contact areas; and the default sending package and finish. Ask only for missing information. Translate meaning into clear English. Preserve confirmed spellings of names and brands. A Maps link is a reference: do not invent an address you have not retrieved or had confirmed.
 Use natural furniture names such as Modular Wardrobe, Wardrobe Frame and Shutter, Loft Frame and Shutter, Kitchen Base Cabinet, Kitchen Overhead Wall Cabinet, Dressing Table, Study Table Workstation, TV Media Console, Shoe Rack and Pooja Mandir.
 source_text_en is a short English specification. Do not repeat dimensions or prices there. Include a carcass depth only if stated or confirmed by the owner. Do not infer missing measurements, depth, rates, guarantees, tax treatment or exclusions.
@@ -1409,7 +1395,7 @@ APPROVED BRAND POOLS
 ${brandLines}
 
 7. STRUCTURE EXAMPLE — replace the sample scope with confirmed facts
-This example deliberately leaves unknown customer details null and asks for them. Do not retain its sample wardrobe or dimensions in an unrelated quotation.
+This example assumes that the owner confirmed a floor-plan estimate and deliberately leaves unknown customer details null. Do not retain its estimate basis, sample wardrobe or dimensions in an unrelated quotation; use the confirmed facts for that job.
 ${jsonFence}json
 ${JSON.stringify(example, null, 2)}
 ${jsonFence}`;
