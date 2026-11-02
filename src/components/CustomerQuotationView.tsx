@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { sharePaymentImage } from '../lib/payment-image-share';
 import {
   Check,
   CheckCircle2,
@@ -219,12 +220,13 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     return () => window.removeEventListener('ume:prepare-print', prepare);
   }, []);
 
-  // Payment & UTR state
+  // Payment screenshot sharing
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(
     Boolean(initialSelection.acceptedTermsAt)
   );
   const [paymentImage, setPaymentImage] = useState<File | null>(null);
   const [paymentImagePreview, setPaymentImagePreview] = useState('');
+  const [showManualPaymentShare, setShowManualPaymentShare] = useState(false);
   useEffect(() => {
     if (!paymentImage) {setPaymentImagePreview(''); return;}
     const url=URL.createObjectURL(paymentImage); setPaymentImagePreview(url);
@@ -495,22 +497,41 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setPaymentFeedback(null);
-    if (!paymentImage) {setPaymentFeedback({type:'error',message:'Choose a payment screenshot first.'});return;}
-    if (!acceptedTerms || paymentAmount<=0 || !Number.isFinite(paymentAmount) || milestones.requiresOwnerSmallOrderRule) {
-      setPaymentFeedback({type:'error',message:'Confirm the payment amount, package and terms before sharing.'});return;
+    e.preventDefault();
+    setPaymentFeedback(null);
+    setShowManualPaymentShare(false);
+    if (submittingPayment) return;
+    if (!paymentImage) {
+      setPaymentFeedback({ type: 'error', message: 'Choose a payment screenshot first.' });
+      return;
     }
-    const text=`Payment screenshot for ${draft.quote.number} — ${draft.customer.name}. Amount: ${formatINR(paymentAmount)}. Method: ${paymentMethod}. Selection: ${activePackageSummaryText}. Please verify against your bank statement. ${window.location.origin}/q/${publicId}`;
-    if (navigator.canShare?.({files:[paymentImage]}) && navigator.share) {
-      try {await navigator.share({files:[paymentImage],title:'UME payment screenshot',text});
-        setPaymentFeedback({type:'success',message:'Share flow completed. Payment is confirmed only after bank verification.'});
-      } catch(error) {if((error as DOMException).name!=='AbortError') setPaymentFeedback({type:'error',message:'Sharing is unavailable. Open WhatsApp below and attach your selected screenshot.'});}
-    } else {
-      window.open(`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(text)}`,'_blank','noopener,noreferrer');
-      setPaymentFeedback({type:'success',message:'WhatsApp opened with your details. Attach the selected screenshot there and tap Send. This browser cannot attach it automatically.'});
+    if (!acceptedTerms || paymentAmount <= 0 || !Number.isFinite(paymentAmount) || milestones.requiresOwnerSmallOrderRule) {
+      setPaymentFeedback({ type: 'error', message: 'Confirm the payment amount, package and terms before sharing.' });
+      return;
     }
-    try {await onSaveSelection({wholeHomeSelection,mixByRoom,roomSelections,selectedOptionalPointers,acceptedTerms:true,explicitCustomerSave:true});setSavedByCustomer(true);setHasUnsavedChanges(false);}
-    catch {setSelectionSaveError('Please save your package again; its latest changes could not be saved.');}
+    setSubmittingPayment(true);
+    try {
+      // Start file sharing directly from the tap, before any save/network await.
+      const result = await sharePaymentImage(paymentImage, draft.quote.number || 'quotation', navigator, window.isSecureContext);
+      if (result === 'cancelled') return;
+      if (result !== 'shared') {
+        setShowManualPaymentShare(true);
+        setPaymentFeedback({ type: 'error', message: result === 'insecure'
+          ? 'Open this quotation using its secure HTTPS link to share the screenshot. You can also use the attachment steps below.'
+          : 'This browser could not open image sharing. Download the screenshot below, then attach it in the WhatsApp chat.' });
+        return;
+      }
+      setPaymentFeedback({ type: 'success', message: 'Image handed to your share app. In WhatsApp, choose V. SUBHASH (' + catalogue.company.phone + ') and tap Send. Payment is confirmed only after bank verification.' });
+      try {
+        await onSaveSelection({ wholeHomeSelection, mixByRoom, roomSelections, selectedOptionalPointers, acceptedTerms: true, explicitCustomerSave: true });
+        setSavedByCustomer(true);
+        setHasUnsavedChanges(false);
+      } catch {
+        setSelectionSaveError('Please save your package again; its latest changes could not be saved.');
+      }
+    } finally {
+      setSubmittingPayment(false);
+    }
   };
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
@@ -1165,13 +1186,13 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                         return (
                           <label
                             key={pointer}
-                            className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-[13px] cursor-pointer ${
+                            className={`optional-item-choice p-3 rounded-xl border flex items-center justify-between gap-3 text-[13px] cursor-pointer ${
                               isChecked
                                 ? 'bg-[#F6FAF7] border-[#1C3A2F]'
                                 : 'bg-[#FAF8F4] border-[#E5DFD3]'
                             }`}
                           >
-                            <div className="flex items-center gap-2.5">
+                            <div className="optional-item-description flex items-start gap-3 min-w-0">
                               <input
                                 type="checkbox"
                                 checked={isChecked}
@@ -1186,7 +1207,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 <span className="text-[#5C645F] ml-2">({item.sizeText})</span>
                               </div>
                             </div>
-                            <span className="font-sans font-bold text-[#1C3A2F] tabular-nums">
+                            <span className="optional-item-amount font-sans font-bold text-[#1C3A2F] tabular-nums shrink-0 whitespace-nowrap">
                               +{formatINR(optAmt)}
                             </span>
                           </label>
@@ -1969,7 +1990,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 </div>
               </div>
 
-              {/* Right 5 Cols: Submit Booking UTR Reference Form */}
+              {/* Payment screenshot file sharing */}
               <form
                 onSubmit={handlePaymentSubmit}
                 className="lg:col-span-5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl p-5 space-y-4 text-[13px]"
@@ -2018,15 +2039,21 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
                 <div className="payment-image-upload">
                   <label htmlFor="customer-payment-image" className="block font-bold mb-2">Payment screenshot</label>
-                  <input id="customer-payment-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{
-                    const file=e.target.files?.[0];setPaymentFeedback(null);
+                  <input id="customer-payment-image" type="file" accept="image/png,image/jpeg,image/webp" disabled={submittingPayment} onChange={e=>{
+                    const file=e.target.files?.[0];setPaymentFeedback(null);setShowManualPaymentShare(false);
                     if(!file){setPaymentImage(null);return;}
                     if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024){setPaymentImage(null);e.target.value='';setPaymentFeedback({type:'error',message:'Choose a JPG, PNG or WebP image smaller than 10 MB.'});return;}
                     setPaymentImage(file);
                   }}/>
                   {paymentImagePreview&&<div className="payment-image-preview"><img src={paymentImagePreview} alt="Selected payment screenshot"/><button type="button" onClick={()=>{setPaymentImage(null);const input=document.getElementById('customer-payment-image') as HTMLInputElement;if(input)input.value='';}}>Remove image</button></div>}
-                  <p className="mt-2 text-xs text-[#5C645F]">Choose WhatsApp and the proprietor from your device’s share options, then review and Send. Images stay on your device until shared.</p>
-                  <a className="block mt-2 underline" target="_blank" rel="noreferrer" href={`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(`Payment for ${draft.quote.number}: ${formatINR(paymentAmount)}. Please verify my attached screenshot. ${window.location.origin}/q/${publicId}`)}`}>Open WhatsApp to {catalogue.company.phone}</a>
+                  <p className="mt-2 text-xs text-[#5C645F]">Tap Share screenshot below, choose WhatsApp, then select V. SUBHASH ({catalogue.company.phone}) and Send. The actual image is attached through your phone’s share sheet.</p>
+                  {showManualPaymentShare && paymentImagePreview && (
+                    <div className="payment-share-fallback" aria-label="Manual screenshot attachment">
+                      <p>1. Download the screenshot. 2. Open the chat and attach it using WhatsApp’s paperclip.</p>
+                      <a href={paymentImagePreview} download={paymentImage?.name || 'payment-screenshot.png'}>Download screenshot</a>
+                      <a target="_blank" rel="noreferrer" href={`https://wa.me/${catalogue.company.whatsapp}?text=${encodeURIComponent(`Payment for ${draft.quote.number}: ${formatINR(paymentAmount)}. I will attach my payment screenshot. ${window.location.origin}/q/${publicId}`)}`}>Open WhatsApp chat</a>
+                    </div>
+                  )}
                 </div>
 
                 <label className="flex items-start gap-2.5 cursor-pointer pt-1">
@@ -2064,7 +2091,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     {submittingPayment
                       ? 'Opening share options…'
                       : milestones.requiresOwnerSmallOrderRule ? 'Owner confirmation required'
-                      : 'Share image on WhatsApp'}
+                      : 'Share screenshot'}
                   </span>
                 </button>
               </form>

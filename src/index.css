@@ -172,3 +172,21 @@ img { max-width: 100%; }
   .customer-quotation { min-height:0!important; padding:0!important; background:white!important; }
   .quotation-print-shell { padding:0!important; margin:0!important; width:210mm!important; }
 }
+
+/* Fixed checkbox geometry prevents long mobile labels from squeezing the control. */
+.ume-app input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  inline-size: 22px;
+  block-size: 22px;
+  min-inline-size: 22px;
+  max-inline-size: 22px;
+  min-block-size: 22px;
+  flex: 0 0 22px;
+  padding: 0;
+  color-scheme: light;
+  accent-color: #1c3a2f;
+  cursor: pointer;
+}
+.ume-app label:has(input[type="checkbox"]) { min-height: 44px; }
+.ume-app input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .6; }

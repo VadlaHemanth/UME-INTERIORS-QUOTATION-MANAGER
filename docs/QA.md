@@ -2,7 +2,7 @@
 
 ## Automated verification
 
-All 27 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
+All 30 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
 
 Pricing/import/review gates, current assistant instruction snapshot, actual rendered payment/link QR scan decoding, sessions and credential changes, owner API access, full-phone lookup, public payload minimization, payment validation, and real SQLite optimistic-transaction checks pass. Add-on tests verify that recommendations do not affect base pricing, accepted work remains optional, missing confirmed details block publication, and malformed/duplicate suggestions are rejected.
 
@@ -35,3 +35,9 @@ The AI add-on review panel was browser-tested with a practice JSON: a tailored f
 Owner quotation cards reserve space for prices and place actions in their own row. The customer payment form accepts JPG/PNG/WebP screenshots and uses native file sharing when available, with a manual WhatsApp attachment fallback. No image is automatically sent or credited. The change-request textarea and actions use a consistent grid.
 
 The reference PDF previously flattened the Kitchen schedule into text when its table heading did not fit the remaining page space. The paginator now moves the intact table to a fresh page and splits rows with repeated column headings. Every room schedule has cell borders. Each page carries one company letterhead; section headings do not duplicate the logo.
+
+## Mobile checkboxes and screenshot sharing
+
+Customer and owner native checkboxes have fixed 22×22px geometry with no flex shrinking and label tap areas of at least 44px high. Customer optional-item prices wrap onto a separate line on narrow screens. Chromium viewport checks at 320, 390 and 768 CSS pixels showed 22px controls and no page-wide overflow; the optional checkbox was checked and unchecked without saving the quotation. No execution terms were accepted during verification.
+
+Three new sharing regression tests check actual image bytes, correct MIME/filename, file-only share payload, invocation within the original tap, unsupported/insecure contexts, target-app failures and cancellation. The direct text-only WhatsApp link was removed from the screenshot picker. Native image sharing requires HTTPS and a supporting browser/installed share target. Real Android-to-WhatsApp delivery cannot be verified from this Windows session; the user chooses the recipient and sends the image on their device.
