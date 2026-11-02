@@ -22,7 +22,7 @@ function bytesFromHex(value: string): Uint8Array<ArrayBuffer> {
 }
 
 export function validUsername(value: unknown): value is string {
-  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$/.test(value);
+  return typeof value === 'string' && value === value.trim() && /^[a-zA-Z0-9][a-zA-Z0-9 ._@+-]{2,63}$/.test(value);
 }
 
 export function validPassword(value: unknown): value is string {
@@ -36,6 +36,7 @@ async function passwordHash(password: string, salt: string): Promise<string> {
 }
 
 export async function createOwner(username: string, password: string, version = 1): Promise<OwnerAccount> {
+  username = username.trim();
   if (!validUsername(username) || !validPassword(password)) throw new Error('Username must be 3–64 characters; password must be 12–256 characters.');
   const salt = randomHex(16);
   return { username, salt, passwordHash: await passwordHash(password, salt), sessionSecret: randomHex(), version };

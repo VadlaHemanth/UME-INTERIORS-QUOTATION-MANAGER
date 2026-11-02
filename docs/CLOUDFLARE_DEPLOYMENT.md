@@ -46,7 +46,7 @@ npx wrangler --config ./wrangler.toml secret put OWNER_USERNAME
 npx wrangler --config ./wrangler.toml secret put OWNER_PASSWORD
 ```
 
-Enter a username with 3–64 letters, numbers, dots, underscores or hyphens, and a unique password of at least 12 characters. Wrangler prompts for these values; keep them out of source files and GitHub. Login stays unavailable until both secrets are configured.
+Enter a username with 3–64 characters starting with a letter or number; email addresses and business names with spaces, dots, underscores, plus signs or hyphens are accepted, and a unique password of at least 12 characters. Wrangler prompts for these values; keep them out of source files and GitHub. Login stays unavailable until both secrets are configured.
 
 Open the HTTPS Worker URL returned by deployment. Customers use `/` or their private `/q/<token>` link. The owner signs in at `/owner`. After login, use the account settings to change the username and password. The password is stored as a salted PBKDF2 hash; saved account changes survive restarts and deployments. Changing credentials or signing out invalidates existing owner sessions.
 
@@ -105,7 +105,7 @@ npx wrangler --config ./wrangler.toml secret put OWNER_USERNAME
 npx wrangler --config ./wrangler.toml secret put OWNER_PASSWORD
 ```
 
-A changed runtime username or password replaces the saved account on the next API request and revokes prior owner sessions. Sign in again with the configured values. No database deletion or reset is needed. Usernames need 3–64 letters, numbers, dots, underscores or hyphens; passwords need 12–256 characters. Invalid configuration produces a clear configuration error instead of silently accepting the previous password.
+A changed runtime username or password replaces the saved account on the next API request and revokes prior owner sessions. Sign in again with the configured values. No database deletion or reset is needed. Usernames need 3–64 characters starting with a letter or number; email addresses and business names with spaces, dots, underscores, plus signs or hyphens are accepted; passwords need 12–256 characters. Invalid configuration produces a clear configuration error instead of silently accepting the previous password.
 
 Changes made through the app’s Account page persist across requests and deployments while the Cloudflare secret values stay unchanged. A later Cloudflare secret change takes precedence. The app stores a salted PBKDF2 baseline to detect that change, with no plaintext credentials in D1. This release also reconciles older accounts that have no baseline to the currently configured secrets. Quotations, payments and rate cards are retained.
 

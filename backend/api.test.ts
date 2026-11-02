@@ -285,3 +285,18 @@ test('secret rotation also strips owner-only quote data from an old session on a
   assert.deepEqual(((await response.json()) as any).quote.draft.owner_requests, []);
   assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, cookieFrom(login)), store, rotated)).status, 401);
 });
+
+
+test('Cloudflare usernames support email addresses and business names with consistent whitespace handling', async () => {
+  const store = memoryStore();
+  const configured = { ...environment, OWNER_USERNAME: '  Studio Owner  ' };
+  const first = await handleApi(request('/api/studio/auth', 'POST', { username: ' Studio Owner ', password: configured.OWNER_PASSWORD }), store, configured);
+  assert.equal(first.status, 200);
+  assert.equal((await first.clone().json() as any).username, 'Studio Owner');
+  const email = { ...configured, OWNER_USERNAME: '  ume.office+owner@example.com  ' };
+  assert.equal((await handleApi(request('/api/studio/bootstrap', 'GET', undefined, cookieFrom(first)), store, email)).status, 401);
+  const next = await handleApi(request('/api/studio/auth', 'POST', { username: 'ume.office+owner@example.com', password: email.OWNER_PASSWORD }), store, email);
+  assert.equal(next.status, 200);
+  assert.equal((await store.load()).state.owner!.username, 'ume.office+owner@example.com');
+  assert.equal((await handleApi(request('/api/studio/auth', 'POST', { username: 'ume.office+owner@example.com', password: email.OWNER_PASSWORD.trim() + ' ' }), store, email)).status, 401, 'password whitespace is never silently changed');
+});

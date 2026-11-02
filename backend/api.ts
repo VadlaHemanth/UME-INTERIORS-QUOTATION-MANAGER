@@ -11,7 +11,7 @@ export interface StateStore {
 function ownerConfigurationError(env: ApiEnvironment): string {
   const issues: string[] = [];
   if (!env.OWNER_USERNAME) issues.push('OWNER_USERNAME is missing from the deployed Worker');
-  else if (!validUsername(env.OWNER_USERNAME)) issues.push('OWNER_USERNAME must be 3–64 characters, start with a letter or number, and use only letters, numbers, dots, underscores or hyphens');
+  else if (!validUsername(env.OWNER_USERNAME)) issues.push('OWNER_USERNAME must be 3–64 characters and start with a letter or number; email addresses and names with spaces, dots, underscores, plus signs or hyphens are supported');
   if (!env.OWNER_PASSWORD) issues.push('OWNER_PASSWORD is missing from the deployed Worker');
   else if (!validPassword(env.OWNER_PASSWORD)) issues.push('OWNER_PASSWORD must be 12–256 characters');
   return `Owner login configuration needs attention: ${issues.join('. ')}. Update these runtime Worker secrets in Cloudflare and deploy the changes.`;
@@ -32,6 +32,7 @@ function validSelection(value: any): boolean {
 // A request reads a consistent state and retries a write only after an optimistic
 // concurrency conflict. D1 commits every changed record and version atomically.
 export async function handleApi(request: Request, store: StateStore, env: ApiEnvironment): Promise<Response> {
+  env = { ...env, OWNER_USERNAME: env.OWNER_USERNAME?.trim() };
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
@@ -48,6 +49,8 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
     try { body = raw ? JSON.parse(raw) : {}; } catch { return json({ error: 'Invalid JSON request.' }, 400); }
     if (!body || Array.isArray(body) || typeof body !== 'object') return json({ error: 'A JSON object is required.' }, 400);
   }
+  if (path === '/api/studio/auth' && typeof body.username === 'string') body.username = body.username.trim();
+  if (path === '/api/studio/credentials' && typeof body.newUsername === 'string') body.newUsername = body.newUsername.trim();
   for (let attempt = 0; attempt < 6; attempt++) {
     const { state, version } = await store.load();
     // Reconcile configured secrets before checking any owner session. Persist
@@ -105,7 +108,7 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
       return json({ error: 'Sign in to the owner studio to continue.' }, 401);
     } else if (path === '/api/studio/credentials' && method === 'PUT') {
       if (!await verifyPassword(state.owner!, body.currentPassword)) return json({ error: 'Current password is incorrect.' }, 403);
-      if (!validUsername(body.newUsername) || !validPassword(body.newPassword)) return json({ error: 'Use a username of 3–64 letters, numbers, dots, underscores or hyphens, and a password of at least 12 characters.' }, 400);
+      if (!validUsername(body.newUsername) || !validPassword(body.newPassword)) return json({ error: 'Use a username or email address of 3–64 characters, starting with a letter or number, and a password of at least 12 characters.' }, 400);
       const baseline = state.owner!.environmentCredentials;
       state.owner = { ...await createOwner(body.newUsername, body.newPassword, state.owner!.version + 1), environmentCredentials: baseline };
       changed = true;

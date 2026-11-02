@@ -2,7 +2,7 @@
 
 ## Automated verification
 
-All 41 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
+All 42 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
 
 Pricing/import/review gates, current assistant instruction snapshot, actual rendered payment/link QR scan decoding, sessions and credential changes, owner API access, full-phone lookup, public payload minimization, payment validation, and real SQLite optimistic-transaction checks pass. Add-on tests verify that recommendations do not affect base pricing, accepted work remains optional, missing confirmed details block publication, and malformed/duplicate suggestions are rejected.
 
@@ -56,3 +56,9 @@ Deployment follow-up: runtime configuration messages distinguish missing binding
 
 
 Worker rename follow-up: the owner renamed the intended app to quotation. Its runtime OWNER_USERNAME and OWNER_PASSWORD Secret bindings were confirmed by name/type only, and its /api/studio/session endpoint returned 200. The main config and deployment guide now target that Worker. The old hostname uses a separate redirect-only Worker, preventing two deployments with different credential settings from reconciling against the same D1 account. Redirect tests preserve customer URLs and prevent forwarding old-host mutation bodies.
+
+
+Username validation now accepts email addresses and business names, trims surrounding username whitespace consistently and retains the 3–64 character bounds. Passwords retain the 12–256 character requirement and are never trimmed. A regression test verifies business-name login, email secret rotation and password-byte preservation.
+
+
+After deployment to the renamed Worker, both encrypted secret bindings remain present. The live password meets the configured requirements, while OWNER_USERNAME still fails the expanded format check. A username-only clarification is needed before the user's final live sign-in can be verified; the password has not been requested or accessed.

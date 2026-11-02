@@ -18,5 +18,14 @@ database_id = "94fa0cb5-d837-44f1-a807-2ad545e91c6a" # Replace after creating yo
 migrations_dir = "migrations"
 
 [observability]
-enabled = false
+enabled = true
+
+[observability.issues]
+enabled = true
+
+[observability.logs]
+enabled = true
+
+[observability.traces]
+enabled = true
 
