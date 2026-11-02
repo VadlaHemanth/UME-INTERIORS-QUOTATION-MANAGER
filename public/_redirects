@@ -1,4 +1,2 @@
-# Cloudflare Pages SPA Routing Rules for UMAMAHESHWARA INTERIORS Quotation Studio
-/q/* /index.html 200
-/studio /index.html 200
-/* /index.html 200
+# SPA fallback is handled by assets.not_found_handling in wrangler.toml.
+/studio /owner 302

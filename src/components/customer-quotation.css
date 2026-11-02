@@ -1,0 +1,102 @@
+/* Customer workspace: readable controls and comparison cards at every width. */
+.customer-quotation { min-width: 0; overflow-wrap: anywhere; }
+.customer-quotation :where(section, form, .quotation-workspace > *, .quotation-summary, input, select, textarea) { min-width: 0; }
+.customer-quotation :where(input, select, textarea) { max-width: 100%; }
+.customer-quotation :where(button, a, input, select, textarea):focus-visible { outline: 3px solid #ba9663; outline-offset: 3px; }
+.customer-quotation button:disabled { cursor: not-allowed; opacity: .65; }
+.customer-quotation :where(button, a) { -webkit-tap-highlight-color: transparent; }
+.customer-quotation section[id], .customer-quotation div[id] { scroll-margin-top: 110px; }
+.customer-quotation .quote-introduction { background: #ede9e0; }
+.customer-quotation .package-choice { padding: 14px; display: flex; flex-direction: row; align-items: center; gap: 12px; overflow: hidden; box-shadow: 0 3px 18px #1c3a2f08; border-width: 1px; }
+.customer-quotation .package-choice[aria-pressed="true"] { outline: 2px solid #1c3a2f; outline-offset: 3px; }
+.customer-quotation .package-choice-image { width: 96px; height: 76px; border: 1px solid #dfd5c3; border-radius: 10px; }
+.customer-quotation .package-choice > .min-w-0 { padding: 0; }
+.customer-quotation .package-choice img { transition: transform .35s ease; }
+@media (hover:hover) { .customer-quotation .package-choice:hover img { transform: scale(1.035); } }
+.customer-quotation .room-comparison-table { min-width: 600px; }
+.customer-quotation .room-comparison-table :where(th,td) { padding-left: 10px; padding-right: 10px; }
+.customer-quotation .room-comparison-table button[aria-pressed] { min-height: 40px; }
+.customer-quotation .room-comparison-table select { min-height: 40px; }
+.customer-quotation .room-selection-controls { align-items: stretch; }
+.customer-quotation .room-selection-controls button { justify-content: center; }
+.customer-quotation .quotation-total { font-size: clamp(1.7rem, 2.8vw, 2.25rem); letter-spacing: -.04em; white-space: nowrap; }
+.customer-quotation .quotation-summary > :first-child { box-shadow: 0 12px 32px #1c3a2f16; }
+.customer-quotation .quotation-summary .justify-between { gap: 12px; }
+.customer-quotation .quotation-summary .justify-between > :last-child { flex-shrink: 0; }
+.customer-quotation #feedback-section form textarea { min-height: 44px; }
+.customer-quotation #feedback-section form :where(button,a) { min-height: 44px; }
+.customer-quotation .milestone-table { min-width: 560px; }
+@media screen and (max-width: 767px) {
+  .customer-quotation .quote-introduction { padding: 20px 16px; }
+  .customer-quotation .package-choice { padding: 14px; gap: 14px; align-items: center; }
+  .customer-quotation .package-choice-image { width: 88px; height: 76px; min-height: 0; }
+  .customer-quotation .package-choice > .min-w-0 { padding: 0; }
+  .customer-quotation #room-matrix-customiser,
+  .customer-quotation #room-breakdown,
+  .customer-quotation #booking-checkout,
+  .customer-quotation #feedback-section { padding: 18px 14px; }
+  .customer-quotation .room-comparison-table,
+  .customer-quotation .detail-price-table,
+  .customer-quotation .milestone-table { display: block; width: 100%; min-width: 0; }
+  .customer-quotation :is(.room-comparison-table,.detail-price-table,.milestone-table) thead { display: none; }
+  .customer-quotation :is(.room-comparison-table,.detail-price-table,.milestone-table) tbody { display: block; }
+  .customer-quotation :is(.room-comparison-table,.detail-price-table,.milestone-table) tr { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); padding: 12px 8px; gap: 8px 4px; }
+  .customer-quotation :is(.room-comparison-table,.detail-price-table,.milestone-table) td { display: block; padding: 4px; min-width: 0; white-space: normal; text-align: left; }
+  .customer-quotation .room-comparison-table td:first-child { grid-column: 1 / -1; }
+  .customer-quotation .room-comparison-table td:nth-child(2) { grid-column: 1 / -1; }
+  .customer-quotation .room-selection-controls { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .customer-quotation .room-selection-controls select { flex: 1; max-width: 220px; }
+  .customer-quotation .room-comparison-table td:nth-child(n+3)::before,
+  .customer-quotation .detail-price-table td:nth-child(n+2)::before,
+  .customer-quotation .milestone-table td:nth-child(n+2)::before { display: block; margin-bottom: 5px; font-size: 11px; font-family: var(--font-sans); font-weight: 600; line-height: 1.4; color: #5c645e; letter-spacing: 0; }
+  .customer-quotation .room-comparison-table td:nth-child(3)::before,
+  .customer-quotation .detail-price-table td:nth-child(4)::before { content: 'Standard'; }
+  .customer-quotation .room-comparison-table td:nth-child(4)::before,
+  .customer-quotation .detail-price-table td:nth-child(5)::before { content: 'Normal'; }
+  .customer-quotation .room-comparison-table td:nth-child(5)::before,
+  .customer-quotation .detail-price-table td:nth-child(6)::before { content: 'Premium'; }
+  .customer-quotation .room-comparison-table td:nth-child(n+3) button { padding: 6px 4px; width: 100%; font-size: 13px; white-space: nowrap; }
+  .customer-quotation .room-comparison-table tr:last-child td:nth-child(n+3) span { display: inline-block; padding: 5px 2px; font-size: 13px; white-space: nowrap; }
+  .customer-quotation .detail-price-table td:first-child { grid-column: 1 / -1; }
+  .customer-quotation .detail-price-table td:nth-child(2) { grid-column: span 2; }
+  .customer-quotation .detail-price-table td:nth-child(2)::before { content: 'Dimensions'; }
+  .customer-quotation .detail-price-table td:nth-child(3)::before { content: 'Area / Qty'; }
+  .customer-quotation .detail-price-table td:nth-child(n+4) { font-size: 13px; padding: 8px 4px; border-radius: 6px; }
+  .customer-quotation .detail-price-table td[colspan] { grid-column: 1 / -1; }
+  .customer-quotation .detail-price-table tr:last-child td:not([colspan]) { grid-column: auto; font-size: 13px; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(2)::before { content: 'Standard'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(3)::before { content: 'Normal'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(4)::before { content: 'Premium'; }
+  .customer-quotation .milestone-table td:first-child { grid-column: 1 / -1; }
+  .customer-quotation .milestone-table td:nth-child(2)::before { content: 'Instalment'; }
+  .customer-quotation .milestone-table td:nth-child(3)::before { content: 'Cumulative'; }
+  .customer-quotation .milestone-table td:nth-child(4)::before { content: 'Due after credit'; }
+  .customer-quotation .milestone-table td:nth-child(n+2) { font-size: 13px; }
+  .customer-quotation #booking-checkout .shrink-0.bg-white { flex-shrink: 1; max-width: 100%; text-align: left; }
+  .customer-quotation .quotation-summary { order: -1; }
+}
+@media screen and (max-width: 380px) {
+  .customer-quotation .package-choice { padding: 12px; gap: 12px; }
+  .customer-quotation .package-choice-image { width: 76px; height: 72px; }
+  .customer-quotation .package-choice > .min-w-0 { padding: 0; }
+  .customer-quotation .room-selection-controls { align-items: stretch; flex-direction: column; }
+  .customer-quotation .room-selection-controls select { max-width: none; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .customer-quotation .package-choice img { transition: none; } }
+
+/* One customer reading scale; the standalone A4 sheet keeps its print styles. */
+.customer-interactive { font-family: var(--font-sans); font-size: 13px; line-height: 1.6; }
+.customer-interactive :where(input,select,textarea,button) { font-family: inherit; }
+.customer-interactive :is(.room-comparison-table,.detail-price-table,.milestone-table) { font-family: var(--font-sans); font-size: 13px; line-height: 1.55; }
+.customer-interactive :is(.room-comparison-table,.detail-price-table,.milestone-table) :is(td,th,button,select) { font-size: 13px; }
+.customer-interactive :is(.room-comparison-table,.detail-price-table,.milestone-table) :is(.text-\[10px\],.text-\[11px\]) { font-size: 12px; line-height: 1.5; }
+.customer-interactive :is(.room-comparison-table,.detail-price-table,.milestone-table) thead th { font-size: 12px; line-height: 1.5; }
+.customer-interactive .detail-price-table td:first-child > p:first-child { font-size: 13px; }
+.customer-interactive .package-choice-title { font-size: 13px; line-height: 1.45; }
+.customer-interactive .package-choice-price { font-size: 18px; line-height: 1.4; letter-spacing: -.025em; white-space: nowrap; }
+.customer-interactive .package-choice .text-\[11px\] { font-size: 11px; line-height: 1.45; }
+.customer-interactive .text-\[10px\], .customer-interactive .text-\[9px\] { font-size: 11px; line-height: 1.45; }
+@media screen and (min-width:768px) and (max-width:1023px) {
+  .customer-quotation .package-choice { padding: 12px; gap: 10px; }
+  .customer-quotation .package-choice-image { width: 72px; height: 76px; }
+}

@@ -8,13 +8,17 @@ import {
   Lock,
   ArrowRight,
   ShieldCheck,
-  KeyRound,
   LogOut,
   Phone,
   Download,
   Share2,
   Check,
+  Settings,
+  X,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { printQuotation } from './lib/print-quotation';
 import { UmeLogoMark } from './components/BrandMark';
 import { CustomerQuotationView } from './components/CustomerQuotationView';
 import {
@@ -23,17 +27,16 @@ import {
   PublishedQuoteSummary,
 } from './components/OwnerStudioView';
 import { DEFAULT_UME_CATALOGUE, StudioCatalogue } from './lib/catalogue';
-import { VIDYA_SAGAR_REDDY_DRAFT } from './lib/historicalData';
-import { calculateQuotationPricing, computeCustomerSelectionTotal } from './lib/pricing';
 import { QuotationDraftV2, ResolvedPackageSelection } from './lib/schema';
 
-type AppMode = 'portal' | 'customer_quote' | 'studio';
+type AppMode = 'portal' | 'customer_quote' | 'studio' | 'owner_login';
 
 function detectInitialRoute(): { mode: AppMode; tokenFromUrl: string | null } {
   if (typeof window === 'undefined') {
     return { mode: 'portal', tokenFromUrl: null };
   }
   const path = window.location.pathname;
+  if (/^\/(owner|studio)\/?$/.test(path)) return { mode: 'owner_login', tokenFromUrl: null };
   const searchParams = new URLSearchParams(window.location.search);
   const qParam = searchParams.get('quote') || searchParams.get('q');
 
@@ -48,7 +51,7 @@ function detectInitialRoute(): { mode: AppMode; tokenFromUrl: string | null } {
 }
 
 export default function App() {
-  const initialRoute = detectInitialRoute();
+  const [initialRoute] = useState(detectInitialRoute);
   const [mode, setMode] = useState<AppMode>(initialRoute.mode);
   const [catalogue, setCatalogue] = useState<StudioCatalogue>(DEFAULT_UME_CATALOGUE);
   const [copiedShareToast, setCopiedShareToast] = useState<boolean>(false);
@@ -67,51 +70,15 @@ export default function App() {
 
   // Protected Owner Studio state
   const [ownerAuthenticated, setOwnerAuthenticated] = useState<boolean>(false);
-  const [ownerPasscodeInput, setOwnerPasscodeInput] = useState<string>('');
+  const [ownerUsername, setOwnerUsername] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerBusy, setOwnerBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [credentialMessage, setCredentialMessage] = useState('');
+  const [actionError, setActionError] = useState('');
   const [ownerAuthError, setOwnerAuthError] = useState<string | null>(null);
-  const [quotes, setQuotes] = useState<PublishedQuoteSummary[]>(() => {
-    const initialSnap = calculateQuotationPricing(
-      VIDYA_SAGAR_REDDY_DRAFT,
-      DEFAULT_UME_CATALOGUE
-    );
-    return [
-      {
-        publicId: 'ume8f92a4c17d3e9051b264a8c3d7f1e902',
-        revision: 1,
-        status: 'Sent',
-        publishedAt: '2026-10-24T11:30:00Z',
-        viewsCount: 14,
-        lastViewedAt: '2026-11-01T09:45:00Z',
-        draft: VIDYA_SAGAR_REDDY_DRAFT,
-        snapshot: initialSnap,
-        approvedDiscountRupees: 0,
-        defaultSentPackage: {
-          grade: 'Premium',
-          protection: 'Standard',
-          finish: 'SF',
-          brand_preference: 'Flaer Ply (SMART)',
-        },
-        lastCustomerSelection: {
-          wholeHomeSelection: {
-            grade: 'Premium',
-            protection: 'Standard',
-            finish: 'SF',
-            brand_preference: 'Flaer Ply (SMART)',
-          },
-          mixByRoom: false,
-          roomSelections: {},
-          selectedOptionalPointers: [],
-          acceptedTermsAt: null,
-          savedByCustomer: false,
-          savedAt: null,
-          savedFinalTotalRupees: initialSnap.baseWholeHomeTotals['Premium__Standard__SF'],
-          summaryLabel: 'Premium Plywood · Standard · SF (Default Sent)',
-        },
-        selectionHistory: [],
-        customerFeedback: [],
-      },
-    ];
-  });
+  const [quotes, setQuotes] = useState<PublishedQuoteSummary[]>([]);
   const [ledger, setLedger] = useState<LedgerEntrySummary[]>([]);
 
   // If opened via /q/<token> URL, fetch ONLY that single customer quotation
@@ -119,7 +86,48 @@ export default function App() {
     if (initialRoute.tokenFromUrl) {
       fetchSingleCustomerQuote(initialRoute.tokenFromUrl);
     }
+    fetch('/api/studio/session').then(r => r.json()).then(async data => {
+      if (data.authenticated) {
+        setOwnerAuthenticated(true);
+        setOwnerUsername(data.username || '');
+        if (initialRoute.mode === 'owner_login') {
+          await loadOwnerStudioData();
+          setMode('studio');
+          window.history.replaceState({}, '', '/owner');
+        }
+      }
+    }).catch(() => {});
+    const onPopState = () => {
+      const route = detectInitialRoute();
+      setMode(route.mode);
+      if (route.mode === 'owner_login') {
+        fetch('/api/studio/session').then(r => r.json()).then(async session => {
+          setOwnerAuthenticated(Boolean(session.authenticated));
+          if (session.authenticated) { await loadOwnerStudioData(); setMode('studio'); }
+        }).catch(() => {});
+      }
+      if (route.tokenFromUrl) fetchSingleCustomerQuote(route.tokenFromUrl);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.getElementById('newUsername')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsOpen(false);
+      if (event.key === 'Tab') {
+        const controls = Array.from(document.querySelectorAll<HTMLElement>('.settings-card button, .settings-card input')).filter(e => !(e as HTMLInputElement).disabled);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
+        else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {document.removeEventListener('keydown', handleKey); previousFocus?.focus();};
+  }, [settingsOpen]);
 
   const fetchSingleCustomerQuote = async (publicId: string) => {
     setLookupLoading(true);
@@ -191,56 +199,62 @@ export default function App() {
   };
 
   const loadOwnerStudioData = async () => {
-    try {
-      const res = await fetch('/api/studio/bootstrap');
-      const data = await res.json();
-      if (data.catalogue) setCatalogue(data.catalogue);
-      if (Array.isArray(data.quotes) && data.quotes.length > 0) {
-        setQuotes(data.quotes);
-      }
-      if (Array.isArray(data.ledger)) {
-        setLedger(data.ledger);
-      }
-    } catch {
-      // Fallback already initialized
-    }
+    const res = await fetch('/api/studio/bootstrap');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Unable to load owner workspace.');
+    if (data.catalogue) setCatalogue(data.catalogue);
+    setQuotes(Array.isArray(data.quotes) ? data.quotes : []);
+    setLedger(Array.isArray(data.ledger) ? data.ledger : []);
   };
 
   const handleOwnerStudioLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setOwnerAuthError(null);
+    setOwnerBusy(true);
     try {
       const res = await fetch('/api/studio/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passcode: ownerPasscodeInput }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: ownerUsername.trim(), password: ownerPassword }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setOwnerAuthError(
-          data.error || 'Invalid Owner Studio PIN. Please enter Proprietor PIN.'
-        );
-        return;
-      }
-      setOwnerAuthenticated(true);
-      setOwnerPasscodeInput('');
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Please check your username and password.');
       await loadOwnerStudioData();
+      setOwnerAuthenticated(true);
+      setOwnerPassword('');
       setMode('studio');
-      window.history.replaceState({}, '', '/studio');
-    } catch {
-      if (
-        ownerPasscodeInput.trim() === '9491' ||
-        ownerPasscodeInput.trim().toLowerCase() === 'ume2026'
-      ) {
-        setOwnerAuthenticated(true);
-        setOwnerPasscodeInput('');
-        await loadOwnerStudioData();
-        setMode('studio');
-        window.history.replaceState({}, '', '/studio');
-      } else {
-        setOwnerAuthError('Invalid Owner Studio PIN.');
-      }
-    }
+      window.history.replaceState({}, '', '/owner');
+    } catch (err) {
+      setOwnerAuthError(err instanceof Error ? err.message : 'Unable to sign in. Please try again.');
+    } finally { setOwnerBusy(false); }
+  };
+
+  const handleOwnerLogout = async () => {
+    try {
+      const res = await fetch('/api/studio/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      if (!res.ok) throw new Error('Unable to sign out. Please try again.');
+      setOwnerAuthenticated(false);
+      setQuotes([]); setLedger([]); setCustomerQuoteRecord(null);
+      setMode('owner_login');
+      window.history.replaceState({}, '', '/owner');
+    } catch (err) { setActionError(String(err)); }
+  };
+
+  const handleCredentialChange = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fields = new FormData(form);
+    setOwnerBusy(true); setCredentialMessage('');
+    try {
+      const res = await fetch('/api/studio/credentials', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({currentPassword: fields.get('currentPassword'), newUsername: fields.get('newUsername'), newPassword: fields.get('newPassword')}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update sign-in details.');
+      setOwnerUsername(String(fields.get('newUsername')));
+      form.reset(); setCredentialMessage('Your sign-in details have been updated.');
+    } catch (err) { setCredentialMessage(err instanceof Error ? err.message : 'Update failed.'); }
+    finally { setOwnerBusy(false); }
   };
 
   const handleSaveSelection = async (selection: {
@@ -254,177 +268,37 @@ export default function App() {
     if (!customerQuoteRecord) return;
     const targetId = customerQuoteRecord.publicId;
 
-    const calc = computeCustomerSelectionTotal(customerQuoteRecord.snapshot, {
-      wholeHomeSelection: selection.wholeHomeSelection,
-      mixByRoom: selection.mixByRoom,
-      roomSelections: selection.roomSelections,
-      selectedOptionalPointers: selection.selectedOptionalPointers,
-      approvedDiscountRupees: customerQuoteRecord.approvedDiscountRupees,
+    const res = await fetch(`/api/quotes/${targetId}/selection`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selection),
     });
-
-    const summaryLabel = selection.mixByRoom
-      ? `Room-Wise Custom Mix (${Object.values(selection.roomSelections)
-          .map((r) => r.grade)
-          .filter((v, i, a) => a.indexOf(v) === i)
-          .join('/')} Plywood)`
-      : `${selection.wholeHomeSelection.grade} Plywood · ${selection.wholeHomeSelection.protection} · ${selection.wholeHomeSelection.finish}`;
-
-    const nowIso = new Date().toISOString();
-
-    try {
-      const res = await fetch(`/api/quotes/${targetId}/selection`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(selection),
-      });
-      const data = await res.json();
-      if (res.ok && data.quote) {
-        setCustomerQuoteRecord(data.quote);
-        setQuotes((prev) =>
-          prev.map((q) => (q.publicId === targetId ? data.quote : q))
-        );
-        return;
-      }
-    } catch {
-      // Fallback local update below
-    }
-
-    setCustomerQuoteRecord((prev) =>
-      prev
-        ? {
-            ...prev,
-            status:
-              prev.status === 'Sent' || prev.status === 'Viewed'
-                ? 'Package chosen'
-                : prev.status,
-            lastCustomerSelection: {
-              ...prev.lastCustomerSelection,
-              wholeHomeSelection: selection.wholeHomeSelection,
-              mixByRoom: selection.mixByRoom,
-              roomSelections: selection.roomSelections,
-              selectedOptionalPointers: selection.selectedOptionalPointers,
-              acceptedTermsAt: selection.acceptedTerms
-                ? nowIso
-                : prev.lastCustomerSelection.acceptedTermsAt,
-              savedByCustomer: selection.explicitCustomerSave
-                ? true
-                : prev.lastCustomerSelection.savedByCustomer,
-              savedAt: selection.explicitCustomerSave
-                ? nowIso
-                : prev.lastCustomerSelection.savedAt,
-              savedFinalTotalRupees: calc.grandTotal,
-              summaryLabel,
-            },
-          }
-        : null
-    );
+    const data = await res.json();
+    if (!res.ok || !data.quote) throw new Error(data.error || 'Your selection could not be saved. Please try again.');
+    setCustomerQuoteRecord(data.quote);
+    setQuotes(prev => prev.map(q => q.publicId === targetId ? data.quote : q));
   };
 
-  const handleUpdateDefaultPackage = async (
-    publicId: string,
-    defaultSentPackage: ResolvedPackageSelection
-  ) => {
+  const handleUpdateDefaultPackage = async (publicId: string, defaultSentPackage: ResolvedPackageSelection) => {
     try {
       const res = await fetch(`/api/studio/quotes/${publicId}/default-package`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ defaultSentPackage }),
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ defaultSentPackage }),
       });
       const data = await res.json();
-      if (res.ok && Array.isArray(data.quotes)) {
-        setQuotes(data.quotes);
-        if (data.quote && customerQuoteRecord?.publicId === publicId) {
-          setCustomerQuoteRecord(data.quote);
-        }
-        return;
-      }
-    } catch {
-      // Fallback below
-    }
-    setQuotes((prev) =>
-      prev.map((q) =>
-        q.publicId === publicId
-          ? {
-              ...q,
-              defaultSentPackage,
-              lastCustomerSelection: {
-                ...q.lastCustomerSelection,
-                wholeHomeSelection: defaultSentPackage,
-                mixByRoom: false,
-                roomSelections: {},
-              },
-            }
-          : q
-      )
-    );
-    setCustomerQuoteRecord((prev) =>
-      prev && prev.publicId === publicId
-        ? {
-            ...prev,
-            defaultSentPackage,
-            lastCustomerSelection: {
-              ...prev.lastCustomerSelection,
-              wholeHomeSelection: defaultSentPackage,
-              mixByRoom: false,
-              roomSelections: {},
-            },
-          }
-        : prev
-    );
+      if (!res.ok) throw new Error(data.error || 'Could not save package.');
+      if (Array.isArray(data.quotes)) setQuotes(data.quotes);
+      if (data.quote && customerQuoteRecord?.publicId === publicId) setCustomerQuoteRecord(data.quote);
+    } catch (err) { setActionError(String(err)); throw err; }
   };
 
-  const handleUpdateQuoteDraft = async (
-    publicId: string,
-    updatedDraft: QuotationDraftV2,
-    defaultSentPackage?: ResolvedPackageSelection
-  ) => {
+  const handleUpdateQuoteDraft = async (publicId: string, updatedDraft: QuotationDraftV2, defaultSentPackage?: ResolvedPackageSelection) => {
     try {
       const res = await fetch(`/api/quotes/${publicId}/draft`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          draft: updatedDraft,
-          defaultSentPackage,
-        }),
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({draft: updatedDraft, defaultSentPackage}),
       });
       const data = await res.json();
-      if (res.ok) {
-        if (Array.isArray(data.quotes)) {
-          setQuotes(data.quotes);
-        }
-        if (data.quote) {
-          setCustomerQuoteRecord((prev) =>
-            prev?.publicId === publicId ? data.quote : prev
-          );
-        }
-        return;
-      }
-    } catch {
-      // Local fallback below
-    }
-    const nextSnap = calculateQuotationPricing(updatedDraft, catalogue);
-    setQuotes((prev) =>
-      prev.map((q) =>
-        q.publicId === publicId
-          ? {
-              ...q,
-              draft: updatedDraft,
-              snapshot: nextSnap,
-              defaultSentPackage: defaultSentPackage || q.defaultSentPackage,
-            }
-          : q
-      )
-    );
-    setCustomerQuoteRecord((prev) =>
-      prev && prev.publicId === publicId
-        ? {
-            ...prev,
-            draft: updatedDraft,
-            snapshot: nextSnap,
-            defaultSentPackage: defaultSentPackage || prev.defaultSentPackage,
-          }
-        : prev
-    );
+      if (!res.ok) throw new Error(data.error || 'Could not save quotation.');
+      if (Array.isArray(data.quotes)) setQuotes(data.quotes);
+      if (data.quote) setCustomerQuoteRecord(prev => prev?.publicId === publicId ? data.quote : prev);
+    } catch (err) { setActionError(String(err)); throw err; }
   };
 
   const handleSubmitPayment = async (payload: {
@@ -498,16 +372,16 @@ export default function App() {
   };
 
   const handleUpdateCatalogue = async (nextCat: StudioCatalogue) => {
-    setCatalogue(nextCat);
     try {
-      await fetch('/api/studio/catalogue', {
+      const res = await fetch('/api/studio/catalogue', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(nextCat),
       });
-    } catch {
-      // Local state already updated
-    }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save rate card.');
+      setCatalogue(data.catalogue || nextCat);
+    } catch (err) { setActionError(String(err)); throw err; }
   };
 
   const handleVerifyOrRejectPayment = async (
@@ -522,17 +396,16 @@ export default function App() {
         body: JSON.stringify({ action, rejectionReason }),
       });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update payment.');
       if (Array.isArray(data.ledger)) setLedger(data.ledger);
       if (Array.isArray(data.quotes)) setQuotes(data.quotes);
-    } catch {
-      // Fallback local update
-    }
+    } catch (err) { setActionError(String(err)); }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F4F1EA] text-[#1B241E]">
+    <div className="ume-app min-h-screen flex flex-col bg-[#F4F1EA] text-[#1B241E]">
       {/* Reference-Matched Top Header Bar (Official UME Interiors Logo, navigation links, Download PDF + Share Quote CTA buttons) */}
-      <header className="flex flex-wrap items-center justify-between gap-3 sm:gap-6 px-4 sm:px-8 py-3.5 bg-white border-b border-[#E5DFD3] no-print">
+      <header className="app-header flex flex-wrap items-center justify-between gap-3 sm:gap-6 px-4 sm:px-8 py-3.5 bg-white border-b border-[#E5DFD3] no-print">
         {/* Zone 1: Official UME Interiors Logo */}
         <a
           href="#top"
@@ -609,7 +482,7 @@ export default function App() {
                   type="button"
                   onClick={() => {
                     setMode('studio');
-                    window.history.replaceState({}, '', '/studio');
+                    window.history.replaceState({}, '', '/owner');
                   }}
                   className="px-3.5 py-2 rounded-lg text-xs font-bold text-[#1B241E] bg-[#E6CBA8] hover:bg-[#DFBE94] transition-colors whitespace-nowrap cursor-pointer"
                 >
@@ -618,7 +491,7 @@ export default function App() {
               )}
               <button
                 type="button"
-                onClick={() => window.print()}
+                onClick={() => void printQuotation()}
                 className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#1B241E] bg-white hover:bg-[#FAF8F3] border border-[#D4CEC2] inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-[#1C3A2F]" />
@@ -632,7 +505,7 @@ export default function App() {
                     setCopiedShareToast(true);
                     setTimeout(() => setCopiedShareToast(false), 2500);
                   } catch {
-                    // Ignore
+                    setActionError('Your browser could not copy the link. You can copy it from the address bar.');
                   }
                 }}
                 className="px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-[#1C3A2F] hover:bg-[#152C23] inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
@@ -652,21 +525,10 @@ export default function App() {
             </>
           )}
 
-          {mode === 'studio' && ownerAuthenticated && (
-            <button
-              type="button"
-              onClick={() => {
-                setOwnerAuthenticated(false);
-                setMode('portal');
-                window.history.replaceState({}, '', '/');
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#1C3A2F] hover:bg-[#152C23] inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Lock Owner Studio
-            </button>
-          )}
-
+          {mode === 'studio' && ownerAuthenticated && <>
+            <button type="button" onClick={() => {setSettingsOpen(true); setCredentialMessage('');}} className="header-secondary"><Settings size={15}/> Account</button>
+            <button type="button" onClick={handleOwnerLogout} className="header-primary"><LogOut size={15}/> Sign out</button>
+          </>}
           {mode === 'portal' && (
             <a
               href={`tel:${catalogue.company.phone}`}
@@ -680,164 +542,59 @@ export default function App() {
       </header>
 
       {/* Main Content Surface */}
-      <main className="flex-1">
+      <main className="flex-1" id="main-content">
+        {actionError && <div role="alert" className="app-error"><span>{actionError}</span><button type="button" onClick={() => setActionError('')} aria-label="Dismiss error"><X size={18}/></button></div>}
         {/* MODE 1: HOME PAGE — PRIVATE CLIENT QUOTATION PORTAL (Never exposes other customers' quotes!) */}
         {mode === 'portal' && (
-          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-10 sm:py-14 space-y-8">
-            {/* Architectural Cover Banner */}
-            <div className="bg-[#1C3A2F] text-white rounded-2xl p-6 sm:p-10 border-t-4 border-[#E6CBA8] shadow-xs space-y-3">
-              <div className="flex flex-wrap items-center gap-2 text-xs font-bold tracking-wider uppercase text-[#EED6B5]">
-                <span>UMAMAHESHWARA INTERIORS</span>
-                <span>·</span>
-                <span>UMAMAHESHWARA ENTERPRISES</span>
-                <span>·</span>
-                <span>RESIDENTIAL AND COMMERCIAL INTERIOR DESIGNERS</span>
+          <div className="portal-page">
+            <section className="portal-hero">
+              <div className="portal-hero-copy">
+                <p className="eyebrow">UME INTERIORS · HYDERABAD</p>
+                <h1>Your space.<br/><em>Beautifully considered.</em></h1>
+                <p>A thoughtful home begins with the details. Explore your personalised interior proposal, compare materials, and make it yours.</p>
+                <a href="#quotation-access" className="hero-link">Open your quotation <ArrowRight size={18}/></a>
+                <div className="hero-caption">RESIDENTIAL & COMMERCIAL INTERIORS</div>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                Private Client Quotation Portal
-              </h1>
-              <p className="text-xs sm:text-sm text-[#D7E2DC] max-w-2xl leading-relaxed">
-                For your privacy, quotations prepared by Umamaheshwara Enterprises Interior Designers are never listed publicly. Enter your private quotation code or registered mobile number below to open only your property’s quotation.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Left 7 Cols: Customer Private Quotation Lookup */}
-              <div className="lg:col-span-7 bg-white rounded-2xl border border-[#E5DFD3] p-6 sm:p-8 shadow-xs space-y-6">
-                <div className="border-b border-[#E5DFD3] pb-4">
-                  <p className="text-[11px] font-bold tracking-wider uppercase text-[#1C3A2F]">
-                    CLIENT QUOTATION ACCESS
-                  </p>
-                  <h2 className="text-xl font-bold text-[#1B241E] mt-1">
-                    Open Your Private Quotation
-                  </h2>
-                  <p className="text-xs text-[#5C645E] mt-1">
-                    Paste your private `/q/` link or enter your Quotation Number along with your registered mobile number.
-                  </p>
-                </div>
-
-                <form onSubmit={handleCustomerLookupSubmit} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="portal-quote-code"
-                      className="block text-xs font-bold text-[#1B241E] mb-1.5"
-                    >
-                      Private Quotation Link, Token, or Quote Number
-                    </label>
-                    <input
-                      id="portal-quote-code"
-                      type="text"
-                      value={lookupCodeInput}
-                      onChange={(e) => setLookupCodeInput(e.target.value)}
-                      placeholder="e.g., UME-2026-1024 or /q/ume8f92a4c17d3e9051..."
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#FAF8F3] border border-[#D4CEC2] focus:outline-none focus:border-[#1C3A2F]"
-                    />
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="portal-quote-phone"
-                      className="block text-xs font-bold text-[#1B241E] mb-1.5"
-                    >
-                      Registered Customer Mobile Number (Required if using Quote Number)
-                    </label>
-                    <input
-                      id="portal-quote-phone"
-                      type="tel"
-                      value={lookupPhoneInput}
-                      onChange={(e) => setLookupPhoneInput(e.target.value)}
-                      placeholder="e.g., 9908074741"
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono tabular-nums bg-[#FAF8F3] border border-[#D4CEC2] focus:outline-none focus:border-[#1C3A2F]"
-                    />
-                  </div>
-
-                  {lookupError && (
-                    <div className="p-3.5 rounded-xl bg-[#FEF2F2] border border-[#B91C1C] text-xs text-[#991B1B] font-medium">
-                      {lookupError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={lookupLoading}
-                    className="w-full py-3.5 px-5 rounded-xl bg-[#1C3A2F] hover:bg-[#152C23] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <span>{lookupLoading ? 'Verifying Quotation...' : 'Open My Quotation'}</span>
-                    <ArrowRight className="w-4 h-4 text-[#EED6B5]" />
-                  </button>
+              <div className="portal-hero-image"><img src="/assets/ume-living.jpg" alt="Warm contemporary living room with carefully crafted interior finishes"/><span>Made for the way you live.</span></div>
+            </section>
+            <section className="portal-access" id="quotation-access">
+              <div className="access-intro"><p className="eyebrow">YOUR PERSONAL PROPOSAL</p><h2>Good design.<br/>Clear choices.</h2><p>Your quotation brings every room, material and price together in one place. Use the private link we shared with you, or enter your quotation details.</p><div className="privacy-note"><ShieldCheck size={22}/><span>Your proposal is private.<br/>Only your quotation will be opened.</span></div></div>
+              <div className="access-card">
+                <h2>Welcome home.</h2><p className="form-intro">Let’s open your interior proposal.</p>
+                <form onSubmit={handleCustomerLookupSubmit}>
+                  <label htmlFor="portal-quote-code">Quotation link or number</label>
+                  <input id="portal-quote-code" value={lookupCodeInput} onChange={e => setLookupCodeInput(e.target.value)} placeholder="Paste your private link or quotation number" required autoComplete="off"/>
+                  <label htmlFor="portal-quote-phone">Registered mobile number <span>(for quotation number access)</span></label>
+                  <input id="portal-quote-phone" type="tel" value={lookupPhoneInput} onChange={e => setLookupPhoneInput(e.target.value)} placeholder="Your registered mobile number" autoComplete="tel"/>
+                  {lookupError && <p role="alert" className="form-error">{lookupError}</p>}
+                  <button type="submit" className="form-submit" disabled={lookupLoading}>{lookupLoading ? 'Opening your quotation…' : 'Open my quotation'}<ArrowRight size={17}/></button>
                 </form>
-
-                <div className="pt-4 border-t border-[#E5DFD3] text-xs text-[#5C645E] space-y-1.5">
-                  <p className="font-bold text-[#1B241E]">
-                    Don’t have your quotation code handy?
-                  </p>
-                  <p>
-                    Use the direct WhatsApp link sent by{' '}
-                    <strong className="text-[#1B241E]">{catalogue.company.proprietor}</strong> (
-                    {catalogue.company.phone}), which opens your quotation directly without typing a code.
-                  </p>
-                </div>
+                <p className="access-help">Need your link? <a href={`https://wa.me/${catalogue.company.whatsapp}`}>Message UME Interiors</a></p>
               </div>
-
-              {/* Right 5 Cols: Protected Owner Studio Gate */}
-              <div className="lg:col-span-5 bg-white rounded-2xl border border-[#E5DFD3] p-6 sm:p-8 shadow-xs space-y-6">
-                <div className="border-b border-[#E5DFD3] pb-4">
-                  <p className="text-[11px] font-bold tracking-wider uppercase text-[#5C645E]">
-                    RESTRICTED PROPRIETOR ACCESS
-                  </p>
-                  <h2 className="text-xl font-bold text-[#1B241E] mt-1 inline-flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[#1C3A2F]" />
-                    Owner Quotation Studio
-                  </h2>
-                  <p className="text-xs text-[#5C645E] mt-1">
-                    Strictly restricted to {catalogue.company.legalName} ({catalogue.company.proprietor}). Customers do not have access to this studio.
-                  </p>
-                </div>
-
-                <form onSubmit={handleOwnerStudioLogin} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="owner-studio-pin"
-                      className="block text-xs font-bold text-[#1B241E] mb-1.5"
-                    >
-                      Proprietor Passcode / PIN
-                    </label>
-                    <div className="relative">
-                      <KeyRound className="w-4 h-4 text-[#5C645E] absolute left-3.5 top-3" />
-                      <input
-                        id="owner-studio-pin"
-                        type="password"
-                        value={ownerPasscodeInput}
-                        onChange={(e) => setOwnerPasscodeInput(e.target.value)}
-                        placeholder="Enter Proprietor PIN (9491)"
-                        className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-sm bg-[#FAF8F3] border border-[#D4CEC2] focus:outline-none focus:border-[#1C3A2F]"
-                      />
-                    </div>
-                  </div>
-
-                  {ownerAuthError && (
-                    <div className="p-3 rounded-xl bg-[#FEF2F2] border border-[#B91C1C] text-xs text-[#991B1B] font-medium">
-                      {ownerAuthError}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 px-5 rounded-xl bg-[#E6CBA8] hover:bg-[#DFBE94] text-[#1B241E] text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                  >
-                    <Lock className="w-3.5 h-3.5" />
-                    Unlock Owner Studio
-                  </button>
-                </form>
-              </div>
-            </div>
+            </section>
           </div>
         )}
 
+        {((mode === 'owner_login') || (mode === 'studio' && !ownerAuthenticated)) && (
+          <section className="owner-login-page">
+            <div className="owner-login-story"><p className="eyebrow">THE UME WORKSPACE</p><h1>Thoughtful spaces.<br/><em>Seamless beginnings.</em></h1><p>Your private workspace for beautiful proposals, considered materials and every client detail.</p><img src="/assets/ume-kitchen.jpg" alt="Bespoke kitchen with warm cabinetry"/></div>
+            <div className="owner-login-card"><div className="login-icon"><Lock size={22}/></div><p className="eyebrow">OWNER ACCESS</p><h2>Welcome to your studio.</h2><p className="form-intro">Sign in to manage quotations and your rate card.</p>
+              <form onSubmit={handleOwnerStudioLogin}>
+                <label htmlFor="owner-username">Username</label><input id="owner-username" name="username" autoComplete="username" value={ownerUsername} onChange={e => setOwnerUsername(e.target.value)} required autoFocus/>
+                <label htmlFor="owner-password">Password</label><div className="password-field"><input id="owner-password" name="password" autoComplete="current-password" type={showPassword ? 'text' : 'password'} value={ownerPassword} onChange={e => setOwnerPassword(e.target.value)} required/><button type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
+                {ownerAuthError && <p role="alert" className="form-error">{ownerAuthError}</p>}
+                <button type="submit" className="form-submit" disabled={ownerBusy}>{ownerBusy ? 'Signing in…' : 'Sign in to studio'}<ArrowRight size={17}/></button>
+              </form><a href="/" className="back-home">← Back to client portal</a>
+            </div>
+          </section>
+        )}
+
+        {mode === 'customer_quote' && !customerQuoteRecord && <div role="status" className="quote-loading"><span className="loading-dot"/> Opening your private quotation…</div>}
         {/* MODE 2: PRIVATE SINGLE-CUSTOMER QUOTATION VIEW (Strictly isolated to their own quote) */}
         {mode === 'customer_quote' && customerQuoteRecord && (
           <CustomerQuotationView
             key={`${customerQuoteRecord.publicId}-${customerQuoteRecord.revision}`}
+            isOwner={ownerAuthenticated}
             publicId={customerQuoteRecord.publicId}
             revision={customerQuoteRecord.revision}
             supersededByPublicId={customerQuoteRecord.supersededByPublicId}
@@ -852,8 +609,8 @@ export default function App() {
             initialSelection={customerQuoteRecord.lastCustomerSelection}
             existingFeedback={customerQuoteRecord.customerFeedback}
             onSaveSelection={handleSaveSelection}
-            onUpdateQuoteDraft={(updatedDraft) =>
-              handleUpdateQuoteDraft(customerQuoteRecord.publicId, updatedDraft)
+            onUpdateQuoteDraft={({draft, defaultSentPackage}) =>
+              handleUpdateQuoteDraft(customerQuoteRecord.publicId, draft, defaultSentPackage)
             }
             onSubmitPayment={handleSubmitPayment}
             onSwitchQuote={(pid) => fetchSingleCustomerQuote(pid)}
@@ -893,6 +650,7 @@ export default function App() {
         )}
       </main>
 
+      {settingsOpen && ownerAuthenticated && <div className="settings-backdrop" onClick={e => {if(e.target === e.currentTarget) setSettingsOpen(false);}}><section role="dialog" aria-modal="true" aria-labelledby="account-title" className="settings-card"><button className="settings-close" type="button" aria-label="Close account settings" onClick={() => setSettingsOpen(false)}><X size={20}/></button><p className="eyebrow">YOUR ACCOUNT</p><h2 id="account-title">Sign-in details</h2><p className="form-intro">Update your studio username and password.</p><form onSubmit={handleCredentialChange}><label htmlFor="newUsername">Username</label><input id="newUsername" name="newUsername" defaultValue={ownerUsername} autoComplete="username" required minLength={3}/><label htmlFor="currentPassword">Current password</label><input id="currentPassword" name="currentPassword" type="password" autoComplete="current-password" required/><label htmlFor="newPassword">New password</label><input id="newPassword" name="newPassword" type="password" autoComplete="new-password" minLength={12} placeholder="At least 12 characters" required/>{credentialMessage && <p role="status" className="credential-message">{credentialMessage}</p>}<button type="submit" disabled={ownerBusy} className="form-submit">{ownerBusy ? 'Updating…' : 'Save sign-in details'}<Check size={17}/></button></form></section></div>}
       {/* Quiet Architectural Footer */}
       <footer className="bg-white border-t border-[#E5DFD3] py-6 px-6 text-xs text-[#5C645E] no-print">
         <div className="max-w-[1380px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">

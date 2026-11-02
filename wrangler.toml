@@ -1,8 +1,20 @@
 name = "ume-interiors-quotation-studio"
-compatibility_date = "2025-02-01"
-pages_build_output_dir = "./dist"
+main = "worker/index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
 
-[vars]
-PUBLIC_DOMAIN = "https://umeinteriors.com"
-OUTPUT_LANGUAGE = "en"
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/owner", "/owner/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ume-interiors-studio"
+database_id = "00000000-0000-0000-0000-000000000000" # Replace after creating your D1 database.
+migrations_dir = "migrations"
+
+[observability]
+enabled = false
 

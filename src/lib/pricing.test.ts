@@ -49,8 +49,8 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
   assert.equal(getPackageDisplayName('Normal'), 'Normal');
   assert.equal(getPackageDisplayName('Premium'), 'Premium');
 
-  // Verify UPI ID is 9491661555@oksbi
-  assert.equal(DEFAULT_UME_CATALOGUE.company.bank.upiId, '9491661555@oksbi');
+  // Verify UPI ID is 9177389543@oksbi
+  assert.equal(DEFAULT_UME_CATALOGUE.company.bank.upiId, '9177389543@oksbi');
 
   // Verify 12-item Standard Depth Schedule in inches
   assert.equal(STANDARD_DEPTH_SCHEDULE_INCHES.length, 12);
@@ -263,14 +263,10 @@ test('Unified Quotation + Rate Card JSON auto-extracts new work elements and app
     name: 'Floating Wall-Mounted Study Desk',
     work_type: 'Wall-mounted study table',
     size_text: '4.0 × 2.0 ft',
-    unit: 'sq_ft',
-    width_ft: 4,
-    height_ft: 2,
-    area_sqft: 8,
+    measure: { unit: 'sq_ft', per_item: 8 },
     quantity: 1,
     optional: false,
     pvc: { eligible: false, parts: [] },
-    notes: 'Custom floating study unit',
     source_text_en: 'One 4 by 2 ft wall-mounted study table',
   });
 

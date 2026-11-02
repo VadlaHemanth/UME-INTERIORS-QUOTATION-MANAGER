@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
+import './pdf-owner.css';
 import {
   formatCleanItemDescription,
   getPackageDisplayName,
@@ -37,6 +38,258 @@ interface PrintableA4SheetProps {
   onReturnToInteractiveSelector?: () => void;
 }
 
+/** The preview and native PDF share these exact measured A4 page nodes. */
+function A4Document({ children, reference }: { children: React.ReactNode; reference: string }) {
+  const sourceRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const source = sourceRef.current;
+    const pages = pagesRef.current;
+    const viewport = viewportRef.current;
+    if (!source || !pages || !viewport) return;
+    let active = true;
+
+    const setPreviewScale = () => {
+      const paperPixels = 210 * 96 / 25.4;
+      const scale = Math.min(1, viewport.clientWidth / paperPixels);
+      viewport.style.setProperty('--pdf-preview-scale', String(scale));
+    };
+    const rebuild = () => {
+      if (!active) return;
+      // Measure outside the preview shell, which is display:none during the interactive view.
+      const measurementHost = document.createElement('div');
+      measurementHost.className = 'quote-document pdf-pagination-measure';
+      measurementHost.setAttribute('aria-hidden', 'true');
+      measurementHost.inert = true;
+      document.body.append(measurementHost);
+      const created: HTMLElement[] = [];
+      let body!: HTMLDivElement;
+      let sectionHeading: HTMLElement | undefined;
+      let sectionLabel = 'Quotation';
+      const newPage = (continued = false) => {
+        const page = document.createElement('section');
+        page.className = 'pdf-page';
+        page.dataset.section = sectionLabel;
+        body = document.createElement('div');
+        body.className = 'pdf-page-body';
+        page.append(body);
+        measurementHost.append(page);
+        created.push(page);
+        if (continued && sectionHeading) {
+          const heading = sectionHeading.cloneNode(true) as HTMLElement;
+          body.append(heading);
+          if (body.scrollHeight > body.clientHeight + 1) {
+            heading.remove();
+            const compact = document.createElement('p');
+            compact.className = 'pdf-continuation-heading';
+            compact.textContent = `${sectionLabel} (continued)`;
+            body.append(compact);
+          }
+        }
+      };
+      const overflows = () => body.scrollHeight > body.clientHeight + 1;
+      const readableText = (node: Node): string => {
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+        return Array.from(node.childNodes).map(readableText).join(' ').replace(/\s+/g, ' ').trim();
+      };
+      const takeText = (text: string, limit: number) => {
+        if (text.length <= limit) return text;
+        let end = limit;
+        const boundary = text.lastIndexOf(' ', limit);
+        if (boundary > limit * .75) end = boundary;
+        // Do not divide a Unicode surrogate pair at a page boundary.
+        const code = text.charCodeAt(end - 1);
+        if (code >= 0xd800 && code <= 0xdbff) end--;
+        return text.slice(0, Math.max((text.codePointAt(0) || 0) > 0xffff ? 2 : 1, end));
+      };
+      const appendLongText = (block: HTMLElement) => {
+        let remaining = readableText(block);
+        while (remaining.length) {
+          const fragment = document.createElement('div');
+          fragment.className = 'pdf-text-fragment';
+          body.append(fragment);
+          let low = 1, high = remaining.length, best = 0;
+          while (low <= high) {
+            const middle = Math.floor((low + high) / 2);
+            fragment.textContent = takeText(remaining, middle);
+            if (overflows()) high = middle - 1;
+            else { best = middle; low = middle + 1; }
+          }
+          if (!best) {
+            fragment.remove();
+            newPage(false);
+            continue;
+          }
+          const part = takeText(remaining, best);
+          fragment.textContent = part;
+          remaining = remaining.slice(part.length).trimStart();
+          if (remaining.length) newPage(true);
+        }
+        // Keep non-text visual content, including payment QR SVGs, in the document.
+        for (const visual of Array.from(block.querySelectorAll('img, svg'))) {
+          const copy = visual.cloneNode(true) as HTMLElement;
+          body.append(copy);
+          if (overflows()) { copy.remove(); newPage(true); body.append(copy); }
+        }
+      };
+      const appendTable = (block: HTMLElement) => {
+        const originalBody = block.querySelector('tbody');
+        const rows = originalBody ? Array.from(originalBody.children) : [];
+        if (!rows.length) return false;
+        let shell!: HTMLElement;
+        let tableBody!: HTMLTableSectionElement;
+        const addShell = () => {
+          shell = block.cloneNode(true) as HTMLElement;
+          tableBody = shell.querySelector('tbody')!;
+          tableBody.replaceChildren();
+          body.append(shell);
+        };
+        addShell();
+        if (overflows()) { shell.remove(); appendLongText(block); return true; }
+        for (const row of rows) {
+          const copy = row.cloneNode(true);
+          tableBody.append(copy);
+          if (overflows()) {
+            tableBody.removeChild(copy);
+            if (!tableBody.children.length) shell.remove();
+            newPage(true);
+            addShell();
+            tableBody.append(copy);
+            if (overflows()) {
+              tableBody.removeChild(copy);
+              // A single long note must continue across rows/pages, never clip.
+              const originalCells = Array.from(row.children) as HTMLElement[];
+              let remaining = originalCells.map(readableText);
+              let continued = false;
+              while (remaining.some(Boolean)) {
+                const fragment = row.cloneNode(false) as HTMLTableRowElement;
+                const cells = originalCells.map((cell) => cell.cloneNode(false) as HTMLElement);
+                fragment.append(...cells);
+                tableBody.append(fragment);
+                const fill = (limit: number) => cells.forEach((cell, index) => {
+                  const text = takeText(remaining[index], limit);
+                  cell.textContent = `${continued && index === 0 ? '(continued) ' : ''}${text}`;
+                  if (remaining[index].length > 80) {
+                    cell.style.whiteSpace = 'normal';
+                    cell.style.overflowWrap = 'anywhere';
+                  }
+                });
+                let low = 1, high = Math.max(...remaining.map((text) => text.length)), best = 0;
+                while (low <= high) {
+                  const middle = Math.floor((low + high) / 2);
+                  fill(middle);
+                  if (overflows()) high = middle - 1;
+                  else { best = middle; low = middle + 1; }
+                }
+                if (!best) {
+                  fragment.remove();
+                  if (!tableBody.children.length) shell.remove();
+                  newPage(false);
+                  addShell();
+                  continue;
+                }
+                fill(best);
+                remaining = remaining.map((text) => text.slice(takeText(text, best).length).trimStart());
+                continued = true;
+                if (remaining.some(Boolean)) { newPage(true); addShell(); }
+              }
+            }
+          }
+        }
+        return true;
+      };
+      const appendBlock = (block: HTMLElement) => {
+        const copy = block.cloneNode(true) as HTMLElement;
+        body.append(copy);
+        if (!overflows()) return;
+        copy.remove();
+        if (block.querySelector('tbody') && appendTable(block)) return;
+        if (body.children.length) newPage(true);
+        body.append(copy);
+        if (overflows()) { copy.remove(); appendLongText(block); }
+      };
+
+      let started = false;
+      for (const section of Array.from(source.children) as HTMLElement[]) {
+        const blocks = (Array.from(section.children) as HTMLElement[]).flatMap((block) =>
+          block.hasAttribute('data-pdf-flow-group') ? Array.from(block.children) as HTMLElement[] : [block]
+        );
+        if (!blocks.length) continue;
+        sectionHeading = blocks[0];
+        sectionLabel = section.dataset.pageLabel || 'Quotation';
+        if (!started) {
+          newPage();
+          started = true;
+        } else {
+          // Keep a section heading with its introduction and at least the first table row.
+          const probes: HTMLElement[] = [];
+          for (const block of blocks.slice(0, 3)) {
+            const probe = block.cloneNode(true) as HTMLElement;
+            const table = probe.querySelector('tbody');
+            if (table) {
+              for (const row of Array.from(table.children).slice(1)) row.remove();
+            }
+            body.append(probe);
+            probes.push(probe);
+            if (table) break;
+          }
+          const needsNewPage = overflows();
+          probes.forEach((probe) => probe.remove());
+          if (needsNewPage) newPage();
+          else {
+            const page = body.parentElement!;
+            page.dataset.section = `${page.dataset.section} / ${sectionLabel}`;
+          }
+        }
+        for (const block of blocks) appendBlock(block);
+      }
+      // An exceptionally tall first block can cause a provisional empty page.
+      for (let index = created.length - 1; index >= 0; index--) {
+        if (!created[index].firstElementChild?.children.length) {
+          created[index].remove();
+          created.splice(index, 1);
+        }
+      }
+      created.forEach((page, index) => {
+        const footer = document.createElement('footer');
+        footer.className = 'pdf-page-footer';
+        const label = document.createElement('span');
+        label.textContent = `${reference} · ${page.dataset.section}`;
+        const number = document.createElement('span');
+        number.textContent = `Page ${index + 1} of ${created.length}`;
+        footer.append(label, number);
+        page.append(footer);
+        page.setAttribute('aria-label', `Quotation page ${index + 1} of ${created.length}`);
+      });
+      pages.replaceChildren(...created);
+      measurementHost.remove();
+      setPreviewScale();
+    };
+    rebuild();
+    void document.fonts.ready.then(rebuild);
+    for (const image of Array.from(source.querySelectorAll('img'))) {
+      if (!image.complete) image.addEventListener('load', rebuild, { once: true });
+    }
+    const resize = new ResizeObserver(setPreviewScale);
+    resize.observe(viewport);
+    window.addEventListener('beforeprint', rebuild);
+    return () => {
+      active = false;
+      resize.disconnect();
+      window.removeEventListener('beforeprint', rebuild);
+    };
+  }, [children, reference]);
+
+  return (
+    <div ref={viewportRef} className="quote-document" role="document" aria-label="A4 quotation preview">
+      <div ref={sourceRef} className="pdf-source-layout" aria-hidden="true" inert>{children}</div>
+      <div ref={pagesRef} className="pdf-pages" />
+    </div>
+  );
+}
+
 export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   publicId,
   revision,
@@ -63,7 +316,8 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   const activeGradeDisplayName = getPackageDisplayName(wholeHomeSelection.grade);
   const quoteRef = draft.quote.number || 'UME-2026-1024';
   const revCode = String(revision).padStart(2, '0');
-  const shareUrl = `https://${catalogue.company.domain}/q/${publicId}`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : `https://${catalogue.company.domain}`;
+  const shareUrl = `${origin}/q/${publicId}`;
 
   const stdWholeHomeTotal =
     snapshot.baseWholeHomeTotals[
@@ -89,46 +343,27 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
     stage3Cumulative + milestones.laminateCompletion10Percent;
 
   return (
-    <div className="max-w-[210mm] mx-auto space-y-6 text-[#18221D] print:space-y-0">
+    <A4Document reference={`${quoteRef} · Rev ${revCode}`}>
       {/* PAGE 1: LETTERHEAD, CLIENT DETAILS & SIDE-BY-SIDE 3-PACKAGE SUMMARY */}
-      <div className="bg-white border border-[#E5DFD3] rounded-xl p-7 sm:p-9 space-y-5 print:border-0 print:rounded-none print:px-0 print:pt-2 print:pb-0">
-        {/* Top Letterhead — Logo height (68px) matched 1:1 with the 4-line company header stack */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-[#1C3A2F] pb-4 pt-1">
-          <div className="flex items-center gap-4 min-w-0">
-            <UmeLogoMark size="pdf" />
-            <div className="flex flex-col justify-between h-[68px] py-0.5 min-w-0">
-              <p className="text-[16px] font-bold tracking-tight leading-none text-[#18221D]">
-                UMAMAHESHWARA INTERIORS
-              </p>
-              <p className="text-[12.5px] font-bold leading-none text-[#3D4741]">
-                Umamaheshwara Enterprises
-              </p>
-              <p className="text-[11.5px] font-semibold leading-none text-[#1C3A2F]">
-                Residential and Commercial Interior Designers
-              </p>
-              <p className="text-[10.5px] leading-none text-[#5C645F] sm:whitespace-nowrap">
-                <span>{catalogue.company.address}</span>{' '}
-                <span className="font-medium text-[#3D4741]">
-                  · Phone: {catalogue.company.phone}
-                </span>
-              </p>
+      <div className="pdf-flow-section" data-page-label="Quotation overview">
+        <header className="pdf-letterhead">
+          <UmeLogoMark size="pdf" />
+          <div className="pdf-company">
+            <div className="pdf-company-title">
+              <p>UMAMAHESHWARA INTERIORS</p>
+              <span>QUOTATION</span>
             </div>
+            <p className="pdf-enterprise">Umamaheshwara Enterprises</p>
+            <p className="pdf-designers">Residential and Commercial Interior Designers</p>
           </div>
-
-          <div className="sm:text-right shrink-0 flex flex-col justify-center">
-            <div>
-              <span className="inline-block px-3.5 py-1 bg-[#1C3A2F] text-[#E6CBA8] rounded-md text-xs font-bold uppercase tracking-widest">
-                QUOTATION
-              </span>
-            </div>
-            <p className="text-[11px] text-[#5C645F] mt-2">
-              Proprietor: <strong className="text-[#18221D]">{catalogue.company.proprietor}</strong>
-            </p>
+          <div className="pdf-contact">
+            <p>{catalogue.company.address}<br /><strong>Phone:</strong> {catalogue.company.phone}</p>
+            <p className="pdf-proprietor"><span>PROPRIETOR</span><strong>{catalogue.company.proprietor}</strong></p>
           </div>
-        </div>
+        </header>
 
         {/* Non-Overflowing 4-Column Quotation Reference & Validity Metadata Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-3.5 text-xs">
+        <div className="grid grid-cols-4 gap-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-3.5 text-xs">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
               Quotation No.
@@ -164,7 +399,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </div>
 
         {/* Client & Selected Package Overview Box */}
-        <div className="grid grid-cols-12 gap-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-5">
+        <div className="pdf-client-summary grid grid-cols-12 gap-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-5">
           <div className="col-span-7 space-y-1 pr-4 border-r border-[#E5DFD3] min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#1C3A2F]">
               Prepared For (Client & Site Address)
@@ -177,7 +412,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </p>
             {draft.customer.phone && (
               <p className="text-xs text-[#5C645F] font-mono tabular-nums pt-1">
-                Mobile: <strong className="text-[#18221D]">+91 {draft.customer.phone}</strong>
+                Mobile: <strong className="text-[#18221D]">{draft.customer.phone}</strong>
               </p>
             )}
           </div>
@@ -197,7 +432,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                     }`}
               </p>
               <p className="text-[11px] text-[#1C3A2F] font-semibold mt-0.5">
-                {activeGradeInfo.termiteProofBadge} · {activeGradeInfo.warrantyBanner}
+                {mixByRoom ? 'Grades and PVC options vary by room. Manufacturer warranties follow the selected product’s certificate and terms.' : `${activeGradeInfo.termiteProofBadge} · ${activeGradeInfo.warrantyBanner}`}
               </p>
             </div>
 
@@ -213,7 +448,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         {/* All 3 Packages Side-by-Side Executive Comparison Strip */}
         <div className="space-y-2 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
-            All 3 Packages Side-by-Side Comparison (Standard · Normal · Premium)
+            Package comparison · Base scope before optional work and discount
           </p>
           <div className="grid grid-cols-3 gap-3">
             {ALL_GRADES.map((g) => {
@@ -267,10 +502,11 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         {/* Room-by-Room Side-by-Side 3-Package Summary Table */}
         <div className="space-y-2 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
-            Room-by-Room Side-by-Side Package Cost Summary
+            Room-by-room package comparison
           </p>
-          <div className="border border-[#E5DFD3] rounded-lg overflow-hidden">
-            <table className="w-full text-left border-collapse text-xs">
+          <div className="pdf-table-scroll border border-[#E5DFD3] rounded-lg overflow-hidden">
+            <table className="pdf-room-comparison w-full text-left border-collapse text-xs">
+              <colgroup><col style={{ width: '25%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '15%' }} /><col style={{ width: '18%' }} /></colgroup>
               <thead>
                 <tr className="bg-[#1C3A2F] text-white">
                   <th className="py-2.5 px-3 font-semibold">Room & Units</th>
@@ -323,7 +559,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 })}
                 <tr className="bg-[#FAF8F4] font-bold">
                   <td className="py-2.5 px-3 text-[#18221D]">
-                    Whole-Home Package Totals
+                    Base scope totals
                   </td>
                   <td className="py-2.5 px-2.5 text-right font-mono tabular-nums">
                     {formatINR(stdWholeHomeTotal)}
@@ -346,12 +582,19 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
         </div>
 
+        <div className="pdf-total-summary print-avoid-break">
+          <span>Selected scope <strong>{formatINR(calc.baseScopeTotal)}</strong></span>
+          {calc.optionalSelectedTotal > 0 && <span>Optional work <strong>+{formatINR(calc.optionalSelectedTotal)}</strong></span>}
+          {calc.discountRupees > 0 && <span>Approved discount <strong>−{formatINR(calc.discountRupees)}</strong></span>}
+          <span>Quotation total <strong>{formatINR(calc.grandTotal)}</strong></span>
+        </div>
+
         {/* Material & Laminate Specifications */}
         <div className="bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-4 text-[11px] space-y-1.5 print-avoid-break">
           <p className="font-bold uppercase tracking-wider text-[#1C3A2F] text-[10px]">
             Included Material, Laminate & Hardware Specifications
           </p>
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[#4A524D] list-disc list-inside">
+          <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-[#4A524D] list-disc list-inside">
             {catalogue.commonMaterials.map((m, idx) => (
               <li key={idx} className="leading-snug">
                 {m}
@@ -362,16 +605,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       </div>
 
       {/* PAGE 2: ITEMISED ROOM-BY-ROOM BREAKDOWN WITH ALL 3 PACKAGE RATES SIDE-BY-SIDE */}
-      <div className="bg-white border border-[#E5DFD3] rounded-xl p-7 sm:p-9 space-y-5 print:border-0 print:rounded-none print:px-0 print:pt-2 print:pb-0 print-break-before">
-        <div className="flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
+      <div className="pdf-flow-section" data-page-label="Furniture scope & rates">
+        <div className="pdf-section-heading flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
             <UmeLogoMark size="md" />
-            <div className="flex flex-col justify-between h-[40px] py-0.5 min-w-0">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F] whitespace-nowrap">
+            <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
+              <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F]">
                 UMAMAHESHWARA INTERIORS · Umamaheshwara Enterprises
               </p>
-              <h2 className="text-[15px] font-bold leading-none text-[#18221D] whitespace-nowrap">
-                Section 01 · Room-Wise Furniture Scope & Side-by-Side Package Rates
+              <h2 className="text-[15px] font-bold leading-none text-[#18221D]">
+                01 · Furniture scope & package rates
               </h2>
             </div>
           </div>
@@ -380,7 +623,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </p>
         </div>
 
-        <div className="space-y-5">
+        <div className="space-y-5" data-pdf-flow-group>
           {snapshot.rooms.map((room) => {
             const rSel =
               mixByRoom && roomSelections[room.roomIndex]
@@ -391,7 +634,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             return (
               <div
                 key={room.roomIndex}
-                className="border border-[#E5DFD3] rounded-lg overflow-hidden print-avoid-break"
+                className="pdf-table-scroll border border-[#E5DFD3] rounded-lg overflow-hidden print-avoid-break"
               >
                 <div className="bg-[#FAF8F4] px-4 py-2.5 border-b border-[#E5DFD3] flex items-center justify-between text-xs">
                   <div>
@@ -404,11 +647,12 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                     </span>
                   </div>
                   <span className="font-bold text-[#18221D] font-mono tabular-nums">
-                    Chosen Subtotal: {formatINR(rSub)}
+                    Selected room total: {formatINR(rSub)}
                   </span>
                 </div>
 
-                <table className="w-full text-left border-collapse text-[10.5px]">
+                <table className="pdf-scope-table w-full text-left border-collapse text-[10.5px]">
+                  <colgroup><col style={{ width: '33%' }} /><col style={{ width: '15%' }} /><col style={{ width: '10%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /></colgroup>
                   <thead>
                     <tr className="bg-[#1C3A2F] text-white">
                       <th className="py-2 px-3 font-semibold w-[40%]">
@@ -425,7 +669,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   </thead>
                   <tbody className="divide-y divide-[#E5DFD3]">
                     {room.items
-                      .filter((i) => !i.optional)
+                      .filter((i) => !i.optional || selectedOptionalPointers.includes(`/rooms/${room.roomIndex}/items/${i.itemIndex}`))
                       .map((item) => {
                         const stdCombo = makeComboKey('Base', rSel.protection, rSel.finish);
                         const normCombo = makeComboKey('Normal', rSel.protection, rSel.finish);
@@ -461,7 +705,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                         return (
                           <tr key={`${room.roomIndex}-${item.itemIndex}`}>
                             <td className="py-2 px-3">
-                              <p className="font-bold text-[#18221D]">{cleanTitle}</p>
+                              <p className="font-bold text-[#18221D]">{cleanTitle}{item.optional ? " · Selected optional work" : ""}</p>
                               <p className="text-[10px] text-[#5C645F] leading-snug mt-0.5">
                                 {cleanDesc}
                               </p>
@@ -500,16 +744,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       </div>
 
       {/* PAGE 3: EASY-TO-UNDERSTAND MILESTONE PAYMENT SCHEDULE, BANK DETAILS & TERMS */}
-      <div className="bg-white border border-[#E5DFD3] rounded-xl p-7 sm:p-9 space-y-5 print:border-0 print:rounded-none print:px-0 print:pt-2 print:pb-0 print-break-before">
-        <div className="flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
+      <div className="pdf-flow-section" data-page-label="Payment schedule & terms">
+        <div className="pdf-section-heading flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
             <UmeLogoMark size="md" />
-            <div className="flex flex-col justify-between h-[40px] py-0.5 min-w-0">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F] whitespace-nowrap">
+            <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
+              <p className="text-[10.5px] font-bold uppercase tracking-wider leading-none text-[#1C3A2F]">
                 UMAMAHESHWARA INTERIORS · Umamaheshwara Enterprises
               </p>
-              <h2 className="text-[15px] font-bold leading-none text-[#18221D] whitespace-nowrap">
-                Section 02 · Milestone Payment Schedule, Bank Account & Terms
+              <h2 className="text-[15px] font-bold leading-none text-[#18221D]">
+                02 · Payment schedule & terms
               </h2>
             </div>
           </div>
@@ -524,13 +768,18 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             How Your 5-Step Payment Schedule Works (100% Transparent):
           </p>
           <p className="text-[11px] text-[#3D4741] leading-relaxed">
-            The <strong>{formatINR(milestones.bookingRequired, true)} order booking payment</strong> is <strong>included inside your first 50% advance</strong> — it is <strong>NOT an extra charge</strong> added on top of your project price ({formatINR(calc.grandTotal, true)}). You pay in 5 simple stages as work progresses at your site:
+            {milestones.requiresOwnerSmallOrderRule ? (
+              <>This order requires proprietor confirmation of booking and work-start terms. The milestone amounts below are indicative. Contact {catalogue.company.proprietor} before making a payment.</>
+            ) : (
+              <>The <strong>{formatINR(milestones.bookingRequired, true)} order booking payment</strong> is <strong>included inside your first 50% advance</strong>. It counts toward your project price ({formatINR(calc.grandTotal, true)}). Payments follow the stages below.</>
+            )}
           </p>
         </div>
 
         {/* 4-Column Easy-to-Understand Milestone Schedule Table */}
-        <div className="border border-[#E5DFD3] rounded-lg overflow-hidden print-avoid-break">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="pdf-table-scroll border border-[#E5DFD3] rounded-lg overflow-hidden print-avoid-break">
+          <table className="pdf-payment-table w-full text-left border-collapse text-xs">
+            <colgroup><col style={{ width: '43%' }} /><col style={{ width: '19%' }} /><col style={{ width: '19%' }} /><col style={{ width: '19%' }} /></colgroup>
             <thead>
               <tr className="bg-[#1C3A2F] text-white">
                 <th className="py-2.5 px-3.5 font-semibold w-[44%]">
@@ -549,6 +798,12 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </thead>
             <tbody className="divide-y divide-[#E5DFD3]">
               {/* Stage 1 */}
+              {milestones.requiresOwnerSmallOrderRule ? (
+                <tr className="bg-[#FAF8F4]">
+                  <td className="py-2.5 px-3.5 font-bold">Step 1 · Booking terms</td>
+                  <td colSpan={3} className="py-2.5 px-3.5 text-xs text-[#5C645F]">Confirm the booking amount with the proprietor before payment.</td>
+                </tr>
+              ) : (
               <tr className="bg-[#FAF8F4]">
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
@@ -572,6 +827,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   )}
                 </td>
               </tr>
+              )}
 
               {/* Stage 2 */}
               <tr>
@@ -580,7 +836,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                     Step 2 · Balance of 50% Work-Start Advance
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    50% Advance ({formatINR(milestones.advance50PercentTotal)}) minus ₹50,000 Booking. Due before plywood dispatch to site.
+                    {milestones.requiresOwnerSmallOrderRule ? 'Work-start terms and booking credit require proprietor confirmation.' : `50% advance (${formatINR(milestones.advance50PercentTotal)}) less the ${formatINR(milestones.bookingRequired)} booking. Due before plywood dispatch to site.`}
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -663,40 +919,34 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   <div className="text-[9.5px] font-semibold text-[#1C3A2F]">100% Complete</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#1C3A2F]">
-                  {formatINR(milestones.totalRemainingBalance, true)}
+                  {formatINR(Math.max(0, calc.grandTotal - verifiedPaidRupees), true)}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Bank Account + QR Box */}
-        <div className="grid grid-cols-12 gap-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-5 items-center print-avoid-break">
-          <div className="col-span-8 space-y-1 text-xs">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#1C3A2F]">
-              Official Bank Remittance Account
-            </p>
-            <p className="font-bold text-[#18221D] text-sm">
-              {catalogue.company.bank.bankName} — {catalogue.company.bank.branch}
-            </p>
-            <p className="text-[#18221D]">
-              Account Name: <strong>{catalogue.company.bank.accountName}</strong>
-            </p>
-            <p className="font-mono tabular-nums text-[#18221D]">
-              Account No: <strong>{catalogue.company.bank.accountNumber}</strong> · IFSC:{' '}
-              <strong>{catalogue.company.bank.ifsc}</strong> · UPI ID:{' '}
-              <strong>{catalogue.company.bank.upiId}</strong>
-            </p>
+        <section className="pdf-bank print-avoid-break" aria-label="Bank account and payment QR codes">
+          <div className="pdf-bank-info">
+            <p className="pdf-eyebrow">Official bank remittance account</p>
+            <h3>{catalogue.company.bank.bankName}</h3>
+            <p className="pdf-bank-branch">{catalogue.company.bank.branch}</p>
+            <p className="pdf-bank-account-name">{catalogue.company.bank.accountName}</p>
+            <dl className="pdf-bank-details">
+              <div><dt>Account no.</dt><dd>{catalogue.company.bank.accountNumber}</dd></div>
+              <div><dt>IFSC</dt><dd>{catalogue.company.bank.ifsc}</dd></div>
+              <div className="pdf-upi"><dt>UPI ID</dt><dd>{catalogue.company.bank.upiId}</dd></div>
+            </dl>
           </div>
-          <div className="col-span-4 flex justify-end gap-4">
-            <DeterministicQrCode
-              value={`upi://pay?pa=${catalogue.company.bank.upiId}&pn=UME%20Interiors&am=50000&cu=INR`}
-              size={76}
-              label="UPI Booking QR"
-            />
-            <DeterministicQrCode value={shareUrl} size={76} label="Online Quote" />
+          <div className="pdf-bank-qrs">
+            {!milestones.requiresOwnerSmallOrderRule && (
+              <DeterministicQrCode
+                value={`upi://pay?${new URLSearchParams({ pa: catalogue.company.bank.upiId, pn: catalogue.company.bank.accountName, am: String(milestones.bookingRequired), cu: 'INR', tn: `Booking ${quoteRef}` }).toString()}`}
+                size={94} label="UPI booking" />
+            )}
+            <DeterministicQrCode value={shareUrl} size={94} label="Online quotation" />
           </div>
-        </div>
+        </section>
 
         {/* Notes & Terms and Conditions (Includes 0.8mm / 0.72mm Laminate Gauge Note) */}
         <div className="space-y-2.5 print-avoid-break">
@@ -706,13 +956,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[10.5px] text-[#18221D] leading-snug">
             <strong>Technical Note on Laminate Thickness & Finish:</strong> Internal balancing/liner laminate is industry-standard <strong>0.8 mm</strong> category (actual factory sheet gauge ranges from <strong>0.72 mm to 0.80 mm</strong> as per standard ISI/manufacturer tolerance). External decorative laminate is <strong>1.0 mm</strong> thickness in the customer’s chosen finish (SF Matte or High-Gloss at the same price).
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[10.5px] text-[#5C645F] leading-snug">
+          <div className="pdf-terms grid grid-cols-2 gap-x-6 gap-y-2 text-[10.5px] text-[#5C645F] leading-snug">
             {catalogue.termsAndConditions.map((t) => (
               <div key={t.id}>
                 <strong className="text-[#18221D]">
-                  {t.id}. {t.title}:
+                  {t.id}. {milestones.requiresOwnerSmallOrderRule && t.id === 1 ? 'Booking confirmation' : milestones.requiresOwnerSmallOrderRule && t.id === 2 ? 'Work-start confirmation' : t.title}:
                 </strong>{' '}
-                {t.clause}
+                {milestones.requiresOwnerSmallOrderRule && [1, 2].includes(t.id) ? 'Booking amount, credit and work-start timing require written proprietor confirmation for this order before payment.' : t.clause}
               </div>
             ))}
           </div>
@@ -736,6 +986,6 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </A4Document>
   );
 };

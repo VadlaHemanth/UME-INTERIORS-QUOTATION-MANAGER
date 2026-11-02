@@ -3,6 +3,8 @@
  * Romanised Telugu/Hindi Leak Detector, Placeholder Gate, and v1->v2 Migrator.
  */
 
+import { validateAddonSuggestions } from './addon-suggestions';
+
 export type InputLanguageCode = 'te' | 'hi' | 'en';
 export type PlywoodGrade = 'Base' | 'Normal' | 'Premium';
 export type ProtectionOption = 'Standard' | 'With PVC';
@@ -80,6 +82,12 @@ export interface ClarificationItem {
   question: string;
 }
 
+export interface SuggestedAddon {
+  room_index: number;
+  reason: string;
+  item: DraftItem;
+}
+
 export interface QuotationDraftV2 {
   schema_version: 'quotation-studio.draft.v2';
   output_language: 'en';
@@ -92,6 +100,7 @@ export interface QuotationDraftV2 {
   owner_requests: OwnerRequest[];
   needs_clarification: ClarificationItem[];
   rate_card_updates?: Record<string, any>;
+  suggested_addons?: SuggestedAddon[];
 }
 
 export interface ValidationIssue {
@@ -319,6 +328,11 @@ export function validateQuotationDraftV2(
       });
     }
   };
+
+  const addonValidation = validateAddonSuggestions(d);
+  for (const message of addonValidation.errors) {
+    issues.push({ path: '/suggested_addons', severity: 'error', code: 'SCHEMA_MISMATCH', message });
+  }
 
   // Customer checks
   if (!d.customer) {

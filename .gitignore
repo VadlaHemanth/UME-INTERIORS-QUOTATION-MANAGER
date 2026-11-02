@@ -9,3 +9,15 @@ coverage/
 .playwright-cli/
 public/assets/aistudio/
 
+# Runtime data, credentials, local previews and browser audit artifacts.
+data/
+.dev.vars*
+.wrangler/
+tmp/
+
+
+LOCAL-LOGIN.txt
+output/
+data/owner-auth.json
+
+.aistudio/

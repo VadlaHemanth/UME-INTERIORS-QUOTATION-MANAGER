@@ -1,0 +1,73 @@
+.owner-studio { overflow-wrap: anywhere; }
+.owner-studio :is(.grid, .flex) > * { min-width: 0; }
+.owner-studio :is(input, select, textarea) { max-width: 100%; }
+.owner-studio :is(button, select, input:not([type=checkbox]):not([type=file])) { min-height: 40px; }
+.owner-studio button { line-height: 1.5; }
+.owner-studio button:disabled { opacity: .55; cursor: wait; }
+.owner-studio .owner-tabs { width: 100%; background: #f5f3ee; padding: 6px; border-color: #e8e3da; }
+.owner-tabs > button { flex: 1 1 auto; white-space: normal; padding: 12px 18px; }
+.owner-package-choice:hover { border-color: #1c3a2f; box-shadow: 0 4px 14px #1c3a2f0b; }
+.owner-instructions { overflow-wrap: anywhere; word-break: break-word; }
+@media screen and (max-width: 760px) {
+  .owner-studio .owner-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .owner-tabs > button { padding: 10px; font-size: 11px; }
+  .owner-studio > div > div > div > h1 { font-size: 22px; }
+}
+/* One physical page model for both preview and browser Save as PDF. */
+.quote-document { width: 100%; max-width: 210mm; margin: 0 auto; overflow: clip; color: #18221d; font: 10px/1.45 var(--font-sans); }
+.pdf-pagination-measure { position: fixed; left: -100000px; top: 0; width: 210mm; max-width: none; visibility: hidden; pointer-events: none; zoom: 1; }
+.pdf-source-layout { position: fixed; left: -100000px; top: 0; width: 186mm; visibility: hidden; pointer-events: none; }
+.pdf-flow-section { display: flex; flex-direction: column; gap: 16px; }
+.pdf-pages { width: 210mm; zoom: var(--pdf-preview-scale, 1); }
+.pdf-page { position: relative; width: 210mm; height: 297mm; padding: 12mm; box-sizing: border-box; margin: 0 0 24px; background: #fff; color: #18221d; box-shadow: 0 3px 18px #26382e16; }
+.pdf-page-body { height: 273mm; display: flex; flex-direction: column; gap: 16px; }
+.pdf-page-body > * { flex-shrink: 0; min-width: 0; }
+.quote-document :is(p, h1, h2, h3, li, td, th) { overflow-wrap: break-word; }
+.quote-document .pdf-page-footer { position: absolute; left: 12mm; right: 12mm; bottom: 5mm; display: flex; justify-content: space-between; gap: 12px; padding: 0 !important; margin: 0; border: 0; font: 9px/1.4 var(--font-sans); color: #788075; }
+.pdf-letterhead { display: grid; grid-template-columns: 136px minmax(0, 1fr); align-items: center; gap: 18px; padding: 2px 0 15px; border-bottom: 2px solid #1c3a2f; }
+.pdf-letterhead img { max-width: 136px; max-height: 58px; }
+.pdf-company-title { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.pdf-company-title > p { margin: 0; font-size: 14px; font-weight: 800; line-height: 1.3; letter-spacing: -.35px; }
+.pdf-company-title > span { padding: 5px 8px; background: #1c3a2f; color: #e6cba8; border-radius: 5px; font-size: 9px; letter-spacing: 1.2px; font-weight: 700; white-space: nowrap; }
+.pdf-enterprise { font-weight: 700; font-size: 11px; margin-top: 5px; }
+.pdf-designers { font-size: 10px; margin-top: 2px; color: #5c645f; }
+.pdf-contact { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: end; gap: 20px; padding-top: 10px; border-top: 1px solid #e5dfd3; font-size: 10px; color: #5c645f; line-height: 1.5; }
+.pdf-contact > p { margin: 0; }
+.pdf-proprietor { display: flex; flex-direction: column; gap: 2px; text-align: right; flex-shrink: 0; }
+.pdf-proprietor span { font-size: 8px; letter-spacing: 1.3px; }
+.pdf-proprietor strong { font-size: 12px; color: #1c3a2f; }
+.pdf-bank { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; background: #faf8f4; border: 1px solid #e5dfd3; border-radius: 10px; padding: 14px; }
+.pdf-eyebrow { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #1c3a2f; }
+.pdf-bank h3 { font-weight: 750; font-size: 12px; margin: 5px 0 2px; }
+.pdf-bank-branch { font-size: 10px; color: #5c645f; }
+.pdf-bank-account-name { font-size: 10px; font-weight: 650; margin: 7px 0; }
+.pdf-bank-details { display: grid; gap: 4px; font-size: 10px; }
+.pdf-bank-details > div { display: grid; grid-template-columns: 75px minmax(0,1fr); gap: 5px; }
+.pdf-bank-details dt { color: #5c645f; }
+.pdf-bank-details dd { margin: 0; font-family: var(--font-mono); font-weight: 650; white-space: nowrap; }
+.pdf-bank-qrs { display: flex; gap: 8px; }
+.pdf-section-heading { min-width: 0; break-after: avoid; }
+.quote-document .pdf-section-heading h2 { font-size: 13px; line-height: 1.4; }
+.quote-document .pdf-section-heading > div > div > p { font-size: 9px; line-height: 1.3; }
+.pdf-section-heading > p { max-width: 30%; white-space: normal; text-align: right; }
+.pdf-total-summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 14px; padding: 12px 14px; background: #e4efe7; border: 1px solid #c5d6c9; border-radius: 8px; font-size: 10px; color: #1c3a2f; }
+.pdf-total-summary span { display: flex; gap: 8px; }
+.pdf-total-summary strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pdf-table-scroll { overflow: visible; }
+.quote-document :is(td.font-mono, span.font-mono, .font-mono strong) { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+.quote-document :is(.pdf-room-comparison, .pdf-scope-table, .pdf-payment-table) { table-layout: fixed; width: 100%; min-width: 0; border-collapse: collapse; }
+.quote-document :is(.pdf-room-comparison, .pdf-scope-table, .pdf-payment-table) :is(td, th) { padding-left: 5px; padding-right: 5px; }
+.quote-document :is(.pdf-room-comparison, .pdf-scope-table, .pdf-payment-table) td.font-mono { font-size: 9.5px; letter-spacing: -.25px; }
+.quote-document .pdf-room-comparison th { font-size: 9px; }
+.quote-document .pdf-room-comparison td:nth-child(5) { font-size: 10px; }
+.quote-document .pdf-payment-table th { font-size: 10px; }
+@media print {
+  .quote-document { width: 210mm; max-width: none; margin: 0; overflow: visible; }
+  .pdf-source-layout { display: none !important; }
+  .pdf-pages { zoom: 1; }
+  .pdf-page { margin: 0; box-shadow: none; break-after: page; page-break-after: always; break-inside: avoid; }
+  .pdf-page:last-child { break-after: auto; page-break-after: auto; }
+}
+
+.pdf-text-fragment { padding: 14px; border: 1px solid #e5dfd3; border-radius: 8px; background: #faf8f4; color: #18221d; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.pdf-continuation-heading { padding-bottom: 10px; border-bottom: 2px solid #1c3a2f; color: #1c3a2f; font-weight: 700; font-size: 12px; }

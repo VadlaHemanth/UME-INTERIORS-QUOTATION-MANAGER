@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import './pdf-owner.css';
+import './addon-suggestions.css';
+import { acceptAddonSuggestion, rejectAddonSuggestion, getAddonSuggestions, validateAddonSuggestions } from '../lib/addon-suggestions';
 import {
   BookOpen,
   Check,
@@ -28,7 +31,6 @@ import {
 } from '../lib/catalogue';
 import {
   APPENDIX_PRACTICE_DRAFT,
-  HISTORICAL_PDF_AUDITS,
   VIDYA_SAGAR_REDDY_DRAFT,
 } from '../lib/historicalData';
 import {
@@ -135,6 +137,17 @@ interface OwnerStudioViewProps {
   ) => Promise<void>;
 }
 
+function createEmptyOwnerDraft(): QuotationDraftV2 {
+  return {
+    schema_version: 'quotation-studio.draft.v2', output_language: 'en', is_demo: false,
+    languages: ['en'], customer: { name: null, site: null, phone: null },
+    quote: { number: null, date: null, valid_until: null },
+    recommended: { grade: 'Base', protection: 'Standard', finish: 'SF', brand_preference: null },
+    rooms: [{ name: 'Master Bedroom', recommended: null, items: [] }],
+    owner_requests: [], needs_clarification: [],
+  };
+}
+
 export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   catalogue,
   quotes,
@@ -152,11 +165,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const [savedDefaultToastId, setSavedDefaultToastId] = useState<string | null>(null);
 
   // Unified Quotation + Rate Card Studio State
-  const [workingDraft, setWorkingDraft] = useState<QuotationDraftV2>(() =>
-    structuredClone(VIDYA_SAGAR_REDDY_DRAFT)
-  );
+  const [workingDraft, setWorkingDraft] = useState<QuotationDraftV2>(createEmptyOwnerDraft);
   const [rawJsonText, setRawJsonText] = useState<string>(() =>
-    JSON.stringify(VIDYA_SAGAR_REDDY_DRAFT, null, 2)
+    JSON.stringify(createEmptyOwnerDraft(), null, 2)
   );
   const [editableCatalogue, setEditableCatalogue] = useState<StudioCatalogue>(() =>
     structuredClone(catalogue)
@@ -164,6 +175,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const [reviewedOwnerRequests, setReviewedOwnerRequests] = useState<boolean>(false);
   const [approvedDiscount, setApprovedDiscount] = useState<number>(0);
   const [supersedeId, setSupersedeId] = useState<string>('');
+  const [isPublishing, setIsPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<{
     ok: boolean;
     message: string;
@@ -232,6 +244,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     return Array.from(missing);
   }, [workingDraft, editableCatalogue.workTypes]);
 
+  const addonSuggestions = useMemo(() => getAddonSuggestions(workingDraft), [workingDraft]);
+
   const validation = useMemo(
     () => validateQuotationDraftV2(workingDraft, { reviewedOwnerRequests }),
     [workingDraft, reviewedOwnerRequests]
@@ -262,8 +276,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         !Array.isArray(parsed.rooms)
       ) {
         const merged = mergeRateCardJsonIntoCatalogue(editableCatalogue, parsed);
-        setEditableCatalogue(merged.catalogue);
         await onUpdateCatalogue(merged.catalogue);
+        setEditableCatalogue(merged.catalogue);
         setPublishResult({
           ok: true,
           message: `Merged ${merged.addedOrUpdatedKeys.length} work element(s) (${merged.addedOrUpdatedKeys.join(', ')}) into your Rate Card Memory!`,
@@ -271,17 +285,21 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         return;
       }
 
-      // Case B: Unified Quotation + Rate Card JSON (extracts rate_card_updates & any new work_type items automatically!)
-      const autoRateMerge = extractAndMergeRateCardFromDraft(editableCatalogue, parsed);
-      if (autoRateMerge.addedOrUpdatedKeys.length > 0) {
-        setEditableCatalogue(autoRateMerge.catalogue);
-        await onUpdateCatalogue(autoRateMerge.catalogue);
+      const v2 = parsed.schema_version === 'quotation-studio.draft.v2' ? parsed : migrateV1ToV2Draft(parsed);
+      if (!v2.customer || !v2.quote || !Array.isArray(v2.rooms) ||
+        !Array.isArray(v2.owner_requests) || !Array.isArray(v2.needs_clarification) ||
+        v2.rooms.some((room: any) => !room || !Array.isArray(room.items) || room.items.some((item: any) =>
+          !item || !item.measure || !item.pvc || !Array.isArray(item.pvc.parts)))) {
+        throw new Error('The draft must include customer, quote, rooms/items, measurements, PVC details, owner_requests and needs_clarification.');
       }
-
-      const v2 =
-        parsed.schema_version === 'quotation-studio.draft.v2'
-          ? parsed
-          : migrateV1ToV2Draft(parsed);
+      const addonValidation = validateAddonSuggestions(v2);
+      if (!addonValidation.valid) throw new Error(addonValidation.errors.join(' '));
+      validateQuotationDraftV2(v2, { reviewedOwnerRequests: false });
+      const autoRateMerge = extractAndMergeRateCardFromDraft(editableCatalogue, v2);
+      if (autoRateMerge.addedOrUpdatedKeys.length > 0) {
+        await onUpdateCatalogue(autoRateMerge.catalogue);
+        setEditableCatalogue(autoRateMerge.catalogue);
+      }
 
       syncDraft(v2);
       setPublishResult({
@@ -294,7 +312,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     } catch (err: any) {
       setPublishResult({
         ok: false,
-        message: `Invalid JSON syntax: ${err?.message || 'Please check that you copied the complete JSON object from your Gemini Gem or Custom GPT.'}`,
+        message: `Unable to load JSON: ${err?.message || 'Please check that you copied the complete JSON object from your Gemini Gem or Custom GPT.'}`,
       });
     }
   };
@@ -328,58 +346,22 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   };
 
   const handleStartNewQuotation = () => {
-    const clean: QuotationDraftV2 = {
-      schema_version: 'quotation-studio.draft.v2',
-      output_language: 'en',
-      is_demo: false,
-      languages: ['en'],
-      customer: { name: '', site: '', phone: '' },
-      quote: {
-        number: `UME-2026-${1025 + quotes.length}`,
-        date: new Date().toISOString().slice(0, 10),
-        valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
-      },
-      recommended: {
-        grade: 'Base',
-        protection: 'Standard',
-        finish: 'SF',
-        brand_preference: 'Garjan 710',
-      },
-      rooms: [
-        {
-          name: 'Master Bedroom',
-          recommended: null,
-          items: [
-            {
-              name: 'Wardrobe',
-              work_type: 'Box type',
-              size_text: '7 ft × 8 ft',
-              measure: { unit: 'sq_ft', per_item: 56 },
-              quantity: 1,
-              pvc: { eligible: true, parts: ['Back panel', 'Bottom floor-contact panel'] },
-              optional: false,
-              source_text_en:
-                'One box-type wardrobe, 7 ft by 8 ft (56 sq ft) billed by front-face area.',
-            },
-          ],
-        },
-      ],
-      owner_requests: [],
-      needs_clarification: [],
-    };
+    const clean = createEmptyOwnerDraft();
     setSupersedeId('');
     syncDraft(clean);
   };
 
   const handleAutoAddMissingWorkTypesToRateCard = async () => {
     if (unmappedWorkTypes.length === 0) return;
-    const merged = extractAndMergeRateCardFromDraft(editableCatalogue, workingDraft);
-    setEditableCatalogue(merged.catalogue);
-    await onUpdateCatalogue(merged.catalogue);
-    setPublishResult({
-      ok: true,
-      message: `Auto-saved ${merged.addedOrUpdatedKeys.join(', ')} into your Rate Card Memory!`,
-    });
+    setPublishResult(null);
+    try {
+      const merged = extractAndMergeRateCardFromDraft(editableCatalogue, workingDraft);
+      await onUpdateCatalogue(merged.catalogue);
+      setEditableCatalogue(merged.catalogue);
+      setPublishResult({ ok: true, message: `Saved ${merged.addedOrUpdatedKeys.join(', ')} to the rate card.` });
+    } catch (error) {
+      setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to save the new work types. Please try again.' });
+    }
   };
 
   const handleAddCustomWorkElementForm = async (e: React.FormEvent) => {
@@ -411,19 +393,27 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
     const nextCat = structuredClone(editableCatalogue);
     nextCat.workTypes[cleanLabel] = newDef;
-    setEditableCatalogue(nextCat);
-    await onUpdateCatalogue(nextCat);
-
-    setNewWorkLabel('');
-    setNewWorkDescription('');
-    setPublishResult({
-      ok: true,
-      message: `Added "${cleanLabel}" to your Rate Card Memory & updated Master Gem Instructions automatically!`,
-    });
+    setPublishResult(null);
+    try {
+      await onUpdateCatalogue(nextCat);
+      setEditableCatalogue(nextCat);
+      setNewWorkLabel('');
+      setNewWorkDescription('');
+      setPublishResult({ ok: true, message: `Saved "${cleanLabel}" to the rate card. Copy the updated assistant instructions to use it in future chats.` });
+    } catch (error) {
+      setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to save this work type. Your form is preserved; please try again.' });
+    }
   };
 
   const handlePublishClick = async () => {
+    if (isPublishing) return;
+    if (!validation.readyForPublish || unmappedWorkTypes.length) {
+      setPublishResult({ ok: false, message: 'Resolve the review issues and missing work-type rates before publishing.' });
+      return;
+    }
     setPublishResult(null);
+    setIsPublishing(true);
+    try {
     // Ensure any inline rate changes in editableCatalogue are persisted first
     await onUpdateCatalogue(editableCatalogue);
 
@@ -452,6 +442,20 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         ok: false,
         message: res.error || 'Publication blocked by validation gate.',
       });
+    }
+    } catch (error) {
+      setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to publish. Please try again.' });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handlePaymentReview = async (paymentId: string, action: 'verify' | 'reject', reason?: string) => {
+    setPublishResult(null);
+    try {
+      await onVerifyOrRejectPayment(paymentId, action, reason);
+    } catch (error) {
+      setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to update this payment. Please try again.' });
     }
   };
 
@@ -512,7 +516,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16">
+    <div className="owner-studio min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16">
       <datalist id="ume-worktypes-datalist">
         {Object.keys(editableCatalogue.workTypes).map((wt) => (
           <option key={wt} value={wt} />
@@ -538,7 +542,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 className="px-4 py-2 bg-[#E4EFE7] hover:bg-[#1C3A2F] text-[#1C3A2F] hover:text-white border border-[#C5DEC9] rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <BookOpen className="w-4 h-4" />
-                Open Master Gem / Custom GPT Instructions
+                Assistant instructions
               </button>
               <button
                 type="button"
@@ -546,13 +550,13 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 className="px-4 py-2 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#D8D0C2] rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <FilePlus2 className="w-4 h-4 text-[#1C3A2F]" />
-                Start Blank Quotation
+                New quotation
               </button>
             </div>
           </div>
 
           {/* 4-Tab Unified Segmented Bar */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-[#EAE3D5] border border-[#DDD4C3] rounded-xl w-fit">
+          <div className="owner-tabs flex flex-wrap items-center gap-1.5 p-1.5 bg-[#EAE3D5] border border-[#DDD4C3] rounded-xl w-fit">
             <button
               type="button"
               onClick={() => setActiveTab('unified_studio')}
@@ -562,7 +566,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   : 'text-[#4A524D] hover:text-[#18221D]'
               }`}
             >
-              1. Create Quote & Rate Card Studio ({Object.keys(editableCatalogue.workTypes).length} Work Types)
+              Create quotation
             </button>
             <button
               type="button"
@@ -573,7 +577,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   : 'text-[#4A524D] hover:text-[#18221D]'
               }`}
             >
-              2. Customer Quotes & Saved Selections ({quotes.length})
+              Quotations & selections ({quotes.length})
             </button>
             <button
               type="button"
@@ -584,7 +588,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   : 'text-[#4A524D] hover:text-[#18221D]'
               }`}
             >
-              3. Gemini Gem / Custom GPT Prompt & Image Prompts
+              Assistant instructions
             </button>
             <button
               type="button"
@@ -595,13 +599,16 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   : 'text-[#4A524D] hover:text-[#18221D]'
               }`}
             >
-              4. Payments Ledger ({ledger.length})
+              Payments ({ledger.length})
             </button>
           </div>
         </div>
       </div>
 
       <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {activeTab !== 'unified_studio' && publishResult && !publishResult.ok && (
+          <div role="alert" className="mb-5 p-4 border border-[#B91C1C] bg-[#FEF2F2] text-[#991B1B] rounded-xl text-sm">{publishResult.message}</div>
+        )}
         {/* TAB 1: UNIFIED CREATE QUOTE & RATE CARD STUDIO */}
         {activeTab === 'unified_studio' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -647,24 +654,24 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </label>
                   </div>
 
-                  {/* Quick Load Verified JSON Templates */}
+                  {/* Quick Load Practice Templates */}
                   <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F] mr-1">
                       Templates:
                     </span>
                     <button
                       type="button"
-                      onClick={() => syncDraft(structuredClone(VIDYA_SAGAR_REDDY_DRAFT))}
+                      onClick={() => syncDraft({ ...structuredClone(VIDYA_SAGAR_REDDY_DRAFT), is_demo: true })}
                       className="px-2.5 py-1 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#E5DFD3] rounded-lg text-[11px] font-semibold cursor-pointer"
                     >
-                      Vidya Sagar Reddy (3BHK)
+                      3BHK practice template
                     </button>
                     <button
                       type="button"
-                      onClick={() => syncDraft(structuredClone(APPENDIX_PRACTICE_DRAFT))}
+                      onClick={() => syncDraft({ ...structuredClone(APPENDIX_PRACTICE_DRAFT), is_demo: true })}
                       className="px-2.5 py-1 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#E5DFD3] rounded-lg text-[11px] font-semibold cursor-pointer"
                     >
-                      2BHK Sample JSON
+                      2BHK practice template
                     </button>
                   </div>
 
@@ -677,7 +684,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     className="w-full p-3.5 text-xs font-mono bg-[#18221D] text-[#FAF8F4] rounded-xl focus:outline-none"
                   />
 
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <button
                       type="button"
                       onClick={() => navigator.clipboard?.writeText(rawJsonText)}
@@ -693,7 +700,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       className="px-4 py-2.5 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Check className="w-4 h-4" />
-                      Load JSON & Auto-Save Rate Card Items
+                      Load quotation & rates
                     </button>
                   </div>
                 </div>
@@ -701,7 +708,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
               {/* Validation & Publish Readiness Card */}
               <div className="bg-white border border-[#E5DFD3] rounded-2xl p-5 shadow-xs space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="text-sm font-bold text-[#18221D]">
                     Validation & Publish Gate
                   </h3>
@@ -720,7 +727,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
                 {validation.issues.length === 0 ? (
                   <p className="text-xs text-[#1C3A2F] bg-[#E4EFE7] p-3 border border-[#C5DEC9] rounded-xl font-medium">
-                    All fields are verified English-only (`quotation-studio.draft.v2`), measurements are complete, and the quotation is ready to publish.
+                    Required details and measurements are complete. Review the selected package and prices before publishing.
                   </p>
                 ) : (
                   <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -744,65 +751,24 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   workingDraft.owner_requests.length > 0) && (
                   <div className="pt-2 border-t border-[#EAE4D8] space-y-2">
                     {workingDraft.is_demo && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          syncDraft({
-                            ...workingDraft,
-                            is_demo: false,
-                            customer: {
-                              name: workingDraft.customer.name || 'M. Venkat Reddy',
-                              site:
-                                workingDraft.customer.site ||
-                                'Flat 202, Aditya Sunshine, Habsiguda, Hyderabad',
-                              phone: workingDraft.customer.phone || '9849011223',
-                            },
-                            recommended: {
-                              grade: workingDraft.recommended?.grade || 'Base',
-                              protection: workingDraft.recommended?.protection || 'Standard',
-                              finish: workingDraft.recommended?.finish || 'SF',
-                              brand_preference: workingDraft.recommended?.brand_preference || null,
-                            },
-                          })
-                        }
-                        className="w-full py-2 px-3 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#D8D0C2] rounded-xl text-xs font-bold text-left cursor-pointer"
-                      >
-                        Mark as Real Customer Job (`is_demo = false`) →
+                      <button type="button" onClick={() => syncDraft({ ...workingDraft, is_demo: false })}
+                        className="w-full py-2 px-3 bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl text-xs font-bold text-left cursor-pointer">
+                        Confirm this is a real customer job →
                       </button>
                     )}
-
                     {workingDraft.needs_clarification.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = structuredClone(workingDraft);
-                          next.rooms.forEach((r) =>
-                            r.items.forEach((it) => {
-                              if (!it.measure.unit) it.measure.unit = 'sq_ft';
-                              if (!it.measure.per_item) it.measure.per_item = 4.5;
-                              if (it.size_text === 'five-six') {
-                                it.size_text = '5 ft × 6 ft';
-                                it.measure.per_item = 30;
-                              }
-                              if (it.pvc.eligible === null) {
-                                it.pvc.eligible = true;
-                                it.pvc.parts = ['Back panel'];
-                              }
-                            })
-                          );
-                          if (!next.customer.name) next.customer.name = 'M. Venkat Reddy';
-                          if (!next.customer.site)
-                            next.customer.site = 'Flat 202, Aditya Sunshine, Habsiguda, Hyderabad';
-                          if (next.recommended && !next.recommended.protection) {
-                            next.recommended.protection = 'With PVC';
-                          }
-                          next.needs_clarification = [];
-                          syncDraft(next);
-                        }}
-                        className="w-full py-2 px-3 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#D8D0C2] rounded-xl text-xs font-bold text-left cursor-pointer"
-                      >
-                        Confirm Clarifications & Clear Open Questions →
-                      </button>
+                      <div className="space-y-2">
+                        <p className="text-xs text-[#5C645F]">Edit the quotation with the confirmed answer, then resolve each question.</p>
+                        {workingDraft.needs_clarification.map((question, questionIndex) => (
+                          <div key={`${question.path}-${questionIndex}`} className="p-3 rounded-xl border border-[#E5DFD3] space-y-2">
+                            <p className="text-xs font-medium">{question.question}</p>
+                            <button type="button" className="text-xs font-bold text-[#1C3A2F] underline underline-offset-4"
+                              onClick={() => syncDraft({ ...workingDraft, needs_clarification: workingDraft.needs_clarification.filter((_, i) => i !== questionIndex) })}>
+                              Mark answered after review
+                            </button>
+                          </div>
+                        ))}
+                      </div>
                     )}
 
                     {workingDraft.owner_requests.length > 0 && (
@@ -860,6 +826,16 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   </div>
                 )}
 
+                {addonSuggestions.length > 0 && <section className="addon-review" aria-labelledby="addon-review-heading">
+                  <div className="addon-review-heading"><div><p className="addon-eyebrow">PERSONALISED IDEAS</p><h3 id="addon-review-heading">Suggested for this home</h3></div><span>{addonSuggestions.length} to review</span></div>
+                  <p className="addon-intro">Useful additions proposed by your assistant. Review what suits this home, then confirm the specification and price. These ideas are outside the quoted scope.</p>
+                  <div className="addon-review-list">{addonSuggestions.map((suggestion, suggestionIndex) => <article key={`${suggestion.room_index}-${suggestion.item.name}-${suggestionIndex}`} className="addon-review-item">
+                    <p className="addon-room">{workingDraft.rooms[suggestion.room_index]?.name || 'Room'}</p><h4>{suggestion.item.name}</h4><p>{suggestion.reason}</p>
+                    <div className="addon-review-meta"><span>Optional addition</span>{(!suggestion.item.measure?.per_item || !suggestion.item.quantity || !suggestion.item.size_text) && <span>Confirm size & quantity</span>}{!editableCatalogue.workTypes[suggestion.item.work_type || ''] && <span>Confirm new work-type rates</span>}</div>
+                    <div className="addon-review-actions"><button type="button" onClick={() => {try {syncDraft(acceptAddonSuggestion(workingDraft, suggestionIndex)); setPublishResult({ok:true,message:'Added as optional work. Review its measurements, quantity, PVC eligibility and rates in the room editor before publishing.'});} catch(error) {setPublishResult({ok:false,message:error instanceof Error ? error.message : 'Could not add this suggestion.'});}}}><Plus size={14}/> Add as optional</button><button type="button" onClick={() => syncDraft(rejectAddonSuggestion(workingDraft, suggestionIndex))}>Dismiss</button></div>
+                  </article>)}</div>
+                </section>}
+
                 {/* Customer & Quote Meta Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   <div>
@@ -868,6 +844,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </label>
                     <input
                       type="text"
+                      aria-label="Customer name"
                       value={workingDraft.customer.name || ''}
                       onChange={(e) =>
                         syncDraft({
@@ -884,6 +861,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </label>
                     <input
                       type="text"
+                      aria-label="Customer mobile number"
                       value={workingDraft.customer.phone || ''}
                       onChange={(e) =>
                         syncDraft({
@@ -900,6 +878,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </label>
                     <input
                       type="text"
+                      aria-label="Quotation reference number"
                       value={workingDraft.quote.number || ''}
                       onChange={(e) =>
                         syncDraft({
@@ -919,6 +898,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </label>
                     <input
                       type="text"
+                      aria-label="Full site address"
                       value={workingDraft.customer.site || ''}
                       onChange={(e) =>
                         syncDraft({
@@ -936,6 +916,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     <input
                       type="number"
                       min={0}
+                      aria-label="Approved discount in rupees"
                       value={approvedDiscount}
                       onChange={(e) => setApprovedDiscount(Number(e.target.value) || 0)}
                       className="w-full px-3 py-2 text-xs font-mono tabular-nums bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl"
@@ -957,13 +938,14 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     {(() => {
                       const matchingQuote =
                         quotes.find((q) => q.publicId === supersedeId) ||
-                        quotes.find((q) => q.draft.quote.number === workingDraft.quote.number) ||
-                        quotes[0];
+                        (workingDraft.quote.number ? quotes.find((q) => q.draft.quote.number === workingDraft.quote.number) : undefined);
                       if (!matchingQuote) return null;
                       return (
                         <button
                           type="button"
                           onClick={async () => {
+                            setPublishResult(null);
+                            try {
                             const pkg: ResolvedPackageSelection = {
                               grade: workingDraft.recommended?.grade || 'Base',
                               protection: workingDraft.recommended?.protection || 'Standard',
@@ -983,6 +965,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                               message: `Saved Default Package (Send as ${getPackageDisplayName(pkg.grade)} · ${pkg.protection}) & all line edits directly to ${matchingQuote.draft.quote.number}!`,
                               publicId: matchingQuote.publicId,
                             });
+                            } catch (error) {
+                              setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to save the quotation. Please try again.' });
+                            }
                           }}
                           className="px-3.5 py-2 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                         >
@@ -1164,7 +1149,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={newWorkLabel}
+                        aria-label="New work type name"
+                      value={newWorkLabel}
                         onChange={(e) => setNewWorkLabel(e.target.value)}
                         placeholder="e.g., Wall-mounted study table"
                         className="w-full px-2.5 py-1.5 text-xs bg-white border border-[#C5DEC9] rounded-lg"
@@ -1176,7 +1162,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={newWorkBase}
+                        aria-label="New work type Standard rate in rupees"
+                      value={newWorkBase}
                         onChange={(e) => setNewWorkBase(Number(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
@@ -1187,7 +1174,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={newWorkNormal}
+                        aria-label="New work type Normal rate in rupees"
+                      value={newWorkNormal}
                         onChange={(e) => setNewWorkNormal(Number(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
@@ -1198,7 +1186,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={newWorkPremium}
+                        aria-label="New work type Premium rate in rupees"
+                      value={newWorkPremium}
                         onChange={(e) => setNewWorkPremium(Number(e.target.value) || 0)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
@@ -1209,7 +1198,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
-                        value={newWorkPvcAdder}
+                        aria-label="New work type PVC extra rate in rupees"
+                      value={newWorkPvcAdder}
                         onChange={(e) => setNewWorkPvcAdder(Number(e.target.value) || 0)}
                         className="w-full px-1.5 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
@@ -1226,7 +1216,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 </div>
 
                 {/* Rooms & Items Editor */}
-                <div className="space-y-3 max-h-96 overflow-y-auto pr-1 pt-2 border-t border-[#EAE4D8]">
+                <div className="space-y-3 pr-1 pt-2 border-t border-[#EAE4D8]">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-[#18221D]">
                       Rooms & Furniture Items ({workingDraft.rooms.length} Rooms)
@@ -1238,18 +1228,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         next.rooms.push({
                           name: `Room ${next.rooms.length + 1}`,
                           recommended: null,
-                          items: [
-                            {
-                              name: 'Wardrobe',
-                              work_type: 'Box type',
-                              size_text: '6 ft × 7 ft',
-                              measure: { unit: 'sq_ft', per_item: 42 },
-                              quantity: 1,
-                              pvc: { eligible: true, parts: ['Back panel'] },
-                              optional: false,
-                              source_text_en: 'Box-type wardrobe, 6 ft by 7 ft (42 sq ft).',
-                            },
-                          ],
+                          items: [],
                         });
                         syncDraft(next);
                       }}
@@ -1267,6 +1246,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       <div className="flex items-center justify-between gap-2">
                         <input
                           type="text"
+                          aria-label={`Name of room ${rIdx + 1}`}
                           value={room.name || ''}
                           onChange={(e) => {
                             const next = structuredClone(workingDraft);
@@ -1280,15 +1260,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           onClick={() => {
                             const next = structuredClone(workingDraft);
                             next.rooms[rIdx].items.push({
-                              name: 'Wall-mounted folding table',
-                              work_type: 'Folding table',
-                              size_text: '2 ft × 3 ft',
-                              measure: { unit: 'sq_ft', per_item: 6 },
-                              quantity: 1,
-                              pvc: { eligible: false, parts: [] },
-                              optional: false,
-                              source_text_en:
-                                'Wall-mounted folding table with both sides laminate finish, 2 ft by 3 ft (6 sq ft).',
+                              name: null, work_type: 'Box type', size_text: null,
+                              measure: { unit: 'sq_ft', per_item: null }, quantity: 1,
+                              pvc: { eligible: false, parts: [] }, optional: false, source_text_en: '',
                             });
                             syncDraft(next);
                           }}
@@ -1353,18 +1327,18 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                                     Number(e.target.value) || null;
                                   syncDraft(next);
                                 }}
-                                placeholder="sq.ft"
+                                placeholder={item.measure.unit === 'sq_ft' ? 'sq ft per item' : item.measure.unit === 'running_ft' ? 'ft per item' : '1 per item'}
                                 className="sm:col-span-2 px-2.5 py-1.5 border border-[#D8D0C2] rounded-md text-xs font-mono tabular-nums text-right"
                               />
                               <input
                                 type="number"
                                 min={1}
                                 aria-label="Quantity"
-                                value={item.quantity ?? 1}
+                                value={item.quantity ?? ''}
                                 onChange={(e) => {
                                   const next = structuredClone(workingDraft);
                                   next.rooms[rIdx].items[iIdx].quantity =
-                                    Number(e.target.value) || 1;
+                                    e.target.value === '' ? null : Number(e.target.value);
                                   syncDraft(next);
                                 }}
                                 className="sm:col-span-1 px-1.5 py-1.5 border border-[#D8D0C2] rounded-md text-xs font-mono tabular-nums text-right"
@@ -1397,6 +1371,54 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                                 className="w-full px-2.5 py-1.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-md text-[11px] text-[#4A544E]"
                               />
                             </div>
+                            <details className="rounded-lg border border-[#E5DFD3] bg-[#FAF8F4] p-3">
+                              <summary className="cursor-pointer text-[11px] font-bold text-[#1C3A2F]">Billing & scope options</summary>
+                              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                                <label className="space-y-1 text-[11px] font-semibold">
+                                  <span className="block">Billing unit</span>
+                                  <select value={item.measure.unit || 'sq_ft'} aria-label={`Billing unit for ${item.name || 'item'}`}
+                                    className="w-full px-2 py-2 border border-[#D8D0C2] bg-white rounded-lg"
+                                    onChange={(event) => {
+                                      const next = structuredClone(workingDraft);
+                                      next.rooms[rIdx].items[iIdx].measure.unit = event.target.value;
+                                      if (['each', 'lumpsum'].includes(event.target.value)) next.rooms[rIdx].items[iIdx].measure.per_item = 1;
+                                      syncDraft(next);
+                                    }}>
+                                    <option value="sq_ft">Square feet</option><option value="running_ft">Running feet</option>
+                                    <option value="each">Per piece</option><option value="lumpsum">Lump sum</option>
+                                  </select>
+                                </label>
+                                <label className="inline-flex items-center gap-2 text-[11px] cursor-pointer">
+                                  <input type="checkbox" checked={Boolean(item.optional)} className="accent-[#1C3A2F] w-4 h-4"
+                                    onChange={(event) => {
+                                      const next = structuredClone(workingDraft);
+                                      next.rooms[rIdx].items[iIdx].optional = event.target.checked;
+                                      syncDraft(next);
+                                    }} /> Optional customer add-on
+                                </label>
+                                <label className="inline-flex items-center gap-2 text-[11px] cursor-pointer">
+                                  <input type="checkbox" checked={Boolean(item.pvc.eligible)} className="accent-[#1C3A2F] w-4 h-4"
+                                    onChange={(event) => {
+                                      const next = structuredClone(workingDraft);
+                                      next.rooms[rIdx].items[iIdx].pvc.eligible = event.target.checked;
+                                      if (!event.target.checked) next.rooms[rIdx].items[iIdx].pvc.parts = [];
+                                      syncDraft(next);
+                                    }} /> Eligible for PVC protection
+                                </label>
+                              </div>
+                              {item.pvc.eligible && (
+                                <label className="block mt-3 space-y-1 text-[11px] font-semibold">
+                                  <span>Confirmed PVC contact areas</span>
+                                  <input type="text" className="w-full px-3 py-2 border border-[#D8D0C2] bg-white rounded-lg"
+                                    value={item.pvc.parts.join(', ')} placeholder="Back panel, bottom floor-contact panel"
+                                    onChange={(event) => {
+                                      const next = structuredClone(workingDraft);
+                                      next.rooms[rIdx].items[iIdx].pvc.parts = event.target.value.split(',').map((part) => part.trim());
+                                      syncDraft(next);
+                                    }} />
+                                </label>
+                              )}
+                            </details>
                           </div>
                         ))}
                       </div>
@@ -1410,9 +1432,21 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     {ALL_GRADES.map((g) => {
                       const isDefaultSent = (workingDraft.recommended?.grade || 'Base') === g;
                       return (
-                        <div
+                        <button
                           key={g}
-                          className={`p-3 rounded-xl border ${
+                          type="button"
+                          aria-pressed={isDefaultSent}
+                          aria-label={`Send ${getPackageDisplayName(g)} package by default`}
+                          onClick={() => syncDraft({
+                            ...workingDraft,
+                            recommended: {
+                              grade: g,
+                              protection: workingDraft.recommended?.protection || 'Standard',
+                              finish: workingDraft.recommended?.finish || 'SF',
+                              brand_preference: editableCatalogue.grades[g].approvedBrands[0]?.name || null,
+                            },
+                          })}
+                          className={`owner-package-choice text-left cursor-pointer p-4 rounded-xl border transition-colors ${
                             isDefaultSent
                               ? 'bg-[#E4EFE7] border-[#1C3A2F]'
                               : 'bg-[#FAF8F4] border-[#E5DFD3]'
@@ -1422,7 +1456,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                             <p className="font-bold text-[#18221D]">{getPackageDisplayName(g)} Package</p>
                             {isDefaultSent && (
                               <span className="px-1.5 py-0.5 bg-[#1C3A2F] text-[#E6CBA8] rounded text-[9px] font-bold uppercase">
-                                Default Sent
+                                Selected
                               </span>
                             )}
                           </div>
@@ -1432,7 +1466,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           <p className="text-[11px] font-mono tabular-nums text-[#5C645F] mt-0.5">
                             +PVC: {formatINR(previewSnapshot.baseWholeHomeTotals[makeComboKey(g, 'With PVC', 'SF')])}
                           </p>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -1455,10 +1489,12 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     <button
                       type="button"
                       onClick={handlePublishClick}
+                      disabled={isPublishing}
+                      aria-busy={isPublishing}
                       className="py-3 px-6 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
                       <Send className="w-4 h-4" />
-                      Save Rate Card & Publish Private Quotation Link
+                      {isPublishing ? 'Publishing…' : 'Save & publish quotation'}
                     </button>
                   </div>
 
@@ -1497,10 +1533,11 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   <Search className="w-4 h-4 text-[#5C645F] absolute left-3 top-2.5" />
                   <input
                     type="text"
-                    value={quoteSearch}
+                    aria-label="Search quotations"
+                      value={quoteSearch}
                     onChange={(e) => setQuoteSearch(e.target.value)}
                     placeholder="Search customer, site, or quote no..."
-                    className="pl-9 pr-3 py-2 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl w-64"
+                    className="pl-9 pr-3 py-2 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl w-full sm:w-64"
                   />
                 </div>
                 <select
@@ -1571,7 +1608,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                                 : 'bg-[#FAF8F4] text-[#4A524D] border border-[#E5DFD3]'
                             }`}
                           >
-                            {isSavedByCustomer ? 'Customer Locked Final Package ✓' : q.status}
+                            {isSavedByCustomer ? 'Customer saved package ✓' : q.status}
                           </span>
                         </div>
                         <p className="text-base font-bold text-[#18221D]">
@@ -1586,7 +1623,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </div>
 
                       {/* Middle: Default Sent Option vs Customer Saved Selection & Final Price */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:min-w-[440px]">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-[420px] lg:max-w-full">
                         <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl space-y-1.5">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
@@ -1608,14 +1645,20 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                                 PlywoodGrade,
                                 ProtectionOption
                               ];
-                              await onUpdateDefaultPackage?.(q.publicId, {
+                              setPublishResult(null);
+                              try {
+                              if (!onUpdateDefaultPackage) throw new Error('Default package saving is not available.');
+                              await onUpdateDefaultPackage(q.publicId, {
                                 grade: g,
                                 protection: p,
                                 finish: 'SF',
-                                brand_preference: defaultSent.brand_preference || null,
+                                brand_preference: catalogue.grades[g].approvedBrands[0]?.name || null,
                               });
                               setSavedDefaultToastId(q.publicId);
                               setTimeout(() => setSavedDefaultToastId(null), 2000);
+                              } catch (error) {
+                                setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to save the default package. Please try again.' });
+                              }
                             }}
                             className="w-full px-2 py-1.5 bg-white border border-[#D8D0C2] rounded-lg text-xs font-bold text-[#18221D]"
                           >
@@ -1766,7 +1809,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                             </p>
                             {!q.selectionHistory || q.selectionHistory.length === 0 ? (
                               <p className="text-[#5C645F]">
-                                Customer has not clicked “Final Save & Lock My Package” yet.
+                                Customer has not saved a package yet.
                               </p>
                             ) : (
                               <div className="space-y-2">
@@ -1842,7 +1885,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     Copy & Paste into Your Single Gemini Gem or Custom GPT Instructions
                   </h2>
                   <p className="text-xs text-[#5C645F] mt-1">
-                    Automatically includes all <strong>{Object.keys(editableCatalogue.workTypes).length} active work types</strong> from your Rate Card Memory and instructs your Gem to ask step-by-step for Customer Name, Location/Google Maps Address, Room Scope, and Custom Box/Item Prices before outputting ONE unified JSON!
+                    Includes all <strong>{Object.keys(editableCatalogue.workTypes).length} current work types</strong> and prices. Copy these instructions into your Gem or Custom GPT again after changing reusable rates. The assistant prepares JSON; you review and publish it here.
                   </p>
                 </div>
                 <button
@@ -1861,7 +1904,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 </button>
               </div>
 
-              <pre className="p-4 bg-[#18221D] text-[#FAF8F4] rounded-xl text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[460px] overflow-y-auto">
+              <pre className="owner-instructions p-4 bg-[#18221D] text-[#FAF8F4] rounded-xl text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[460px] overflow-y-auto">
                 {dynamicGemInstructions}
               </pre>
             </div>
@@ -1985,15 +2028,15 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           <>
                             <button
                               type="button"
-                              onClick={() => onVerifyOrRejectPayment(entry.id, 'verify')}
+                              onClick={() => handlePaymentReview(entry.id, 'verify')}
                               className="px-3 py-1.5 bg-[#15803D] text-white rounded-lg text-xs font-bold cursor-pointer"
                             >
-                              Verify & Credit ₹50k
+                              Verify & credit {formatINR(entry.amountRupees)}
                             </button>
                             <button
                               type="button"
                               onClick={() =>
-                                onVerifyOrRejectPayment(
+                                handlePaymentReview(
                                   entry.id,
                                   'reject',
                                   'UTR not found in SBI statement'

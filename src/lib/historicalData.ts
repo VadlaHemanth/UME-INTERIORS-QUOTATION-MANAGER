@@ -1,9 +1,12 @@
 import { QuotationDraftV2 } from './schema';
 
+// Source examples are anonymized; original client records remain in the ignored local database.
+// Legacy exported identifiers are retained for import compatibility and arithmetic regression tests.
+
 /**
- * 1. K. Vidya Sagar Reddy — Real 21-Item Job from Attached PDFs:
- *    - Vidya_Sagar_Reddy_Premium_793444ab.pdf -> Exact Total: ₹7,32,965.00 (Premium · Standard)
- *    - Vidya_Sagar_Reddy_82b58b9c.pdf         -> Exact Total: ₹5,46,034.00 (Base · Standard)
+ * 1. Demo Customer One — Anonymized 21-item arithmetic reference:
+ *    - Reference_Premium.pdf -> Exact Total: ₹7,32,965.00 (Premium · Standard)
+ *    - Reference_Standard.pdf         -> Exact Total: ₹5,46,034.00 (Base · Standard)
  */
 export const VIDYA_SAGAR_REDDY_DRAFT: QuotationDraftV2 = {
   schema_version: 'quotation-studio.draft.v2',
@@ -11,9 +14,9 @@ export const VIDYA_SAGAR_REDDY_DRAFT: QuotationDraftV2 = {
   is_demo: false,
   languages: ['te', 'en'],
   customer: {
-    name: 'K. Vidya Sagar Reddy',
-    site: 'Flat No: 302, Navya Pinnacle Apartment, Raghavendra Nagar Colony, Gayatri Nagar, Uppal Bhagayath, Hyderabad, Telangana 500039',
-    phone: '9908074741',
+    name: 'Demo Customer One',
+    site: 'Example Apartment One, Hyderabad',
+    phone: null,
   },
   quote: {
     number: 'UME-2026-1024',
@@ -327,7 +330,7 @@ export const VIDYA_SAGAR_REDDY_DRAFT: QuotationDraftV2 = {
 };
 
 /**
- * 2. J. Karthik — Peerzadiguda Job from Attached PDF (QUOTATION_4f19d65b.pdf)
+ * 2. Demo Customer Two — Anonymized arithmetic reference (QUOTATION_4f19d65b.pdf)
  *    Date: 10-09-2026 · Exact Printed Total: ₹5,27,445.00
  */
 export const KARTHIK_PEERZADIGUDA_DRAFT: QuotationDraftV2 = {
@@ -336,9 +339,9 @@ export const KARTHIK_PEERZADIGUDA_DRAFT: QuotationDraftV2 = {
   is_demo: false,
   languages: ['te', 'en'],
   customer: {
-    name: 'J. Karthik',
-    site: 'Plot No: 63, Street No. 1, Parvathapur, Peerzadiguda, Hyderabad, Telangana 500098',
-    phone: '9492528215',
+    name: 'Demo Customer Two',
+    site: 'Example Apartment Two, Hyderabad',
+    phone: null,
   },
   quote: {
     number: 'UME-2026-0910',
@@ -678,7 +681,7 @@ export const KARTHIK_PEERZADIGUDA_DRAFT: QuotationDraftV2 = {
 };
 
 /**
- * Custom line overrides for J. Karthik historical PDF (`QUOTATION_4f19d65b.pdf`)
+ * Custom line overrides for Demo Customer Two historical PDF (`QUOTATION_4f19d65b.pdf`)
  * where Frame type / Loft / Folding table were billed at ₹750/sq.ft, Locker at ₹1,100/sq.ft,
  * Wood wall paneling at ₹450/sq.ft, and Wall mount bed at ₹1,000/sq.ft -> Exact Total ₹5,27,445.00
  */
@@ -775,11 +778,11 @@ export interface HistoricalPdfAuditRecord {
 export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
   {
     id: 'vidya-sagar-premium',
-    title: 'Vidya Sagar Reddy — Premium Package (30/25/21 Yrs)',
-    pdfAssetPath: '/assets/aistudio/Vidya_Sagar_Reddy_Premium_793444ab.pdf',
-    customerName: 'K. Vidya Sagar Reddy',
+    title: 'Demo Customer One — Premium Package (30/25/21 Yrs)',
+    pdfAssetPath: '',
+    customerName: 'Demo Customer One',
     date: '2026-10-24',
-    site: 'Flat No: 302, Navya Pinnacle Apartment, Uppal Bhagayath, Hyderabad 500039',
+    site: 'Example Apartment One, Hyderabad',
     packageMapped: 'Premium · Standard · High Gloss / SF',
     brandsListed:
       'Flaer Ply (SMART - 30 Yrs), Saburi (Gold - 30 Yrs), Austin (Gold - 25 Yrs), Green Ply (Optima G - 25 Yrs), Century Ply (Bond Shield - 21 Yrs)',
@@ -802,11 +805,11 @@ export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
   },
   {
     id: 'vidya-sagar-base',
-    title: 'Vidya Sagar Reddy — Base BWP Package',
-    pdfAssetPath: '/assets/aistudio/Vidya_Sagar_Reddy_82b58b9c.pdf',
-    customerName: 'K. Vidya Sagar Reddy',
+    title: 'Demo Customer One — Base BWP Package',
+    pdfAssetPath: '',
+    customerName: 'Demo Customer One',
     date: '2026-10-24',
-    site: 'Flat No: 302, Navya Pinnacle Apartment, Uppal Bhagayath, Hyderabad 500039',
+    site: 'Example Apartment One, Hyderabad',
     packageMapped: 'Base · Standard · High Gloss / SF',
     brandsListed: 'Garjan 710, 303 SURAKSHA, Wildwood, or Swadeshi Plywood BWP',
     printedTotalRupees: 546034,
@@ -827,11 +830,11 @@ export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
   },
   {
     id: 'karthik-peerzadiguda',
-    title: 'J. Karthik — Peerzadiguda Custom BWP 710/303 Quote',
-    pdfAssetPath: '/assets/aistudio/QUOTATION_4f19d65b.pdf',
-    customerName: 'J. Karthik',
+    title: 'Demo Customer Two — Reference Custom BWP 710/303 Quote',
+    pdfAssetPath: '',
+    customerName: 'Demo Customer Two',
     date: '2026-09-10',
-    site: 'Plot No: 63, Street No. 1, Parvathapur, Peerzadiguda, Hyderabad 500098',
+    site: 'Example Apartment Two, Hyderabad',
     packageMapped: 'Base/Custom · Standard · High Gloss / SF',
     brandsListed: 'BWP 710 or 303 Plywood',
     printedTotalRupees: 527445,
@@ -853,11 +856,11 @@ export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
   },
   {
     id: 'subhash-warranty-normal',
-    title: 'Subhash (Nallagandla) — Normal Package (20/15/10 Yrs Warranty)',
-    pdfAssetPath: '/assets/aistudio/QUOTATION_WARRANTY_87e298a8.pdf',
-    customerName: 'Subhash',
+    title: 'Demo Customer Three — Normal Package (20/15/10 Yrs Warranty)',
+    pdfAssetPath: '',
+    customerName: 'Demo Customer Three',
     date: '2025-04-29',
-    site: 'Flat No: 301, Vintcs Jagruthi Homes, Diamond Heights Community, Nallagandla, Telangana 600019',
+    site: 'Example Apartment Three, Hyderabad',
     packageMapped: 'Normal · Standard · High Gloss / SF',
     brandsListed: 'BWR 710 or 303 Plywood (20 / 15 / 10 Years Warranty)',
     printedTotalRupees: 1206619,
@@ -878,11 +881,11 @@ export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
   },
   {
     id: 'subhash-pvc',
-    title: 'Subhash (Nallagandla) — Normal + 6mm PVC Package',
-    pdfAssetPath: '/assets/aistudio/QUOTATION_PVC_5a971fff.pdf',
-    customerName: 'Subhash',
+    title: 'Demo Customer Three — Normal + 6mm PVC Package',
+    pdfAssetPath: '',
+    customerName: 'Demo Customer Three',
     date: '2025-04-29',
-    site: 'Flat No: 301, Vintcs Jagruthi Homes, Diamond Heights Community, Nallagandla, Telangana 600019',
+    site: 'Example Apartment Three, Hyderabad',
     packageMapped: 'Normal · With PVC · High Gloss / SF',
     brandsListed: 'BWR 710 or 303 Plywood + 6mm PVC Board Near Wall, Slab and Flooring Area',
     printedTotalRupees: 1424314.5,
@@ -902,11 +905,11 @@ export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
   },
   {
     id: 'subhash-premium-100-bwp',
-    title: 'Subhash (Nallagandla) — Premium 100% BWP Package (30/25/20 Yrs)',
-    pdfAssetPath: '/assets/aistudio/QUOTATION_PREMIUM_100__BWP_8abcc2a3.pdf',
-    customerName: 'Subhash',
+    title: 'Demo Customer Three — Premium 100% BWP Package (30/25/20 Yrs)',
+    pdfAssetPath: '',
+    customerName: 'Demo Customer Three',
     date: '2025-04-29',
-    site: 'Flat No: 301, Vintcs Jagruthi Homes, Diamond Heights Community, Nallagandla, Telangana 600019',
+    site: 'Example Apartment Three, Hyderabad',
     packageMapped: 'Premium (2025) · Standard · High Gloss / SF',
     brandsListed:
       'BWP 710 – Siam (Club Gold – 30 Yrs) or Austin Gold (Marine Grade – 25 Yrs) or Century Bond (21 Yrs)',
@@ -914,7 +917,7 @@ export const HISTORICAL_PDF_AUDITS: HistoricalPdfAuditRecord[] = [
     computedTotalRupees: 1467118,
     exactMatch: true,
     keyRatesExtracted: [
-      'Box type items: ₹1,200 / sq.ft (2025 rate; updated to ₹1,250 / sq.ft in Oct 2026 Vidya Sagar Reddy quote)',
+      'Box type items: ₹1,200 / sq.ft (2025 rate; updated to ₹1,250 / sq.ft in Oct 2026 Demo Customer One quote)',
       'Frame type / Loft: ₹950–₹1,200 / sq.ft',
       'Wood wall paneling: ₹650 / sq.ft',
       'Outside 1mm laminate worth up to Rs.1,600/- and Handles worth up to Rs.300/-',
@@ -943,11 +946,11 @@ export interface DictationPreset {
 export const DICTATION_PRESETS: DictationPreset[] = [
   {
     id: 'vidya-sagar-full',
-    title: '1. Vidya Sagar Reddy — Full 5-Room Site Note (Telugu + Roman Telugu + English)',
+    title: '1. Demo Customer One — Full 5-Room Site Note (Telugu + Roman Telugu + English)',
     languages: ['te', 'en'],
     badge: 'Complete Publishable Job · ₹7,32,965',
     transcript:
-      'Customer peru K. Vidya Sagar Reddy garu, phone 9908074741. Site Flat No 302, Navya Pinnacle Apartment, Raghavendra Nagar Colony, Gayatri Nagar, Uppal Bhagayath, Hyderabad 500039. Quote date 24-10-2026, recommended package Premium grade Standard protection High Gloss finish, Flaer Ply SMART preference. Master bedroom lo loft frame and shutter 9.9 ft by 11.9 ft, wardrobe lopala okati box type locker ఒకటిన్నర అడుగులు by 3 ft back panel wall touch, box type dressing table 7 ft by 2 ft, folding table 2 ft by 3 ft. Children bedroom lo frame type wardrobe 6.9 by 8.5 ft, loft 3 by 11.9 ft, box type study table 7 by 4 ft. Kitchen lo box type base cabinet 2.9 by 10 ft, 6 tandem baskets, wall cabinet 2 by 10 ft, opposite kitchen cabinet 6.9 by 5.9 ft, loft 3 by 21 ft, wood wall paneling under loft 1.9 by 24 ft, wash area box wardrobe 2.5 by 2.5 ft, breakfast counter 2.5 by 6.3 ft, breakfast counter paneling 2.5 by 7.3 ft, mini crockery unit 4 by 2 ft, upper pillar paneling 3.5 by 11 ft. Pooja room lo box type pooja mandir 6.9 by 4 ft, pooja CNC glass door paneling 7.5 by 4.5 ft. Hall and Dining lo box type TV unit with louvers 9.5 by 8 ft, main door paina TV unit louver paneling 3.5 by 3.5 ft. All sq ft front face billing confirmed.',
+      'Customer peru Demo Customer One garu, phone not provided. Site Example Apartment One, Hyderabad. Quote date 24-10-2026, recommended package Premium grade Standard protection High Gloss finish, Flaer Ply SMART preference. Master bedroom lo loft frame and shutter 9.9 ft by 11.9 ft, wardrobe lopala okati box type locker ఒకటిన్నర అడుగులు by 3 ft back panel wall touch, box type dressing table 7 ft by 2 ft, folding table 2 ft by 3 ft. Children bedroom lo frame type wardrobe 6.9 by 8.5 ft, loft 3 by 11.9 ft, box type study table 7 by 4 ft. Kitchen lo box type base cabinet 2.9 by 10 ft, 6 tandem baskets, wall cabinet 2 by 10 ft, opposite kitchen cabinet 6.9 by 5.9 ft, loft 3 by 21 ft, wood wall paneling under loft 1.9 by 24 ft, wash area box wardrobe 2.5 by 2.5 ft, breakfast counter 2.5 by 6.3 ft, breakfast counter paneling 2.5 by 7.3 ft, mini crockery unit 4 by 2 ft, upper pillar paneling 3.5 by 11 ft. Pooja room lo box type pooja mandir 6.9 by 4 ft, pooja CNC glass door paneling 7.5 by 4.5 ft. Hall and Dining lo box type TV unit with louvers 9.5 by 8 ft, main door paina TV unit louver paneling 3.5 by 3.5 ft. All sq ft front face billing confirmed.',
     expectedResult: VIDYA_SAGAR_REDDY_DRAFT,
   },
   {
@@ -1024,15 +1027,15 @@ export const DICTATION_PRESETS: DictationPreset[] = [
     languages: ['hi', 'te', 'en'],
     badge: 'Owner Request Gate · Private Review',
     transcript:
-      'Customer R. Srinivas Rao, Flat 404, My Home Avatar, Puppalaguda, Hyderabad. Recommend Premium With PVC High Gloss. Kitchen mein ek box type base cabinet 3 ft by 12 ft (36 sq ft face area), wet area back panel and bottom panel PVC eligible. Customer Greenply exact supply mang raha hai aur ₹15,000 festival discount bol raha hai, plus bol raha hai ₹50,000 cash de diya.',
+      'Customer Demo Customer Four, Example Apartment Four, Hyderabad. Recommend Premium With PVC High Gloss. Kitchen mein ek box type base cabinet 3 ft by 12 ft (36 sq ft face area), wet area back panel and bottom panel PVC eligible. Customer Greenply exact supply mang raha hai aur ₹15,000 festival discount bol raha hai, plus bol raha hai ₹50,000 cash de diya.',
     expectedResult: {
       schema_version: 'quotation-studio.draft.v2',
       output_language: 'en',
       is_demo: false,
       languages: ['hi', 'te', 'en'],
       customer: {
-        name: 'R. Srinivas Rao',
-        site: 'Flat 404, My Home Avatar, Puppalaguda, Hyderabad',
+        name: 'Demo Customer Four',
+        site: 'Example Apartment Four, Hyderabad',
         phone: null,
       },
       quote: {

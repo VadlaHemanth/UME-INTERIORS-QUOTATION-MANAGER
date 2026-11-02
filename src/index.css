@@ -24,7 +24,7 @@
     color: var(--ume-ink);
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    min-width: 320px;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -53,51 +53,122 @@
   }
 }
 
-/* Clean, High-Precision A4 Print & Save-as-PDF Stylesheet */
+/* Browser print uses the exact page nodes and geometry shown in the A4 preview. */
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 12mm 12mm;
-  }
+  @page { size: A4 portrait; margin: 0; }
+  html, body { margin: 0 !important; padding: 0 !important; min-width: 0; background: #fff !important; }
+  body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .no-print, .settings-backdrop, .app-error { display: none !important; }
+  .print-only { display: block !important; }
+  .ume-app, .ume-app main, .customer-quotation { margin: 0 !important; padding: 0 !important; min-height: 0 !important; background: #fff !important; }
+  div:has(> .quote-document) { margin: 0 !important; padding: 0 !important; }
+}
 
-  body {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-    background-color: #FFFFFF !important;
-    color: #1B241E !important;
-    font-size: 9.5pt;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
+/* Shared shell: warm stone, forest and quietly detailed typography. */
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+#root { min-height: 100vh; }
+:focus-visible { outline: 3px solid #a98250; outline-offset: 4px; }
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), select { cursor: pointer; }
+button:disabled { opacity: .55; cursor: wait; }
+input, select, textarea { max-width: 100%; min-width: 0; }
+img { max-width: 100%; }
+.ume-app main, .ume-app main > *, .ume-app .grid > *, .ume-app .flex > * { min-width: 0; }
+.ume-app p, .ume-app h1, .ume-app h2, .ume-app h3 { overflow-wrap: anywhere; }
+.app-header { min-height: 84px; background: #fff !important; padding-inline: clamp(20px, 3vw, 56px); }
+.app-header nav { gap: clamp(12px, 1.65vw, 28px); }
+.header-primary, .header-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border-radius: 9px; font-size: 12px; font-weight: 600; min-height: 42px; }
+.header-primary { background: #1c3a2f; color: #fff; }
+.header-secondary { background: #fff; border: 1px solid #ddd7cb; }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .16em; line-height: 1.8; text-transform: uppercase; }
+.portal-page { max-width: 1380px; margin: auto; padding: 36px clamp(18px, 4vw, 60px) 72px; }
+.portal-hero { display: grid; grid-template-columns: 1.05fr 1fr; background: #1c3a2f; color: #fff; border-radius: 20px; overflow: hidden; min-height: 420px; }
+.portal-hero-copy { padding: clamp(28px, 4.2vw, 64px); display: flex; align-items: flex-start; flex-direction: column; }
+.portal-hero-copy .eyebrow { color: #d9c29e; margin-bottom: 22px; }
+.portal-hero h1 { font-size: clamp(30px, 3.4vw, 50px); font-weight: 500; line-height: 1.16; letter-spacing: -.045em; margin: 0 0 22px; }
+.portal-hero em, .owner-login-story em { font-family: Georgia, serif; font-weight: 400; color: #e6cba8; }
+.portal-hero-copy > p:not(.eyebrow) { font-size: 13px; line-height: 1.85; max-width: 365px; color: #dce3dd; }
+.hero-link { margin-top: 26px; font-size: 12px; display: inline-flex; align-items: center; gap: 30px; border-bottom: 1px solid #c5b695; padding-bottom: 9px; }
+.hero-caption { margin-top: auto; padding-top: 36px; font-size: 8px; letter-spacing: .18em; color: #b9c6be; }
+.portal-hero-image { position: relative; min-height: 100%; background: #e8e2d8; }
+.portal-hero-image img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
+.portal-hero-image span { position: absolute; bottom: 24px; left: 24px; background: #fffcf3ed; padding: 12px 16px; border-radius: 6px; color: #253c30; font: italic 18px Georgia, serif; }
+.portal-access { display: grid; grid-template-columns: 1fr 1.1fr; gap: clamp(30px, 6vw, 90px); padding: 70px 30px 0; align-items: center; }
+.access-intro .eyebrow { color: #7d735f; margin-bottom: 16px; }
+.access-intro h2 { font-size: clamp(28px, 3vw, 40px); font-weight: 500; line-height: 1.2; margin-bottom: 18px; letter-spacing: -.04em; }
+.access-intro > p:not(.eyebrow) { max-width: 350px; color: #687067; font-size: 13px; line-height: 1.9; }
+.privacy-note { display: flex; gap: 14px; margin-top: 28px; align-items: center; color: #3f5648; font-size: 11px; line-height: 1.8; }
+.access-card, .owner-login-card, .settings-card { background: #fff; border: 1px solid #e3ded4; border-radius: 18px; padding: clamp(24px, 3vw, 40px); box-shadow: 0 12px 36px #3b332a05; }
+.access-card h2, .owner-login-card h2, .settings-card h2 { font-size: 25px; font-weight: 600; line-height: 1.3; letter-spacing: -.035em; }
+.form-intro { font-size: 12px; color: #6c736b; line-height: 1.8; margin: 9px 0 27px; }
+.access-card form, .owner-login-card form, .settings-card form { display: flex; flex-direction: column; }
+.access-card label, .owner-login-card label, .settings-card label { font-size: 11px; font-weight: 600; margin-bottom: 8px; }
+.access-card label span { font-weight: 400; color: #777e73; }
+.access-card input, .owner-login-card input, .settings-card input { width: 100%; height: 48px; background: #faf9f6; border: 1px solid #ddd8cd; border-radius: 8px; padding: 0 14px; font-size: 12px; margin-bottom: 21px; }
+.access-card input::placeholder { color: #93988e; }
+.form-submit { min-height: 48px; border-radius: 8px; background: #1c3a2f; color: white; display: flex; justify-content: center; align-items: center; gap: 18px; font-size: 12px; font-weight: 600; padding: 12px 18px; transition: background .2s; }
+.form-submit:hover { background: #2c4f3f; }
+.form-error { font-size: 12px; line-height: 1.7; color: #9e352c; background: #fff3ef; border: 1px solid #ebc6ba; border-radius: 8px; padding: 12px; margin-bottom: 18px; }
+.access-help { margin-top: 20px; color: #7c8179; font-size: 10px; text-align: center; line-height: 1.8; }
+.access-help a { color: #274b3c; text-decoration: underline; text-underline-offset: 3px; }
+.owner-login-page { max-width: 1150px; margin: auto; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: clamp(30px, 6vw, 90px); padding: 60px 36px 80px; }
+.owner-login-story .eyebrow { color: #7c725e; margin-bottom: 20px; }
+.owner-login-story h1 { font-size: clamp(30px, 3.2vw, 44px); font-weight: 500; line-height: 1.2; margin-bottom: 20px; }
+.owner-login-story em { color: #677b65; }
+.owner-login-story > p:not(.eyebrow) { color: #72776d; font-size: 12px; line-height: 1.9; max-width: 340px; }
+.owner-login-story img { border-radius: 12px; margin-top: 28px; width: 100%; height: 200px; object-fit: cover; }
+.login-icon { width: 48px; height: 48px; border-radius: 12px; background: #eef2e9; display: grid; place-items: center; color: #244334; margin-bottom: 24px; }
+.owner-login-card .eyebrow { color: #8d7958; margin-bottom: 10px; }
+.password-field { position: relative; }
+.password-field input { padding-right: 50px; }
+.password-field button { position: absolute; top: 0; right: 0; width: 45px; height: 48px; display: grid; place-items: center; color: #737c70; }
+.back-home { display: block; text-align: center; font-size: 11px; margin-top: 24px; color: #747d70; }
+.settings-backdrop { position: fixed; inset: 0; z-index: 100; background: #15271ddd; display: flex; justify-content: center; align-items: center; padding: 20px; overflow: auto; }
+.settings-card { position: relative; width: 100%; max-width: 460px; max-height: calc(100dvh - 40px); overflow: auto; }
+.settings-close { position: absolute; top: 18px; right: 18px; padding: 6px; }
+.settings-card .eyebrow { color: #8d7958; margin-bottom: 12px; }
+.credential-message { padding: 12px; background: #eef2e9; border-radius: 6px; font-size: 12px; margin-bottom: 16px; line-height: 1.7; }
+.app-error { display: flex; gap: 12px; justify-content: space-between; background: #fff0e9; color: #933d30; padding: 14px 24px; font-size: 12px; border-bottom: 1px solid #edcbbd; }
+@media (max-width: 1100px) { .app-header > div.hidden { display: none; } .app-header nav { width: 100%; order: 3; justify-content: space-between; padding-top: 8px; border-top: 1px solid #eee9e0; } }
+@media (max-width: 767px) {
+  .app-header { min-height: 74px; gap: 12px; padding: 16px 18px; }
+  .app-header > div:last-child { gap: 6px; }
+  .app-header button { padding: 10px; font-size: 11px; }
+  .portal-page { padding: 20px 16px 44px; }
+  .portal-hero { grid-template-columns: 1fr; border-radius: 14px; }
+  .portal-hero-copy { padding: 30px 26px; }
+  .portal-hero h1 { font-size: 36px; }
+  .portal-hero-image { min-height: 220px; }
+  .hero-caption { padding-top: 28px; }
+  .portal-access { grid-template-columns: 1fr; gap: 28px; padding: 38px 2px 0; }
+  .access-intro h2 br { display: none; }
+  .access-intro > p:not(.eyebrow) { max-width: none; }
+  .privacy-note { margin-top: 16px; }
+  .access-card { padding: 26px 22px; }
+  .owner-login-page { grid-template-columns: 1fr; padding: 30px 18px 44px; gap: 30px; max-width: 500px; }
+  .owner-login-story img { display: none; }
+  .owner-login-story h1 { font-size: 30px; }
+  .owner-login-story > p:not(.eyebrow) { max-width: none; }
+  .ume-app footer { padding: 24px 18px; }
+}
+@media (max-width: 380px) { .app-header { padding-inline: 12px; } .app-header img { max-width: 90px; height: 34px; } .portal-hero h1 { font-size: 31px; } }
+@media print { .settings-backdrop, .app-error { display: none !important; } }
 
-  .no-print {
-    display: none !important;
-  }
+.quote-loading { display:flex; min-height:55vh; justify-content:center; align-items:center; gap:12px; color:#64705e; font-size:13px; padding:30px; }
+.loading-dot { width:9px; height:9px; background:#85937c; border-radius:50%; }
 
-  .print-only {
-    display: block !important;
-  }
+.app-header > div:last-child { max-width:100%; min-width:0; flex-shrink:1; }
+@media (max-width:767px) { .app-header > div:last-child { flex-wrap:wrap; } }
 
-  .print-break-before {
-    break-before: page;
-    page-break-before: always;
-  }
+.owner-studio .text-xs { font-size:13px; line-height:1.55; }
+.owner-studio :is(.text-\[10px\],.text-\[11px\]) { font-size:11px; line-height:1.5; }
+.owner-studio :is(input.font-mono,td.font-mono) { font-family:var(--font-sans); font-variant-numeric:tabular-nums; }
 
-  .print-avoid-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  table {
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  thead {
-    display: table-header-group;
-  }
-
-  tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+@media print {
+  html, body, #root { margin:0!important; padding:0!important; min-height:0!important; }
+  .ume-app { display:block!important; min-height:0!important; background:white!important; }
+  .customer-quotation { min-height:0!important; padding:0!important; background:white!important; }
+  .quotation-print-shell { padding:0!important; margin:0!important; width:210mm!important; }
 }

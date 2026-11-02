@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import QRCode from 'qrcode';
 import { FinishOption, PlywoodGrade, ProtectionOption } from '../lib/schema';
 
 /**
@@ -463,79 +464,36 @@ export const LaminateFinishSwatch: React.FC<{
   );
 };
 
-/**
- * Deterministic SVG QR Code Generator (100% offline & A4 Print ready)
- */
+/** Standards-compliant QR modules, encoded locally with a four-module quiet zone. */
 export const DeterministicQrCode: React.FC<{
   value: string;
   size?: number;
   label?: string;
-}> = ({ value, size = 92, label }) => {
-  const gridSize = 21;
-  const cells: boolean[][] = Array.from({ length: gridSize }, () =>
-    Array(gridSize).fill(false)
-  );
-
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  const drawFinder = (r0: number, c0: number) => {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        const isBorder = r === 0 || r === 6 || c === 0 || c === 6;
-        const isInner = r >= 2 && r <= 4 && c >= 2 && c <= 4;
-        cells[r0 + r][c0 + c] = isBorder || isInner;
+}> = ({ value, size = 112, label }) => {
+  const modules = useMemo(() => QRCode.create(value, { errorCorrectionLevel: 'M' }).modules, [value]);
+  const quietZone = 4;
+  const viewSize = modules.size + quietZone * 2;
+  const path = useMemo(() => {
+    const cells: string[] = [];
+    for (let row = 0; row < modules.size; row++) {
+      for (let column = 0; column < modules.size; column++) {
+        if (modules.get(row, column)) {
+          cells.push(`M${column + quietZone},${row + quietZone}h1v1h-1z`);
+        }
       }
     }
-  };
-
-  drawFinder(0, 0);
-  drawFinder(0, gridSize - 7);
-  drawFinder(gridSize - 7, 0);
-
-  let seed = Math.abs(hash) || 1234567;
-  for (let r = 0; r < gridSize; r++) {
-    for (let c = 0; c < gridSize; c++) {
-      const inTopLeft = r < 8 && c < 8;
-      const inTopRight = r < 8 && c >= gridSize - 8;
-      const inBottomLeft = r >= gridSize - 8 && c < 8;
-      if (inTopLeft || inTopRight || inBottomLeft) continue;
-      seed = (seed * 48271) % 2147483647;
-      cells[r][c] = seed % 10 < 5;
-    }
-  }
-
+    return cells.join('');
+  }, [modules]);
   return (
-    <div className="inline-flex flex-col items-center">
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${gridSize + 2} ${gridSize + 2}`}
-        className="bg-white border border-[#E4DFD7] rounded-lg p-1.5"
-        role="img"
-        aria-label={label || `QR Code for ${value}`}
-      >
-        {cells.map((row, rIdx) =>
-          row.map((filled, cIdx) =>
-            filled ? (
-              <rect
-                key={`${rIdx}-${cIdx}`}
-                x={cIdx + 1}
-                y={rIdx + 1}
-                width={1}
-                height={1}
-                fill="#141210"
-              />
-            ) : null
-          )
-        )}
+    <figure className="qr-code inline-flex flex-col items-center shrink-0 m-0">
+      <svg width={size} height={size} viewBox={`0 0 ${viewSize} ${viewSize}`}
+        className="block bg-white border border-[#E4DFD7] rounded-md"
+        role="img" aria-label={label || 'QR code'} shapeRendering="crispEdges">
+        <title>{label || 'QR code'}</title>
+        <rect width={viewSize} height={viewSize} fill="#ffffff" />
+        <path d={path} fill="#111111" />
       </svg>
-      {label && (
-        <span className="mt-1 text-[10px] font-medium text-[#68625B]">{label}</span>
-      )}
-    </div>
+      {label && <figcaption className="mt-1 text-[10px] text-center font-medium text-[#5C645F]">{label}</figcaption>}
+    </figure>
   );
 };

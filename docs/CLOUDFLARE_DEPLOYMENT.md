@@ -1,0 +1,104 @@
+# Deploy UME Interiors to Cloudflare
+
+This app includes a Cloudflare Worker, static frontend and D1 storage. The commands explicitly select this app’s config so a parent folder’s Wrangler project cannot be selected accidentally. Deploy the Worker project in this repository. Uploading only `dist/` to Pages would leave login, saving and publishing without an API.
+
+## 1. Install and check
+
+Use Node.js 22.12+ (or a current supported Node.js LTS) and open a terminal in this checkout.
+
+```powershell
+npm ci
+npm test
+npm run lint
+npm run build
+npx wrangler --config ./wrangler.toml login
+```
+
+## 2. Create persistent storage
+
+```powershell
+npx wrangler --config ./wrangler.toml d1 create ume-interiors-studio
+```
+
+Copy the returned database UUID into `database_id` under `[[d1_databases]]` in `wrangler.toml`, replacing the all-zero placeholder. Keep the binding named `DB`. Then run:
+
+```powershell
+npx wrangler --config ./wrangler.toml d1 migrations apply DB --remote
+```
+
+Both migration files must be applied. `0002_runtime_store.sql` creates the actual current app storage. New deployments start with an empty quotation list and the default rate card. Existing local customer files are not uploaded automatically.
+
+## 3. Publish and configure the owner account
+
+```powershell
+npx wrangler --config ./wrangler.toml deploy
+npx wrangler --config ./wrangler.toml secret put OWNER_USERNAME
+npx wrangler --config ./wrangler.toml secret put OWNER_PASSWORD
+```
+
+Enter a username with 3–64 letters, numbers, dots, underscores or hyphens, and a unique password of at least 12 characters. Wrangler prompts for these values; keep them out of source files and GitHub. Login stays unavailable until both secrets are configured.
+
+Open the HTTPS Worker URL returned by deployment. Customers use `/` or their private `/q/<token>` link. The owner signs in at `/owner`. After login, use the account settings to change the username and password. The password is stored as a salted PBKDF2 hash; saved account changes survive restarts and deployments. Changing credentials or signing out invalidates existing owner sessions.
+
+The public customer portal does not expose the owner form. Customer links remain bearer access links: share each private link only with its intended customer.
+
+## 4. Add your domain
+
+In Cloudflare, select **Workers & Pages → ume-interiors-quotation-studio → Settings → Domains & Routes → Add → Custom Domain**. Select a hostname managed by your Cloudflare account, such as `quotes.umeinteriors.com`. Open it and test one fresh owner publication and a customer Save operation. The app generates new share links using the current hostname.
+
+## Future updates
+
+```powershell
+git pull
+npm ci
+npm test
+npm run lint
+npm run build
+npx wrangler --config ./wrangler.toml d1 migrations apply DB --remote
+npx wrangler --config ./wrangler.toml deploy
+```
+
+Never delete the D1 database to update the app. Database contents and the saved owner account are independent of a code deployment. Use the Cloudflare D1 dashboard or Wrangler export for backups:
+
+```powershell
+npx wrangler --config ./wrangler.toml d1 export DB --remote --output studio-backup.sql
+```
+
+The backup contains private customer and authentication records. Store it privately; do not commit it.
+
+## Run locally
+
+Copy `.env.example` to `.env` and set `OWNER_USERNAME` and `OWNER_PASSWORD`. Then:
+
+```powershell
+npm run dev
+```
+
+Open `http://127.0.0.1:3000/owner`. Local saves use the ignored `data/ume-studio-db.json`. Local changes do not modify Cloudflare D1. To expose the development server to another device on your LAN, explicitly set `HOST=0.0.0.0` in your private `.env`.
+
+For the actual Worker runtime, put the same two values into ignored `.dev.vars`, build the frontend, apply migrations locally and start Wrangler:
+
+```powershell
+npm run build
+npx wrangler --config ./wrangler.toml d1 migrations apply DB --local
+npx wrangler --config ./wrangler.toml dev
+```
+
+Worker local D1 data stays in ignored `.wrangler/`, separately from the Express JSON database and production D1. `npm run preview` serves only the frontend; use one of the two full-stack commands above to test saving and authentication.
+
+## Account recovery
+
+Environment secrets only initialize a missing account; they do not overwrite a password changed in the app. If you forget the production password, update `OWNER_USERNAME` and `OWNER_PASSWORD` with Wrangler, then reset only the authentication record:
+
+```powershell
+npx wrangler --config ./wrangler.toml d1 execute DB --remote --command "DELETE FROM studio_runtime_records WHERE record_key = 'auth';"
+```
+
+The next login initializes the account from the new secrets. Quotations and payments remain in the database. This command invalidates all owner sessions.
+
+## Cloudflare references
+
+- [Workers static assets and SPA routing](https://developers.cloudflare.com/workers/static-assets/)
+- [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
+- [Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
+- [D1 export](https://developers.cloudflare.com/d1/reference/wrangler-commands/#export)
