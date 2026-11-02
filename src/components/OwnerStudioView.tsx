@@ -152,6 +152,36 @@ function createEmptyOwnerDraft(): QuotationDraftV2 {
   };
 }
 
+function getOwnerRequestPresentation(path: string) {
+  const normalizedPath = path.toLowerCase();
+  if (normalizedPath.includes('payment')) {
+    return {
+      badge: 'PAYMENT',
+      title: 'Payment schedule',
+      summary: 'Confirm the payment milestones customers will see before work begins and at each completion stage.',
+    };
+  }
+  if (normalizedPath.includes('bank') || normalizedPath.includes('upi')) {
+    return {
+      badge: 'BANK',
+      title: 'Bank and payment details',
+      summary: 'Confirm these receiving-account details are correct before customers use them to make a payment.',
+    };
+  }
+  if (normalizedPath.includes('term') || normalizedPath.includes('note') || normalizedPath.includes('condition')) {
+    return {
+      badge: 'TERMS',
+      title: 'Extra-work and site terms',
+      summary: 'Confirm these conditions and charges are approved for this quotation before they are shown to the customer.',
+    };
+  }
+  return {
+    badge: 'REVIEW',
+    title: 'Special quotation note',
+    summary: 'Confirm this requested detail is correct before it is included in the quotation.',
+  };
+}
+
 export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   catalogue,
   quotes,
@@ -258,6 +288,12 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     () => validateQuotationDraftV2(workingDraft, { reviewedOwnerRequests }),
     [workingDraft, reviewedOwnerRequests]
   );
+  const ordinaryValidationIssues = useMemo(
+    () => validation.issues.filter((issue) => issue.code !== 'UNREVIEWED_OWNER_REQUEST'),
+    [validation]
+  );
+  const pendingOwnerReviewCount = reviewedOwnerRequests ? 0 : workingDraft.owner_requests.length;
+  const publishGateCount = ordinaryValidationIssues.length + pendingOwnerReviewCount;
 
   const previewSnapshot = useMemo(
     () => calculateQuotationPricing(workingDraft, editableCatalogue),
@@ -729,17 +765,20 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   >
                     {validation.readyForPublish
                       ? 'Ready to Publish ✓'
-                      : `${validation.issues.length} Issue(s) to Resolve`}
+                      : pendingOwnerReviewCount > 0 && ordinaryValidationIssues.length === 0
+                        ? `${pendingOwnerReviewCount} Owner Detail(s) to Review`
+                        : `${publishGateCount} Issue(s) to Resolve`}
                   </span>
                 </div>
 
-                {validation.issues.length === 0 ? (
+                {ordinaryValidationIssues.length === 0 && workingDraft.owner_requests.length === 0 ? (
                   <p className="text-xs text-[#1C3A2F] bg-[#E4EFE7] p-3 border border-[#C5DEC9] rounded-xl font-medium">
                     Required details and measurements are complete. Review the selected package and prices before publishing.
                   </p>
                 ) : (
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {validation.issues.map((issue, idx) => (
+                  <div className="space-y-3">
+                    {ordinaryValidationIssues.length > 0 && <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {ordinaryValidationIssues.map((issue, idx) => (
                       <div
                         key={idx}
                         className="p-3 bg-[#FFFBEB] border border-[#B45309]/40 rounded-xl text-xs space-y-1"
@@ -751,6 +790,41 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         <p className="text-[#18221D] font-medium">{issue.message}</p>
                       </div>
                     ))}
+                    </div>}
+                    {workingDraft.owner_requests.length > 0 && (
+                      <section className={`rounded-xl border p-3.5 space-y-3 ${reviewedOwnerRequests ? 'border-[#C5DEC9] bg-[#F6FAF7]' : 'border-[#C9BFA8] bg-[#FAF8F4]'}`} aria-labelledby="owner-review-title">
+                        <div>
+                          <p className="text-[11px] font-bold tracking-wider text-[#1C3A2F]">OWNER CONFIRMATION</p>
+                          <h4 id="owner-review-title" className="mt-0.5 text-sm font-bold text-[#18221D]">Review these {workingDraft.owner_requests.length} quotation detail{workingDraft.owner_requests.length === 1 ? '' : 's'}</h4>
+                          <p className="mt-1 text-xs leading-relaxed text-[#5C645F]">These are important payment, bank or terms details from the imported quote. They are not customer-facing errors; confirm them before publishing.</p>
+                        </div>
+                        <div className="space-y-2.5">
+                          {workingDraft.owner_requests.map((request, requestIndex) => {
+                            const presentation = getOwnerRequestPresentation(request.path);
+                            return <article key={`${request.path}-${requestIndex}`} className="rounded-lg border border-[#E5DFD3] bg-white p-3 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded-md bg-[#E4EFE7] px-2 py-0.5 text-[10px] font-bold tracking-wide text-[#1C3A2F]">{presentation.badge}</span>
+                                <h5 className="text-xs font-bold text-[#18221D]">{presentation.title}</h5>
+                              </div>
+                              <p className="text-xs leading-relaxed text-[#5C645F]">{presentation.summary}</p>
+                              <div className="rounded-md bg-[#FAF8F4] px-2.5 py-2">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#5C645F]">Details to confirm</p>
+                                <p className="mt-1 text-xs leading-relaxed text-[#18221D]">{request.text}</p>
+                              </div>
+                            </article>;
+                          })}
+                        </div>
+                        <label className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border border-[#D8D0C2] bg-white p-2.5 text-xs font-medium text-[#18221D]">
+                          <input
+                            type="checkbox"
+                            checked={reviewedOwnerRequests}
+                            onChange={(e) => setReviewedOwnerRequests(e.target.checked)}
+                            className="h-[22px] w-[22px] shrink-0 accent-[#1C3A2F]"
+                          />
+                          <span>{reviewedOwnerRequests ? 'All listed details have been reviewed.' : `I have reviewed all ${workingDraft.owner_requests.length} listed detail${workingDraft.owner_requests.length === 1 ? '' : 's'}.`}</span>
+                        </label>
+                      </section>
+                    )}
                   </div>
                 )}
 
@@ -768,9 +842,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   </div>
                 )}
 
-                {(workingDraft.is_demo ||
-                  workingDraft.needs_clarification.length > 0 ||
-                  workingDraft.owner_requests.length > 0) && (
+                {(workingDraft.is_demo || workingDraft.needs_clarification.length > 0) && (
                   <div className="pt-2 border-t border-[#EAE4D8] space-y-2">
                     {workingDraft.is_demo && (
                       <button type="button" onClick={() => syncDraft({ ...workingDraft, is_demo: false })}
@@ -791,20 +863,6 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    {workingDraft.owner_requests.length > 0 && (
-                      <label className="flex items-center gap-2 text-xs font-medium cursor-pointer p-2.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl">
-                        <input
-                          type="checkbox"
-                          checked={reviewedOwnerRequests}
-                          onChange={(e) => setReviewedOwnerRequests(e.target.checked)}
-                          className="w-4 h-4 accent-[#1C3A2F] rounded"
-                        />
-                        <span>
-                          Owner has reviewed all {workingDraft.owner_requests.length} special request(s)
-                        </span>
-                      </label>
                     )}
                   </div>
                 )}
