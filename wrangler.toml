@@ -1,5 +1,5 @@
 account_id = "3f8099bcfe776445db674c284829eb82"
-name = "ume-interiors-quotation-studio"
+name = "quotation"
 main = "worker/index.ts"
 compatibility_date = "2026-11-01"
 workers_dev = true

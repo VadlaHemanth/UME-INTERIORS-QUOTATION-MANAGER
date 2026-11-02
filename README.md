@@ -36,7 +36,7 @@ For projects below the app's booking threshold, online booking is disabled until
 
 ## Production hosting
 
-Use [the Cloudflare deployment guide](docs/CLOUDFLARE_DEPLOYMENT.md). This is a full-stack Worker + D1 app; a static-only `dist` upload cannot process sign-ins or save quotations. The business deployment is live at [UME Interiors](https://ume-interiors-quotation-studio.umeinteriors.workers.dev), with [owner access](https://ume-interiors-quotation-studio.umeinteriors.workers.dev/owner). Its D1 database and owner secrets are configured. Configure your own account, D1 database UUID and owner secrets for a separate deployment. Cloudflare production starts with an empty quotation list; local customer records and credentials are never bundled into the deployment.
+Use [the Cloudflare deployment guide](docs/CLOUDFLARE_DEPLOYMENT.md). This is a full-stack Worker + D1 app; a static-only `dist` upload cannot process sign-ins or save quotations. The business deployment is live at [UME Interiors](https://quotation.umeinteriors.workers.dev), with [owner access](https://quotation.umeinteriors.workers.dev/owner). Its D1 database and owner secrets are configured. Configure your own account, D1 database UUID and owner secrets for a separate deployment. Cloudflare production starts with an empty quotation list; local customer records and credentials are never bundled into the deployment.
 
 ```powershell
 npm run deploy

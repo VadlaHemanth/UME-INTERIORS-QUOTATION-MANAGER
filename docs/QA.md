@@ -2,7 +2,7 @@
 
 ## Automated verification
 
-All 39 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
+All 41 automated tests pass for this release, including owner publication, customer saving and immutable revisions.
 
 Pricing/import/review gates, current assistant instruction snapshot, actual rendered payment/link QR scan decoding, sessions and credential changes, owner API access, full-phone lookup, public payload minimization, payment validation, and real SQLite optimistic-transaction checks pass. Add-on tests verify that recommendations do not affect base pricing, accepted work remains optional, missing confirmed details block publication, and malformed/duplicate suggestions are rejected.
 
@@ -52,4 +52,7 @@ Regression coverage verifies fenced/raw JSON import, complete catalogue PVC scop
 Secret-rotation tests cover username-only, password-only and combined changes; immediate old-session rejection on owner APIs and public quote reads; preserved Account-page changes when environment values do not change; older saved-account migration; invalid configuration; and preserved quotation records. The environment comparison baseline is stored as a salted PBKDF2 digest, never plaintext. No user credential value is printed or changed by these tests.
 
 
-Deployment follow-up: runtime configuration messages distinguish missing bindings from invalid values without exposing credentials. Wrangler keep_vars=true preserves values entered in dashboard runtime settings. Encrypted owner credentials belong in the deployed Worker’s Variables and Secrets section, rather than build variables. The initial post-deployment check found the owner bindings absent. After the user configured and deployed the runtime credentials, the live owner-session configuration endpoint returned 200. The local endpoint also returned 200, and the production /owner sign-in page was opened for the user. The user’s new password was not accessed or printed by the agent.
+Deployment follow-up: runtime configuration messages distinguish missing bindings from invalid values without exposing credentials. Wrangler keep_vars=true preserves values entered in dashboard runtime settings. Encrypted owner credentials belong in the deployed Worker’s Variables and Secrets section, rather than build variables. The initial post-deployment check targeted the old Worker name after the owner had renamed the intended app to quotation. The renamed Worker retained both encrypted owner bindings and the same D1 database. Its owner-session configuration endpoint returned 200, as did the local endpoint. The user’s new password was not accessed or printed by the agent.
+
+
+Worker rename follow-up: the owner renamed the intended app to quotation. Its runtime OWNER_USERNAME and OWNER_PASSWORD Secret bindings were confirmed by name/type only, and its /api/studio/session endpoint returned 200. The main config and deployment guide now target that Worker. The old hostname uses a separate redirect-only Worker, preventing two deployments with different credential settings from reconciling against the same D1 account. Redirect tests preserve customer URLs and prevent forwarding old-host mutation bodies.

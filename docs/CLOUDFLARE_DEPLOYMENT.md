@@ -4,9 +4,9 @@ This app includes a Cloudflare Worker, static frontend and D1 storage. The comma
 
 ## Current deployment
 
-Live app: https://ume-interiors-quotation-studio.umeinteriors.workers.dev
+Live app: https://quotation.umeinteriors.workers.dev
 
-Owner login: https://ume-interiors-quotation-studio.umeinteriors.workers.dev/owner
+Owner login: https://quotation.umeinteriors.workers.dev/owner
 
 This checkout is already configured for the business Cloudflare account and its D1 database. Both migrations and owner secrets are configured. For updates to this deployment, use **Future updates** below; do not create another database. For a separate account, replace `account_id` and create your own database.
 
@@ -54,7 +54,7 @@ The public customer portal does not expose the owner form. Customer links remain
 
 ## 4. Add your domain
 
-In Cloudflare, select **Workers & Pages → ume-interiors-quotation-studio → Settings → Domains & Routes → Add → Custom Domain**. Select a hostname managed by your Cloudflare account, such as `quotes.umeinteriors.com`. Open it and test one fresh owner publication and a customer Save operation. The app generates new share links using the current hostname.
+In Cloudflare, select **Workers & Pages → quotation → Settings → Domains & Routes → Add → Custom Domain**. Select a hostname managed by your Cloudflare account, such as `quotes.umeinteriors.com`. Open it and test one fresh owner publication and a customer Save operation. The app generates new share links using the current hostname.
 
 ## Future updates
 
@@ -98,7 +98,7 @@ Worker local D1 data stays in ignored `.wrangler/`, separately from the Express 
 
 ## Account recovery
 
-Update OWNER_USERNAME and OWNER_PASSWORD in **Workers & Pages → ume-interiors-quotation-studio → Settings → Variables and Secrets**, then deploy the changes. Choose **Secret** as the type for both values. These must be runtime Worker secrets, not build variables or secrets on a different Worker/environment. This repository sets keep_vars=true so code deployments preserve dashboard runtime variables; encrypted credentials should remain Secret bindings. Wrangler can also prompt for each value:
+Update OWNER_USERNAME and OWNER_PASSWORD in **Workers & Pages → quotation → Settings → Variables and Secrets**, then deploy the changes. Choose **Secret** as the type for both values. These must be runtime Worker secrets, not build variables or secrets on a different Worker/environment. This repository sets keep_vars=true so code deployments preserve dashboard runtime variables; encrypted credentials should remain Secret bindings. Wrangler can also prompt for each value:
 
 ```powershell
 npx wrangler --config ./wrangler.toml secret put OWNER_USERNAME
@@ -117,3 +117,14 @@ For local Express development, restart the server after editing .env. Production
 - [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
 - [Worker secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 - [D1 export](https://developers.cloudflare.com/d1/reference/wrangler-commands/#export)
+
+
+## Renamed Worker and old links
+
+The main deployment target is now quotation, at https://quotation.umeinteriors.workers.dev. Keep owner runtime secrets on this Worker. The old ume-interiors-quotation-studio Worker serves only a temporary redirect for GET/HEAD requests and never reads or writes the studio database. Existing customer-link paths and package query strings are preserved. A stale old-host submission gets a refresh message instead of forwarding passwords or payments.
+
+The redirect uses wrangler.legacy-redirect.toml; ordinary npm run deploy updates only the quotation app. Redeploy the redirect separately only when its target changes:
+
+```powershell
+npx wrangler deploy --config wrangler.legacy-redirect.toml
+```
