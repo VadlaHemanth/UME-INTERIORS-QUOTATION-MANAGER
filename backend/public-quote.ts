@@ -15,6 +15,10 @@ function publicDraft(draft: QuotationDraftV2): QuotationDraftV2 {
     customer: { name: draft.customer.name, phone: draft.customer.phone, site: draft.customer.site },
     quote: {
       number: draft.quote.number, date: draft.quote.date, valid_until: draft.quote.valid_until,
+      ...(draft.quote.notes ? { notes: [...draft.quote.notes] } : {}),
+      ...(typeof draft.quote.show_recommended_package === 'boolean'
+        ? { show_recommended_package: draft.quote.show_recommended_package }
+        : {}),
       ...(typeof draft.quote.is_floor_plan_estimate === 'boolean' ? { is_floor_plan_estimate: draft.quote.is_floor_plan_estimate } : {}),
       ...(draft.quote.estimate_basis ? { estimate_basis: draft.quote.estimate_basis } : {}),
       ...(draft.quote.estimate_note ? { estimate_note: draft.quote.estimate_note } : {}),
@@ -29,7 +33,6 @@ function publicDraft(draft: QuotationDraftV2): QuotationDraftV2 {
         size_text: item.size_text,
         measure: { unit: item.measure.unit, per_item: item.measure.per_item },
         quantity: item.quantity,
-        pvc: { eligible: item.pvc.eligible, parts: [...item.pvc.parts] },
         optional: item.optional,
         source_text_en: item.source_text_en,
       })),
@@ -48,8 +51,13 @@ export function publicQuote(record: PublishedQuotationRecord) {
     revision: record.revision,
     supersededByPublicId: record.supersededByPublicId,
     status: record.status,
+    workOrder: record.workOrder ? structuredClone(record.workOrder) : undefined,
     draft: publicDraft(record.draft),
-    snapshot: structuredClone(record.snapshot),
+    snapshot: {
+      ...structuredClone(record.snapshot),
+      pvcSummary: undefined,
+      rooms: record.snapshot.rooms.map(room => ({...room,items:room.items.map(({pvcEligible:_eligible,pvcParts:_parts,...item}) => item)})),
+    },
     approvedDiscountRupees: record.approvedDiscountRupees,
     defaultSentPackage: selection(record.defaultSentPackage),
     lastCustomerSelection: {

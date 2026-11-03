@@ -95,3 +95,12 @@
   .company-footer-identity { align-items: flex-start; gap: 15px; }
   .company-footer-identity > :first-child { flex-shrink: 0; }
 }
+.material-package { border-top: 1px solid #e5dfd3; padding-block: 20px; }
+.material-package summary { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; cursor: pointer; font-weight: 700; padding-block: 8px; }
+.material-package summary span { font-size: 13px; font-weight: 400; color: #5c645e; }
+.material-package .business-fields { margin-top: 20px; }
+.material-package h3 { font-size: 15px; margin: 24px 0 12px; }
+.material-brand { padding: 0 0 18px; }
+.material-extra { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; margin-block: 12px; }
+.material-extra input { width: 100%; min-width: 0; padding: 10px; border: 1px solid #d8d0c2; border-radius: 8px; }
+@media(max-width:640px) { .material-extra { grid-template-columns: 1fr 1fr; } .material-extra input:first-child { grid-column: 1 / -1; } }

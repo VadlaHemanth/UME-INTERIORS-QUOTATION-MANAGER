@@ -1,6 +1,7 @@
 import { createOwner, rememberEnvironmentCredentials, reconcileEnvironmentCredentials, issueSession, readSession, sessionCookie, validPassword, validSession, validUsername, verifyPassword } from './auth';
 import { registerDataRoutes, type ApiContext, type ApiReply, type ApiRouter, type StudioState } from './routes';
 import { publicCatalogue, publicQuote } from './public-quote';
+import { upgradeCatalogue } from '../src/lib/commercial-spec';
 
 export interface ApiEnvironment { OWNER_USERNAME?: string; OWNER_PASSWORD?: string }
 export interface StateStore {
@@ -53,6 +54,12 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
   if (path === '/api/studio/credentials' && typeof body.newUsername === 'string') body.newUsername = body.newUsername.trim();
   for (let attempt = 0; attempt < 6; attempt++) {
     const { state, version } = await store.load();
+    const upgraded = upgradeCatalogue(state.catalogue);
+    if (upgraded !== state.catalogue) {
+      state.catalogue = upgraded;
+      if (!await store.save(state, version)) continue;
+      continue;
+    }
     // Reconcile configured secrets before checking any owner session. Persist
     // atomically and reload so early 401/session responses cannot lose rotation.
     if (state.owner) {

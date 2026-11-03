@@ -25,6 +25,11 @@ test('the floor-plan checkbox always shows its notice and an unchecked quote has
   const unchecked = { ...floorPlan, is_floor_plan_estimate: false, estimate_basis: 'floor_plan' as const, estimate_note: 'Legacy note must not appear.' };
   assert.equal(getQuotationBasisLabel(unchecked), '');
   assert.equal(getQuotationEstimateNote(unchecked), '');
+  const workOrderNote = getQuotationEstimateNote(floorPlan, 'work_order');
+  assert.match(workOrderNote, /agreed scope.*supplied floor plan/);
+  assert.match(workOrderNote, /updated work order.*approved by the customer/);
+  assert.doesNotMatch(workOrderNote, /preliminary estimate|revised quotation/);
+  assert.equal(getQuotationEstimateNote(unchecked, 'work_order'), '');
 });
 
 test('site-measured and unspecified quotations show only their confirmed basis and owner note', () => {
@@ -62,5 +67,17 @@ test('estimate metadata rejects invalid bases, excessive notes and non-English t
   }
   for (const valid of [undefined, null, '', 'A'.repeat(MAX_QUOTATION_ESTIMATE_NOTE_LENGTH)]) {
     assert.equal(validateQuotationDraftV2({ ...input, quote: { ...quote, estimate_note: valid } }).readyForPublish, true);
+  }
+
+  for (const invalid of ['yes', 1, null]) {
+    const result = validateQuotationDraftV2({ ...input, quote: { ...quote, show_recommended_package: invalid } });
+    assert.equal(result.validForDraft, false);
+    assert.ok(result.issues.some((issue) => issue.path === '/quote/show_recommended_package'));
+  }
+  for (const valid of [undefined, true, false]) {
+    assert.equal(
+      validateQuotationDraftV2({ ...input, quote: { ...quote, show_recommended_package: valid } }).validForDraft,
+      true
+    );
   }
 });

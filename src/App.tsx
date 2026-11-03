@@ -74,6 +74,7 @@ export default function App() {
   // Isolated single-customer quote state when a customer opens their private /q/ link or unlocks their quote
   const [customerQuoteRecord, setCustomerQuoteRecord] =
     useState<PublishedQuoteSummary | null>(null);
+  const [customerCatalogue,setCustomerCatalogue] = useState<StudioCatalogue | null>(null);
   const [customerVerifiedPaid, setCustomerVerifiedPaid] = useState<number>(0);
   const [customerPendingCount, setCustomerPendingCount] = useState<number>(0);
 
@@ -85,6 +86,7 @@ export default function App() {
 
   // Protected Owner Studio state
   const [ownerAuthenticated, setOwnerAuthenticated] = useState<boolean>(false);
+  const [ownerStudioLoaded,setOwnerStudioLoaded] = useState(false);
   const [ownerUsername, setOwnerUsername] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
   const [ownerBusy, setOwnerBusy] = useState(false);
@@ -150,7 +152,7 @@ export default function App() {
         setMode('portal');
         return;
       }
-      if (data.catalogue) setCatalogue(data.catalogue);
+      if (data.catalogue) { setCustomerCatalogue(data.catalogue); setCatalogue(previous => ({...previous,company:data.catalogue.company})); }
       setCustomerQuoteRecord(data.quote);
       setCustomerVerifiedPaid(data.verifiedPaidRupees || 0);
       setCustomerPendingCount(data.pendingPaymentsCount || 0);
@@ -192,6 +194,7 @@ export default function App() {
         return;
       }
       if (data.catalogue) setCatalogue(data.catalogue);
+      if (data.catalogue) setCustomerCatalogue(data.catalogue);
       setCustomerQuoteRecord(data.quote);
       setCustomerVerifiedPaid(data.verifiedPaidRupees || 0);
       setCustomerPendingCount(data.pendingPaymentsCount || 0);
@@ -207,10 +210,12 @@ export default function App() {
   const loadOwnerStudioData = async () => {
     const res = await fetch('/api/studio/bootstrap');
     const data = await res.json();
+    if (res.status === 401) { setOwnerAuthenticated(false); setMode('owner_login'); setOwnerAuthError('Your session has expired. Sign in to continue.'); window.history.replaceState({}, '', '/owner'); }
     if (!res.ok) throw new Error(data.error || 'Unable to load owner workspace.');
     if (data.catalogue) setCatalogue(data.catalogue);
     setQuotes(Array.isArray(data.quotes) ? data.quotes : []);
     setLedger(Array.isArray(data.ledger) ? data.ledger : []);
+    setOwnerStudioLoaded(true);
   };
 
   const handleOwnerStudioLogin = async (e: React.FormEvent) => {
@@ -239,6 +244,7 @@ export default function App() {
       const res = await fetch('/api/studio/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
       if (!res.ok) throw new Error('Unable to sign out. Please try again.');
       setOwnerAuthenticated(false);
+      setOwnerStudioLoaded(false);
       setSettingsOpen(false);
       setQuotes([]); setLedger([]); setCustomerQuoteRecord(null);
       setMode('owner_login');
@@ -309,8 +315,22 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save quotation.');
       if (Array.isArray(data.quotes)) setQuotes(data.quotes);
+      if (data.catalogue) setCatalogue(data.catalogue);
+      if (data.catalogue) setCustomerCatalogue(data.catalogue);
       if (data.quote) setCustomerQuoteRecord(prev => prev?.publicId === publicId ? data.quote : prev);
     } catch (err) { setActionError(String(err)); throw err; }
+  };
+
+  const returnToStudio = async () => {
+    try { await loadOwnerStudioData(); setMode('studio'); window.history.replaceState({}, '', '/owner'); }
+    catch (error) { setActionError(error instanceof Error ? error.message : 'Could not return to the studio. Please try again.'); }
+  };
+
+  const handleRecordVerifiedPayment = async (publicId: string, amountRupees: number, reference: string) => {
+    const response = await fetch(`/api/studio/quotes/${publicId}/verified-payment`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountRupees, reference})});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not record payment.');
+    setQuotes(data.quotes); setLedger(data.ledger);
   };
 
   const handleSubmitPayment = async (payload: {
@@ -351,6 +371,7 @@ export default function App() {
     supersedePublicId?: string;
     approvedDiscountRupees: number;
     defaultSentPackage?: ResolvedPackageSelection;
+    confirmWorkOrderSelection?: boolean;
   }): Promise<{ ok: boolean; shareUrl?: string; publicId?: string; error?: string }> => {
     try {
       const res = await fetch('/api/studio/publish', {
@@ -381,6 +402,14 @@ export default function App() {
     } catch (err: any) {
       return { ok: false, error: err?.message || 'Failed to publish draft.' };
     }
+  };
+
+  const handleSaveOwnerDraft = async (draft: QuotationDraftV2, publicId?: string, approvedDiscountRupees = 0) => {
+    const response = await fetch('/api/studio/drafts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draft,publicId,approvedDiscountRupees})});
+    const data = await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not save the draft.');
+    setQuotes(data.quotes);
+    return data.record as PublishedQuoteSummary;
   };
 
   const handleUpdateCatalogue = async (nextCat: StudioCatalogue) => {
@@ -437,7 +466,9 @@ export default function App() {
         </a>
 
         {/* Zone 2: Reference Navigation Links (Customers NEVER see Owner Studio links or other quotes!) */}
-        {mode === 'customer_quote' && customerQuoteRecord ? (
+        {mode === 'customer_quote' && customerQuoteRecord?.workOrder ? (
+          <nav className="hidden lg:flex items-center gap-8 text-xs font-semibold"><a href="#work-order-scope">Agreed scope</a><a href="#work-order-materials">Materials & terms</a><a href="#work-order-payment">Payments & support</a></nav>
+        ) : mode === 'customer_quote' && customerQuoteRecord ? (
           <nav className="hidden lg:flex items-center gap-8 text-xs font-semibold text-[#1B241E]">
             <a
               href="#choose-package"
@@ -490,10 +521,7 @@ export default function App() {
               {ownerAuthenticated && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode('studio');
-                    window.history.replaceState({}, '', '/owner');
-                  }}
+                  onClick={() => void returnToStudio()}
                   className="px-3.5 py-2 rounded-lg text-xs font-bold text-[#1B241E] bg-[#E6CBA8] hover:bg-[#DFBE94] transition-colors whitespace-nowrap cursor-pointer"
                 >
                   ← Back to Owner Studio
@@ -529,7 +557,7 @@ export default function App() {
                 ) : (
                   <>
                     <Share2 className="w-3.5 h-3.5 text-[#EED6B5]" />
-                    <span>Share Quote</span>
+                    <span>{customerQuoteRecord?.workOrder ? 'Share' : 'Share Quote'}</span>
                   </>
                 )}
               </button>
@@ -612,13 +640,14 @@ export default function App() {
             status={customerQuoteRecord.status}
             draft={customerQuoteRecord.draft}
             snapshot={customerQuoteRecord.snapshot}
-            catalogue={catalogue}
+            catalogue={customerCatalogue || catalogue}
             approvedDiscountRupees={customerQuoteRecord.approvedDiscountRupees}
             verifiedPaidRupees={customerVerifiedPaid}
             pendingPaymentsCount={customerPendingCount}
             defaultSentPackage={customerQuoteRecord.defaultSentPackage}
             initialSelection={customerQuoteRecord.lastCustomerSelection}
             existingFeedback={customerQuoteRecord.customerFeedback}
+            workOrder={customerQuoteRecord.workOrder}
             onSaveSelection={handleSaveSelection}
             onUpdateQuoteDraft={({draft, defaultSentPackage}) =>
               handleUpdateQuoteDraft(customerQuoteRecord.publicId, draft, defaultSentPackage)
@@ -632,40 +661,27 @@ export default function App() {
         {mode === 'studio' && ownerAuthenticated && settingsOpen && (
           <Suspense fallback={<ViewLoading>Opening settings…</ViewLoading>}><BusinessSettings
             company={catalogue.company}
+            catalogue={catalogue}
+            onSaveCatalogue={handleUpdateCatalogue}
             ownerUsername={ownerUsername}
             onSaveCompany={handleSaveCompany}
             onSaveCredentials={handleCredentialChange}
             onClose={() => { setSettingsOpen(false); requestAnimationFrame(() => document.getElementById('studio-settings-trigger')?.focus()); }}
           /></Suspense>
         )}
-        {mode === 'studio' && ownerAuthenticated && (
-          <div hidden={settingsOpen}><Suspense fallback={<ViewLoading>Opening your studio…</ViewLoading>}><OwnerStudioView
+        {ownerAuthenticated && ownerStudioLoaded && (
+          <div hidden={mode !== 'studio' || settingsOpen}><Suspense fallback={<ViewLoading>Opening your studio…</ViewLoading>}><OwnerStudioView
             catalogue={catalogue}
             quotes={quotes}
             ledger={ledger}
-            onOpenCustomerQuote={(pid) => {
-              const found = quotes.find((q) => q.publicId === pid);
-              if (found) {
-                const vPaid = ledger
-                  .filter((p) => p.publicId === pid && p.status === 'Verified Paid')
-                  .reduce((s, p) => s + p.amountRupees, 0);
-                const pCount = ledger.filter(
-                  (p) => p.publicId === pid && p.status === 'Payment submitted'
-                ).length;
-                setCustomerQuoteRecord(found);
-                setCustomerVerifiedPaid(vPaid);
-                setCustomerPendingCount(pCount);
-                setMode('customer_quote');
-                window.history.replaceState({}, '', `/q/${pid}`);
-              } else {
-                fetchSingleCustomerQuote(pid);
-              }
-            }}
+            onOpenCustomerQuote={(pid) => void fetchSingleCustomerQuote(pid)}
             onPublishDraft={handlePublishDraft}
+            onSaveOwnerDraft={handleSaveOwnerDraft}
             onUpdateDefaultPackage={handleUpdateDefaultPackage}
             onUpdateQuoteDraft={handleUpdateQuoteDraft}
             onUpdateCatalogue={handleUpdateCatalogue}
             onVerifyOrRejectPayment={handleVerifyOrRejectPayment}
+            onRecordVerifiedPayment={handleRecordVerifiedPayment}
           /></Suspense></div>
         )}
       </main>

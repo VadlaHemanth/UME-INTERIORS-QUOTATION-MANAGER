@@ -14,7 +14,7 @@ test('assistant instructions use current edited rates and keep the example behin
   const catalogue = structuredClone(DEFAULT_UME_CATALOGUE);
   catalogue.workTypes['Box type'].rates.Base.Standard = 987;
   const instructions = buildDynamicGemInstructions(catalogue);
-  assert.match(instructions, /work_type "Box type"; unit "sq_ft"; Standard \(Base\) 987,/);
+  assert.match(instructions, /work_type "Box type"; unit "sq_ft"; Basic \(Base\) 987,/);
   assert.match(instructions, /signs in at \/owner/);
   assert.match(instructions, /not a live sync/);
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
@@ -26,18 +26,21 @@ test('assistant instructions use current edited rates and keep the example behin
 });
 
 
-test('assistant output includes catalogue PVC scope, real-job status and JSON recommendations in one copyable block', () => {
+test('assistant output keeps per-item PVC internal and requires tailored JSON recommendations in one copyable block', () => {
   const catalogue = structuredClone(DEFAULT_UME_CATALOGUE);
   catalogue.workTypes['Box type'].pvcDefaultParts = ['Owner-approved wall-contact back panel'];
   const instructions = buildDynamicGemInstructions(catalogue);
   assert.match(instructions, /ALWAYS use COPY-AND-PASTE FORMAT/);
   assert.match(instructions, /ONE fenced json code block/);
   assert.match(instructions, /Always include suggested_addons/);
+  assert.match(instructions, /AUTOMATIC SITE PROTECTION/);
+  assert.match(instructions, /do not include a pvc object/i);
+  assert.match(instructions, /quote\.show_recommended_package: false/);
   assert.match(instructions, /Never default an ordinary customer job to true/);
-  for (const definition of Object.values(catalogue.workTypes)) assert.ok(instructions.includes(JSON.stringify(definition.pvcDefaultParts)));
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
   assert.equal(example.is_demo, false);
-  assert.deepEqual(example.rooms[0].items[0].pvc.parts, catalogue.workTypes['Box type'].pvcDefaultParts);
+  assert.equal('pvc' in example.rooms[0].items[0], false);
+  assert.equal('pvc' in example.suggested_addons![0].item, false);
   assert.ok(example.suggested_addons!.length > 0);
   example.customer = { name: 'Anita Rao', phone: '9000000000', site: 'Flat 203, Uppal, Hyderabad' };
   example.quote = { number: 'UME-2026-2040', date: '2026-11-02', valid_until: '2026-12-02' };
@@ -56,5 +59,6 @@ test('assistant instructions use the floor-plan checkbox without assuming a site
   assert.equal(example.quote.is_floor_plan_estimate, false);
   assert.equal(example.quote.estimate_basis, undefined);
   assert.equal(example.quote.estimate_note, undefined);
+  assert.equal(example.quote.show_recommended_package, false);
   assert.equal(validateQuotationDraftV2(example).validForDraft, true);
 });

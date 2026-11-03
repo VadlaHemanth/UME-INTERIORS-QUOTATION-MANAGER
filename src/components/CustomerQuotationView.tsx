@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { sharePaymentImage } from '../lib/payment-image-share';
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
 import {
@@ -49,8 +50,15 @@ import { DeterministicQrCode } from './BrandMark';
 import { printQuotation } from '../lib/print-quotation';
 import { PrintableA4Sheet } from './PrintableA4Sheet';
 import './customer-quotation.css';
+import { materialLines, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import type { FinalizedWorkOrder } from '../lib/quote-workflow';
+import { WorkOrderView } from './WorkOrderView';
+import { PlywoodSpecifications } from './PlywoodSpecifications';
 
 interface CustomerQuotationViewProps {
+  isPreview?: boolean;
+  initialPrintPreview?: boolean;
+  workOrder?: FinalizedWorkOrder;
   publicId: string;
   revision: number;
   isOwner?: boolean;
@@ -110,11 +118,12 @@ function parseUrlPackageParam(
   if (!rawPkg) return null;
 
   const lower = rawPkg.toLowerCase();
-  if (!/(premium|normal|standard|base)/.test(lower)) return null;
+  if (!/(premium|normal|standard|base|basic)/.test(lower)) return null;
+  const packageToken = lower.match(/premium|normal|standard|base|basic/)?.[0];
   const grade: PlywoodGrade =
-    lower.includes('premium')
+    packageToken === 'premium'
       ? 'Premium'
-      : lower.includes('normal')
+      : packageToken === 'normal' || packageToken === 'standard'
       ? 'Normal'
       : 'Base';
 
@@ -139,6 +148,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   publicId,
   revision,
   isOwner = false,
+  isPreview = false,
+  initialPrintPreview = false,
+  workOrder,
   supersededByPublicId,
   draft,
   snapshot,
@@ -153,6 +165,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   onSubmitPayment,
   onSwitchQuote,
 }) => {
+  useEffect(() => {
+    const previousTitle = document.title;
+    document.title = `${workOrder ? 'Work order' : 'Quotation'} - ${draft.quote.number || 'Unpublished preview'}`;
+    return () => { document.title = previousTitle; };
+  }, [draft.quote.number, Boolean(workOrder)]);
   const resolvedStartingSelection = useMemo((): ResolvedPackageSelection => {
     if (initialSelection.savedByCustomer) {
       return initialSelection.wholeHomeSelection;
@@ -223,7 +240,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const [activeBreakdownRoomIdx, setActiveBreakdownRoomIdx] = useState<number | 'ALL'>(0);
 
   // View mode: Interactive vs Printable A4 PDF Sheet
-  const [showPrintSheet, setShowPrintSheet] = useState<boolean>(false);
+  const [showPrintSheet, setShowPrintSheet] = useState<boolean>(initialPrintPreview);
   useEffect(() => {
     if (showPrintSheet || !selectionActionsRef.current || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(([entry]) => setEndActionsVisible(entry.isIntersecting), {
@@ -233,9 +250,10 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     return () => observer.disconnect();
   }, [showPrintSheet]);
   useEffect(() => {
-    const prepare = () => setShowPrintSheet(true);
+    const prepare = () => flushSync(() => setShowPrintSheet(true));
     window.addEventListener('ume:prepare-print', prepare);
-    return () => window.removeEventListener('ume:prepare-print', prepare);
+    window.addEventListener('beforeprint', prepare);
+    return () => { window.removeEventListener('ume:prepare-print', prepare); window.removeEventListener('beforeprint', prepare); };
   }, []);
 
   // Payment screenshot sharing
@@ -364,7 +382,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const paymentAmountIsValid = Number.isFinite(paymentAmount) && paymentAmount > 0;
   const upiAmountWithinLimit = paymentAmountIsValid && Number.isFinite(upiLimit) && upiLimit > 0 && paymentAmount <= upiLimit;
   const upiId = catalogue.company.bank.upiId.trim();
-  const canPayWithUpi = !milestones.requiresOwnerSmallOrderRule && upiAmountWithinLimit && Boolean(upiId);
+  const canPayWithUpi = !isPreview && !milestones.requiresOwnerSmallOrderRule && upiAmountWithinLimit && Boolean(upiId);
   const upiPaymentUrl = canPayWithUpi ? `upi://pay?${new URLSearchParams({
     pa: upiId,
     pn: catalogue.company.bank.accountName,
@@ -468,6 +486,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   };
 
   const handleCustomerFinalSave = async (): Promise<boolean> => {
+    if (isPreview) { setSaveToastMessage('Preview updated locally. Publish the quotation to enable customer saving.'); return true; }
     if (selectionSaveInFlight.current || submittingPayment) return false;
     selectionSaveInFlight.current = true;
     setSavingPackage(true);
@@ -549,6 +568,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPreview) { setPaymentFeedback({type:'error',message:'This is a preview. Publish the quotation before requesting payment.'}); return; }
     setPaymentFeedback(null);
     if (submittingPayment) return;
     if (!paymentImage) {
@@ -596,6 +616,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPreview) { setFeedbackStatus({ok:false,message:'This is an unpublished preview. Customer requests become available after publication.'}); return; }
     setFeedbackStatus(null);
     if (!feedbackMessage.trim()) {
       setFeedbackStatus({
@@ -645,6 +666,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     : `${activePackageDisplayName} Package${
         wholeHomeSelection.protection === 'With PVC' ? ' (+6mm PVC Shield)' : ''
       }`;
+  // The owner may guide the customer to one package, but the customer's live
+  // selection is always the only card that receives the selected treatment.
+  const ownerRecommendedGrade = draft.quote.show_recommended_package
+    ? (defaultSentPackage?.grade || draft.recommended?.grade || null)
+    : null;
 
   const displayedBreakdownRooms = useMemo(() => {
     if (activeBreakdownRoomIdx === 'ALL') {
@@ -671,7 +697,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
       : `Topic: ${feedbackTopic} — Please call/message me to discuss minor changes in my quotation.`;
     const text = [
       `Hello ${catalogue.company.proprietor} (${catalogue.company.brandName}),`,
-      `Quotation Ref: ${draft.quote.number} (Rev 0${revision})`,
+      `Quotation Ref: ${draft.quote.number}`,
       `Client: ${draft.customer.name} (${draft.customer.site})`,
       `Selected Package: ${activePackageSummaryText}`,
       `Estimated Total: ${formatINR(calc.grandTotal)}`,
@@ -692,6 +718,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     feedbackMessage,
   ]);
 
+  if (workOrder) return <WorkOrderView publicId={publicId} revision={revision} draft={draft} snapshot={snapshot} catalogue={catalogue} approvedDiscountRupees={approvedDiscountRupees} verifiedPaidRupees={verifiedPaidRupees} workOrder={workOrder}/>;
+
   return (
     <div className="customer-quotation min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16">
       {/* Screen-only Action Bar when viewing Print Preview */}
@@ -701,8 +729,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
             <div className="flex items-center gap-2 text-[13px]">
               <FileText className="w-4 h-4 text-[#E6CBA8]" />
               <span>
-                Viewing Printable A4 Quotation PDF ({draft.quote.number} · Rev{' '}
-                {String(revision).padStart(2, '0')})
+                Quotation PDF · {draft.quote.number}
               </span>
             </div>
             <div className="flex items-center gap-2.5">
@@ -727,7 +754,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
       )}
 
       {/* Superseded Revision Notice */}
-      {supersededByPublicId && (
+      {isOwner && supersededByPublicId && (
         <div className="bg-[#FFFBEB] border-b border-[#D97706] px-4 py-3 no-print">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-[13px] text-[#92400E]">
             <span>
@@ -747,8 +774,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
       )}
 
       {/* Printable A4 Sheet (Always rendered for @media print, or on screen when toggled) */}
-      <div className={`quotation-print-shell ${showPrintSheet ? 'block py-8 px-4' : 'hidden print:block'}`}>
+      {showPrintSheet && <div className="quotation-print-shell block py-8 px-4">
         <PrintableA4Sheet
+          isPreview={isPreview}
           publicId={publicId}
           revision={revision}
           draft={draft}
@@ -762,7 +790,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
           verifiedPaidRupees={verifiedPaidRupees}
           onReturnToInteractiveSelector={() => setShowPrintSheet(false)}
         />
-      </div>
+      </div>}
 
       {/* INTERACTIVE CUSTOMER QUOTATION STUDIO */}
       {!showPrintSheet && (
@@ -777,8 +805,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
               <div className="space-y-2 max-w-3xl">
                 <div className="quote-reference flex flex-wrap items-center gap-2 text-[13px] font-bold text-[#1C3A2F]">
                   <span className="font-sans">{draft.quote.number || 'Quotation'}</span>
-                  <span>·</span>
-                  <span>Revision {String(revision).padStart(2, '0')}</span>
+                  {isOwner && <span>· Revision {revision}</span>}
                   {savedByCustomer && !hasUnsavedChanges && (
                     <span className="quote-saved-status">
                       <CheckCircle2 size={14} aria-hidden="true" /> Selection saved
@@ -832,12 +859,13 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
             </div>
 
             {estimateNote && (
-              <div className="quote-estimate-note" role="note">
-                <FileText size={18} aria-hidden="true" />
-                <p>{estimateBasisLabel && <strong>{estimateBasisLabel}. </strong>}{estimateNote}</p>
-              </div>
+              <details className="quote-estimate-disclosure">
+                <summary><FileText size={18} aria-hidden="true"/><span><strong>{estimateBasisLabel || 'Quotation note'}</strong><small>{draft.quote.is_floor_plan_estimate === true || draft.quote.estimate_basis === 'floor_plan' ? 'Prices and quantities may change after the site visit. View details.' : 'View the full quotation note.'}</small></span><ChevronDown size={16} aria-hidden="true"/></summary>
+                <p>{estimateNote}</p>
+              </details>
             )}
 
+            <p className="text-[13px] font-semibold">Prices include materials and labour for the listed scope.</p>
             {/* Choose Your Package (Shown ONCE right here in the Hero Section) */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -854,10 +882,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="package-choice-grid grid grid-cols-1 xl:grid-cols-3 gap-4">
                 {ALL_GRADES.map((g) => {
                   const dispName = getPackageDisplayName(g);
                   const isActive = !mixByRoom && wholeHomeSelection.grade === g;
+                  const isOwnerRecommended = ownerRecommendedGrade === g;
                   const amt = sideBySideWholeHomeTotals[g];
                   const gInfo = catalogue.grades[g];
 
@@ -878,6 +907,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       className={`package-choice p-4 rounded-2xl border text-left flex items-center gap-4 cursor-pointer ${
                         isActive
                           ? 'bg-[#1C3A2F] text-white border-2 border-[#1C3A2F]'
+                          : isOwnerRecommended
+                          ? 'bg-[#FFFCF6] hover:bg-white text-[#18221D] border-[#B69258]'
                           : 'bg-[#FAF8F4] hover:bg-white text-[#18221D] border-[#D8CEBC]'
                       }`}
                     >
@@ -897,22 +928,33 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span
-                            className={`package-choice-title text-sm font-bold ${
+                            className={`package-choice-title text-sm font-bold shrink-0 ${
                               isActive ? 'text-[#E6CBA8]' : 'text-[#18221D]'
                             }`}
                           >
                             {dispName} Package
                           </span>
-                          <span
-                            className={`w-5 h-5 rounded-full inline-flex items-center justify-center shrink-0 ${
-                              isActive
-                                ? 'bg-[#E6CBA8] text-[#142920]'
-                                : 'border border-[#B8B0A0] bg-white'
-                            }`}
-                          >
-                            {isActive && <Check className="w-3.5 h-3.5" />}
+                          <span className="inline-flex items-center gap-1.5 shrink-0">
+                            {isOwnerRecommended && (
+                              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                                isActive
+                                  ? 'bg-[#E6CBA8] text-[#142920]'
+                                  : 'bg-[#F0E3C8] text-[#76541C]'
+                              }`}>
+                                Recommended
+                              </span>
+                            )}
+                            <span
+                              className={`w-5 h-5 rounded-full inline-flex items-center justify-center ${
+                                isActive
+                                  ? 'bg-[#E6CBA8] text-[#142920]'
+                                  : 'border border-[#B8B0A0] bg-white'
+                              }`}
+                            >
+                              {isActive && <Check className="w-3.5 h-3.5" />}
+                            </span>
                           </span>
                         </div>
 
@@ -945,6 +987,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 })}
               </div>
             </div>
+            <PlywoodSpecifications catalogue={catalogue} grades={ALL_GRADES}/>
           </section>
 
           {selectionSaveError && (
@@ -986,7 +1029,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       Tailor each room
                     </h2>
                     <p className="text-[13px] text-[#5C645F] mt-0.5">
-                      Compare <strong>Standard</strong>, <strong>Normal</strong> and{' '}
+                      Compare <strong>Basic</strong>, <strong>Standard</strong> and{' '}
                       <strong>Premium</strong>. Choose a package and optional <strong>6 mm PVC</strong> protection for each room.
                     </p>
                   </div>
@@ -1016,12 +1059,12 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                           Room Package & +PVC Add-On
                         </th>
                         <th className="py-3 px-3 text-right font-semibold whitespace-nowrap">
-                          Standard
+                          Basic
                         </th>
                         <th className="py-3 px-3 text-right font-semibold whitespace-nowrap">
-                          Normal
+                          Standard
                         </th>
-                        <th className="py-3 px-3.5 text-right font-semibold text-[#E6CBA8] whitespace-nowrap">
+                        <th className="py-3 px-3.5 text-right font-semibold whitespace-nowrap">
                           Premium (BWP)
                         </th>
                       </tr>
@@ -1123,7 +1166,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 }
                                 disabled={selectionIsBusy}
                                 aria-pressed={rSel.grade === 'Base'}
-                                aria-label={`Select Standard package for ${room.name}`}
+                                aria-label={`Select Basic package for ${room.name}`}
                                 className={`px-2.5 py-1 rounded-md text-[13px] transition-colors cursor-pointer ${
                                   rSel.grade === 'Base'
                                     ? 'bg-[#1C3A2F] text-white font-bold'
@@ -1143,7 +1186,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 }
                                 disabled={selectionIsBusy}
                                 aria-pressed={rSel.grade === 'Normal'}
-                                aria-label={`Select Normal package for ${room.name}`}
+                                aria-label={`Select Standard package for ${room.name}`}
                                 className={`px-2.5 py-1 rounded-md text-[13px] transition-colors cursor-pointer ${
                                   rSel.grade === 'Normal'
                                     ? 'bg-[#1C3A2F] text-white font-bold'
@@ -1418,14 +1461,14 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                     rSel.grade === 'Base' ? 'bg-[#E4EFE7] text-[#1C3A2F]' : ''
                                   }`}
                                 >
-                                  Standard
+                                  Basic
                                 </th>
                                 <th
                                   className={`py-3 px-2.5 text-right font-bold whitespace-nowrap ${
                                     rSel.grade === 'Normal' ? 'bg-[#E4EFE7] text-[#1C3A2F]' : ''
                                   }`}
                                 >
-                                  Normal
+                                  Standard
                                 </th>
                                 <th
                                   className={`py-3 px-3 text-right font-bold whitespace-nowrap ${
@@ -1516,11 +1559,6 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                             <p className="text-[13px] text-[#5C645F] mt-0.5 leading-relaxed">
                                               {cleanDescription}
                                             </p>
-                                            {item.pvcEligible && rSel.protection === 'With PVC' && (
-                                              <p className="text-[11px] font-semibold text-[#1C3A2F] mt-1">
-                                                6mm PVC board at contact areas: {item.pvcParts.join(', ')}
-                                              </p>
-                                            )}
                                           </>
                                         )}
                                       </td>
@@ -1614,7 +1652,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                               {/* Room Totals Row for all 3 Packages */}
                               <tr className="bg-[#FAF8F4] font-bold text-[13px] border-t border-[#D8CEBC]">
                                 <td className="py-2.5 px-4 text-[#18221D]" colSpan={3}>
-                                  {room.name} Total (Standard vs Normal vs Premium)
+                                  {room.name} total (Basic, Standard and Premium)
                                 </td>
                                 <td className="py-2.5 px-2.5 text-right font-sans tabular-nums text-[#4A524D]">
                                   {formatINR(stdRoomTotal)}
@@ -1663,7 +1701,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   </div>
                 </div>
 
-                {/* OPTIONAL 6MM PVC BOARD ON THE RIGHT SIDE (Validated Factual Scope) */}
+                {/* Optional package-level PVC protection. Individual scope is automatic. */}
                 <div className="p-3.5 rounded-xl bg-white/10 border border-white/20 text-[13px] space-y-1.5">
                   <label className="flex items-start gap-2.5 cursor-pointer">
                     <input
@@ -1678,17 +1716,17 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="font-bold text-white">
-                          Add 6 mm PVC to all rooms
+                          Add 6 mm PVC protection to all rooms
                         </span>
                         <span className="px-1.5 py-0.5 bg-white/15 text-white/90 rounded text-[9px] font-bold uppercase">
                           Optional
                         </span>
                       </div>
                       <p className="text-[11px] text-white/85 leading-snug">
-                        6mm PVC board at the wall, slab, and floor contact areas specified in your scope. The quoted add-on applies only to eligible units.
+                        Applied automatically to the appropriate work in your selected rooms.
                       </p>
                       <p className="text-[11px] font-sans font-bold text-[#E6CBA8]">
-                        +{formatINR(wholeHomePvcDeltaRupees)} ({snapshot.pvcSummary.eligibleItemCount} eligible units)
+                        +{formatINR(wholeHomePvcDeltaRupees)} for your selected scope
                       </p>
                     </div>
                   </label>
@@ -2061,7 +2099,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       <button type="button" className="customer-action customer-action-primary" disabled>Pay with UPI</button>
                     )}
                     <p className="payment-field-help">
-                      {milestones.requiresOwnerSmallOrderRule ? 'Contact UME to confirm the booking arrangement before paying.'
+                      {isPreview ? 'Payment actions become available after publication.' : milestones.requiresOwnerSmallOrderRule ? 'Contact UME to confirm the booking arrangement before paying.'
                         : !paymentAmountIsValid ? 'Enter a payment amount to open your UPI app.'
                         : !upiAmountWithinLimit ? `This amount exceeds the ${formatINR(upiLimit)} UPI limit. Select a bank transfer instead.`
                         : !upiId ? 'UPI is unavailable. Please use the bank details below.'
@@ -2195,8 +2233,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
               <div className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl text-[#18221D] leading-relaxed">
                 <strong>Laminate Thickness & Finish Note:</strong> All internal balancing/liner laminate is industry-standard <strong>0.8 mm</strong> category (actual factory sheet gauge ranges from <strong>0.72 mm to 0.80 mm</strong> as per standard ISI/market tolerance). All visible outside laminate is <strong>1.0 mm</strong> thickness in the customer’s chosen finish (SF Matte or High-Gloss at the same price).
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px] text-[#5C645F]">
-                {catalogue.termsAndConditions.slice(0, 6).map((t) => (
+              <ul className="quotation-notes-list">{[...materialLines(catalogue,ALL_GRADES),...scopeNotes(catalogue,ALL_GRADES),...quotationCustomerNotes(draft)].map((note,index) => <li key={index}>{note}</li>)}</ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] text-[#4A524D]">
+                {catalogue.termsAndConditions.map((t) => (
                   <div key={t.id} className="leading-snug">
                     <strong className="text-[#18221D]">
                       {t.id}. {t.title}:

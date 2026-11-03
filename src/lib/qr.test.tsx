@@ -92,6 +92,14 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
     assert.equal(url.searchParams.get('tn'), 'Booking UME-TEST-EDITED-BANK');
     assert.notEqual(url.searchParams.get('pa'), DEFAULT_UME_CATALOGUE.company.bank.upiId);
     assert.notEqual(url.searchParams.get('pn'), DEFAULT_UME_CATALOGUE.company.bank.accountName);
+    const preview = renderToStaticMarkup(<PrintableA4Sheet
+      isPreview publicId="preview" revision={1} draft={draft} snapshot={snapshot} catalogue={catalogue}
+      wholeHomeSelection={{grade:'Base',protection:'Standard',finish:'SF',brand_preference:null}}
+      mixByRoom={false} roomSelections={{}} selectedOptionalPointers={[]} approvedDiscountRupees={0} verifiedPaidRupees={0}
+    />);
+    assert.doesNotMatch(preview,/aria-label="UPI booking"/);
+    assert.doesNotMatch(preview,/aria-label="Online quotation"/);
+    assert.match(preview,/Unpublished preview/);
   } finally {
     stylesheetHook.deregister();
   }

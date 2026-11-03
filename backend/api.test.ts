@@ -157,6 +157,7 @@ test('every public quote response excludes owner notes, raw rate edits, history 
     assert.deepEqual(payload.quote.draft.needs_clarification, []);
     assert.equal('rate_card_updates' in payload.quote.draft, false);
     assert.equal('custom_rates' in payload.quote.draft.rooms[0].items[0], false);
+    assert.equal('pvc' in payload.quote.draft.rooms[0].items[0], false);
     assert.equal('selectionHistory' in payload.quote, false);
     assert.equal('viewsCount' in payload.quote, false);
     assert.equal('lastViewedAt' in payload.quote, false);
@@ -189,6 +190,7 @@ test('owner publication, customer save and immutable revision work through the s
   assert.equal(published.status,201);
   const first = (await published.json() as any).record;
   assert.ok(first.publicId.startsWith('ume'));
+  assert.equal('pvc' in first.draft.rooms[0].items[0], false);
   const snapshot = structuredClone(first.snapshot);
   const selected = await handleApi(request(`/api/quotes/${first.publicId}/selection`,'PATCH', {
     wholeHomeSelection: defaultSentPackage, mixByRoom:true,
@@ -206,11 +208,82 @@ test('owner publication, customer save and immutable revision work through the s
   assert.notEqual(second.publicId,first.publicId);
   const original = await handleApi(request(`/api/quotes/${first.publicId}`),store,environment);
   const originalData = await original.json() as any;
-  assert.deepEqual(originalData.quote.snapshot,snapshot);
-  assert.equal(originalData.quote.supersededByPublicId,second.publicId);
+  assert.equal(originalData.quote.publicId,second.publicId,'an existing customer link opens the latest revision');
+  const historical = (await store.load()).state.quotes.find(q=>q.publicId===first.publicId)!;
+  assert.deepEqual(historical.snapshot,snapshot,'the previous owner revision remains immutable');
+  assert.equal(historical.supersededByPublicId,second.publicId);
   const changed = await handleApi(request(`/api/studio/quotes/${second.publicId}/default-package`,'PATCH',{defaultSentPackage:{...defaultSentPackage,grade:'Normal'}},cookie),store,environment);
   assert.equal(changed.status,200);
   assert.equal((await changed.json() as any).quote.defaultSentPackage.grade,'Normal');
+});
+
+test('saved drafts stay private, new metadata is generated and draft publication starts at revision one',async()=>{
+  const store=memoryStore();
+  const login=await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment);
+  const cookie=cookieFrom(login);
+  const draft=structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
+  draft.quote={number:null,date:null,valid_until:null,notes:['Materials and labour are included in the itemised scope.'],show_recommended_package:true};
+  const saved=await handleApi(request('/api/studio/drafts','POST',{draft},cookie),store,environment);
+  assert.equal(saved.status,200);
+  const record=(await saved.json() as any).record;
+  assert.equal(record.status,'Draft');assert.equal(record.revision,0);assert.match(record.draft.quote.number,/^UME-\d{2}-\d{4}$/);assert.match(record.draft.quote.date,/^\d{4}-\d{2}-\d{2}$/);
+  assert.equal((await handleApi(request(`/api/quotes/${record.publicId}`),store,environment)).status,404);
+  assert.equal((await handleApi(request(`/api/quotes/${record.publicId}/selection`,'PATCH',{}),store,environment)).status,404);
+  const published=await handleApi(request('/api/studio/publish','POST',{draft:record.draft,supersedePublicId:record.publicId,reviewedOwnerRequests:true},cookie),store,environment);
+  assert.equal(published.status,201);
+  const final=(await published.json() as any).record;
+  assert.equal(final.revision,1);assert.equal(final.draft.quote.number,record.draft.quote.number);
+  const visible=await handleApi(request(`/api/quotes/${record.publicId}`),store,environment);
+  const data=await visible.json() as any;
+  assert.equal(data.quote.publicId,final.publicId);assert.equal(data.quote.draft.quote.show_recommended_package,true);
+  assert.deepEqual(data.quote.draft.quote.notes,['Materials and labour are included in the itemised scope.']);
+  assert.equal('pvcEligible' in data.quote.snapshot.rooms[0].items[0],false);
+});
+
+test('saved rate-card edits price the next revision, preserve the previous snapshot and do not revoke the owner session',async()=>{
+  const store=memoryStore(paymentFixture());
+  const login=await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment);
+  const cookie=cookieFrom(login);
+  const initial=(await store.load()).state;
+  const original=structuredClone(initial.quotes[0].snapshot);
+  const catalogue=structuredClone(initial.catalogue);
+  catalogue.workTypes['Box type'].rates.Premium={Standard:1500,'With PVC':1575};
+  catalogue.grades.Premium.allowances!.handleRupees=275;
+  assert.equal((await handleApi(request('/api/studio/catalogue','PUT',catalogue,cookie),store,environment)).status,200);
+  assert.equal((await handleApi(request('/api/studio/session','GET',undefined,cookie),store,environment)).status,200);
+  const published=await handleApi(request('/api/studio/publish','POST',{draft:initial.quotes[0].draft,supersedePublicId:initial.quotes[0].publicId,reviewedOwnerRequests:true},cookie),store,environment);
+  assert.equal(published.status,201);
+  const next=(await published.json() as any).record;
+  assert.equal(next.snapshot.rooms[0].items[1].unitRates.Premium__Standard__SF,1500);
+  assert.equal(next.catalogueSnapshot.grades.Premium.allowances.handleRupees,275);
+  assert.deepEqual((await store.load()).state.quotes[0].snapshot,original);
+  const latest=await handleApi(request(`/api/quotes/${initial.quotes[0].publicId}`),store,environment);
+  assert.equal((await latest.json() as any).quote.publicId,next.publicId);
+  assert.equal((await handleApi(request('/api/studio/bootstrap','GET',undefined,cookie),store,environment)).status,200);
+});
+
+test('verified booking freezes the agreed selection into a work order and credits payments across later revisions',async()=>{
+  const store=memoryStore(paymentFixture());
+  const login=await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment);
+  const cookie=cookieFrom(login);
+  const selected={grade:'Normal',protection:'With PVC',finish:'SF',brand_preference:null};
+  await handleApi(request('/api/quotes/ume-test-api/selection','PATCH',{wholeHomeSelection:selected,mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],explicitCustomerSave:true,acceptedTerms:true}),store,environment);
+  const verified=await handleApi(request('/api/studio/quotes/ume-test-api/verified-payment','POST',{amountRupees:50000,reference:'BANK-VERIFIED-0001'},cookie),store,environment);
+  assert.equal(verified.status,201);
+  const first=(await verified.json() as any).quote;
+  assert.equal(first.workOrder.selection.wholeHomeSelection.grade,'Normal');
+  assert.equal((await handleApi(request('/api/quotes/ume-test-api/selection','PATCH',{wholeHomeSelection:{...selected,grade:'Premium'}}),store,environment)).status,409);
+  const draft=structuredClone(first.draft);draft.rooms[0].items[0].measure.per_item+=1;
+  const revised=await handleApi(request('/api/studio/publish','POST',{draft,supersedePublicId:first.publicId,reviewedOwnerRequests:true},cookie),store,environment);
+  assert.equal(revised.status,201);
+  const next=(await revised.json() as any).record;
+  assert.equal(next.workOrder.selection.wholeHomeSelection.grade,'Normal');
+  assert.equal(next.revision,2);
+  const visible=await handleApi(request('/api/quotes/ume-test-api'),store,environment);
+  const data=await visible.json() as any;
+  assert.equal(data.quote.publicId,next.publicId);assert.equal(data.verifiedPaidRupees,50000);assert.ok(data.quote.workOrder);
+  assert.ok(data.quote.workOrder.totalRupees > first.workOrder.totalRupees);
+  assert.equal((await handleApi(request('/api/studio/quotes/ume-test-api/verified-payment','POST',{amountRupees:50000,reference:'BANK-VERIFIED-0001'},cookie),store,environment)).status,409);
 });
 
 

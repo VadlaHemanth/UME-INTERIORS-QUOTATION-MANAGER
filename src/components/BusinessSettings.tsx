@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Eye, EyeOff } from 'lucide-react';
 import { CompanySettings, validateCompanySettings } from '../lib/company-settings';
 import './BusinessSettings.css';
+import { MaterialSettings } from './MaterialSettings';
+import type { StudioCatalogue } from '../lib/catalogue';
 
-type Section = 'business' | 'payments' | 'account';
+type Section = 'business' | 'payments' | 'materials' | 'account';
 export type CredentialUpdate = { currentPassword: string; newUsername: string; newPassword: string };
 type Props = {
   company: CompanySettings;
@@ -12,9 +14,11 @@ type Props = {
   onSaveCompany: (company: CompanySettings) => Promise<CompanySettings>;
   onSaveCredentials: (values: CredentialUpdate) => Promise<void>;
   onClose: () => void;
+  catalogue: StudioCatalogue;
+  onSaveCatalogue: (value: StudioCatalogue) => Promise<void>;
 };
 
-export function BusinessSettings({ company, ownerUsername, initialSection = 'business', onSaveCompany, onSaveCredentials, onClose }: Props) {
+export function BusinessSettings({ company, catalogue, onSaveCatalogue, ownerUsername, initialSection = 'business', onSaveCompany, onSaveCredentials, onClose }: Props) {
   const [section, setSection] = useState<Section>(initialSection);
   const [draft, setDraft] = useState(() => structuredClone(company));
   const [saved, setSaved] = useState(() => structuredClone(company));
@@ -126,11 +130,12 @@ export function BusinessSettings({ company, ownerUsername, initialSection = 'bus
       <nav className="business-settings-nav" aria-label="Settings sections">
         <button type="button" aria-current={section === 'business' ? 'page' : undefined} onClick={() => setSection('business')}>Business</button>
         <button type="button" aria-current={section === 'payments' ? 'page' : undefined} onClick={() => setSection('payments')}>Payment details</button>
+        <button type="button" aria-current={section === 'materials' ? 'page' : undefined} onClick={() => setSection('materials')}>Packages & materials</button>
         <button type="button" aria-current={section === 'account' ? 'page' : undefined} onClick={() => setSection('account')}>Account</button>
         <p>Business and payment details appear on customer quotations.</p>
       </nav>
       <div className="business-settings-panel">
-        {section !== 'account' ? <form onSubmit={saveCompany} noValidate>
+        {section === 'materials' ? <MaterialSettings catalogue={catalogue} onSave={onSaveCatalogue}/> : section !== 'account' ? <form onSubmit={saveCompany} noValidate>
           <div className="business-section-heading"><h2>{section === 'business' ? 'Business details' : 'Payment details'}</h2><p>{section === 'business' ? 'Your business identity, address and customer contact details.' : 'The account and UPI ID customers use to pay for their project.'}</p></div>
           {section === 'business' ? <div className="business-fields">
             {field('brandName', 'Display business name', { autoComplete: 'organization', wide: true })}

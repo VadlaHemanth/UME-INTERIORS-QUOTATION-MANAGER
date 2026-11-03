@@ -1,8 +1,20 @@
-# Release verification — 2 November 2026
+# Release verification — 3 November 2026
+
+## Current release
+
+The regression suite passes **67/67 tests**. Added coverage verifies private draft storage, automatic metadata, latest-link resolution with immutable owner history, rate-card changes applied to the next publication, payment credits across revisions, confirmed work-order selection locks, canonical vocabulary, editable allowances, current assistant output and public removal of per-item PVC metadata. Historical pricing fixtures retain their totals.
+
+Production-bundle browser verification uses a separate local database and synthetic QA customers. Customer and owner screens, previews, package settings, mobile consent checkboxes and work orders are checked for runtime errors and page-wide overflow. Normal, work-order and unusually long-description PDFs are generated from the same measured A4 nodes used by preview. Printed pages are checked for table grids, continuation headers, clipped content, lone totals and blank pages. No live bank transaction or physical Android WhatsApp delivery is claimed.
+
+The owner navigation keeps the editor mounted when opening a customer quote, reloads current server data on return, and isolates quotation material snapshots from the owner's reusable catalogue. The downloadable assistant instructions must match the live generator exactly; a regression test enforces this.
+
+Final Chromium checks cover 360, 390, 768 and 1440 CSS pixels. Package cards stay readable at tablet widths, without clipped prices or recommendation labels. Native print and preview both produce eight quotation pages and seven work-order pages for the test fixture; the long-content fixture produces eleven pages. Every physical page contains one letterhead and nonempty content. Confirmed work orders use agreed-scope wording rather than a preliminary-estimate notice. The final design inspector reported zero failures; retained warnings concern the approved ivory identity, selection borders and long-form report density.
+
+## Earlier verification record (2 November)
 
 ## Automated verification
 
-The latest full regression run passed **59/59 tests**, including owner publication, customer saving and immutable revisions.
+The earlier regression run passed **59/59 tests**, including owner publication, customer saving and immutable revisions.
 
 Pricing/import/review gates, current assistant instruction snapshot, actual rendered payment/link QR scan decoding, sessions and credential changes, owner API access, full-phone lookup, public payload minimization, payment validation, and real SQLite optimistic-transaction checks pass. Add-on tests verify that recommendations do not affect base pricing, accepted work remains optional, missing confirmed details block publication, and malformed/duplicate suggestions are rejected.
 

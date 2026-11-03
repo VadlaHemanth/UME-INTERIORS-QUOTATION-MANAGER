@@ -37,6 +37,10 @@ export interface QuoteMeta {
   number: string | null;
   date: string | null;
   valid_until: string | null;
+  /** Approved quotation-specific notes shown in the online document and PDF. */
+  notes?: string[];
+  /** Owner-controlled customer-facing badge for the selected default package. */
+  show_recommended_package?: boolean;
   /** Preferred flag for the standard floor-plan preliminary estimate notice. */
   is_floor_plan_estimate?: boolean;
   /** Legacy import fields retained for existing quotations and JSON. */
@@ -67,7 +71,12 @@ export interface DraftItem {
   size_text: string | null;
   measure: ItemMeasure;
   quantity: number | null;
-  pvc: ItemPVC;
+  /**
+   * Legacy import metadata only. New assistant JSON and published quotations
+   * omit this field: the applicable contact-area protection is determined by
+   * the selected work type in the rate card, not by a per-item checkbox.
+   */
+  pvc?: ItemPVC;
   optional: boolean | null;
   source_text_en: string;
   custom_rates?: ItemCustomRates | null;
@@ -359,6 +368,22 @@ export function validateQuotationDraftV2(
 
   // Quote meta checks
   if (d.quote) {
+    if (d.quote.notes !== undefined) {
+      if (!Array.isArray(d.quote.notes) || d.quote.notes.length > 30 || d.quote.notes.some(note => typeof note !== 'string' || note.length > 3000)) {
+        issues.push({path:'/quote/notes',severity:'error',code:'SCHEMA_MISMATCH',message:'Quotation notes must be a list of up to 30 English notes, each within 3,000 characters.'});
+      } else d.quote.notes.forEach((note,index) => checkStringField(note, `/quote/notes/${index}`, false));
+    }
+    if (
+      d.quote.show_recommended_package !== undefined &&
+      typeof d.quote.show_recommended_package !== 'boolean'
+    ) {
+      issues.push({
+        path: '/quote/show_recommended_package',
+        severity: 'error',
+        code: 'SCHEMA_MISMATCH',
+        message: 'Set show_recommended_package to true or false.',
+      });
+    }
     if (d.quote.is_floor_plan_estimate !== undefined && typeof d.quote.is_floor_plan_estimate !== 'boolean') {
       issues.push({
         path: '/quote/is_floor_plan_estimate', severity: 'error', code: 'SCHEMA_MISMATCH',
@@ -493,25 +518,9 @@ export function validateQuotationDraftV2(
               message: `Confirm whether "${item.name || 'item'}" is base scope (optional=false) or an add-on (optional=true).`,
             });
           }
-          if (!item.pvc || item.pvc.eligible === null || item.pvc.eligible === undefined) {
-            issues.push({
-              path: `${iPath}/pvc/eligible`,
-              severity: 'publish_blocker',
-              code: 'MISSING_REQUIRED_FIELD',
-              message: `Confirm PVC eligibility for "${item.name || 'item'}".`,
-            });
-          } else if (item.pvc.eligible && (!Array.isArray(item.pvc.parts) || item.pvc.parts.length === 0)) {
-            issues.push({
-              path: `${iPath}/pvc/parts`,
-              severity: 'publish_blocker',
-              code: 'MISSING_REQUIRED_FIELD',
-              message: `Item "${item.name || 'item'}" is marked PVC-eligible; list the confirmed wall-contact or wet-area parts.`,
-            });
-          } else if (Array.isArray(item.pvc.parts)) {
-            item.pvc.parts.forEach((p, pIdx) => {
-              checkStringField(p, `${iPath}/pvc/parts/${pIdx}`, true);
-            });
-          }
+          // `pvc` was a legacy per-item entry. It is intentionally ignored on
+          // import: applicable protection now comes from the work-type rate
+          // card, so an old PVC field can never block a quotation.
         });
       }
     });
@@ -602,10 +611,6 @@ export function migrateV1ToV2Draft(raw: Record<string, any>): QuotationDraftV2 {
                 per_item: typeof it.measure?.per_item === 'number' ? it.measure.per_item : it.area_sqft ?? null,
               },
               quantity: typeof it.quantity === 'number' ? it.quantity : 1,
-              pvc: {
-                eligible: typeof it.pvc?.eligible === 'boolean' ? it.pvc.eligible : Boolean(it.pvc_eligible),
-                parts: Array.isArray(it.pvc?.parts) ? it.pvc.parts.map((p: any) => translateRomanTokens(String(p))) : [],
-              },
               optional: typeof it.optional === 'boolean' ? it.optional : false,
               source_text_en: translateRomanTokens(
                 String(it.source_text_en || it.source_text || `${it.name || 'Item'} per spoken scope.`)
@@ -630,6 +635,10 @@ export function migrateV1ToV2Draft(raw: Record<string, any>): QuotationDraftV2 {
       number: raw.quote?.number ?? null,
       date: raw.quote?.date ?? null,
       valid_until: raw.quote?.valid_until ?? null,
+      ...(Array.isArray(raw.quote?.notes) ? { notes: raw.quote.notes } : {}),
+      ...(raw.quote?.show_recommended_package !== undefined
+        ? { show_recommended_package: raw.quote.show_recommended_package }
+        : {}),
       ...(raw.quote?.is_floor_plan_estimate !== undefined ? { is_floor_plan_estimate: raw.quote.is_floor_plan_estimate } : {}),
       ...(raw.quote?.estimate_basis !== undefined ? { estimate_basis: raw.quote.estimate_basis } : {}),
       ...(raw.quote?.estimate_note !== undefined ? { estimate_note: raw.quote.estimate_note } : {}),

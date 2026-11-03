@@ -1,4 +1,6 @@
 import { FinishOption, PlywoodGrade, ProtectionOption } from './schema';
+import { canonicalFurnitureName, FURNITURE_VOCABULARY } from './furniture';
+import type { PackageAllowances } from './commercial-spec';
 
 export interface WorkTypeDefinition {
   id: string;
@@ -17,7 +19,8 @@ export interface WorkTypeDefinition {
 
 export interface GradeInfo {
   grade: PlywoodGrade;
-  displayLabel: 'Standard' | 'Normal' | 'Premium';
+  displayLabel: 'Basic' | 'Standard' | 'Premium';
+  allowances?: PackageAllowances;
   tagline: string;
   warrantyBanner: string;
   termiteProofBadge: string;
@@ -133,11 +136,11 @@ export const STANDARD_DEPTH_SCHEDULE_INCHES: StandardDepthRule[] = [
 ];
 
 /**
- * Maps internal schema key ('Base' | 'Normal' | 'Premium') to Customer Display Package Name ('Standard' | 'Normal' | 'Premium')
+ * Stable storage keys map to the public Basic / Standard / Premium package names.
  */
-export function getPackageDisplayName(grade: PlywoodGrade): 'Standard' | 'Normal' | 'Premium' {
-  if (grade === 'Base') return 'Standard';
-  if (grade === 'Normal') return 'Normal';
+export function getPackageDisplayName(grade: PlywoodGrade): 'Basic' | 'Standard' | 'Premium' {
+  if (grade === 'Base') return 'Basic';
+  if (grade === 'Normal') return 'Standard';
   return 'Premium';
 }
 
@@ -228,77 +231,7 @@ export function standardizeCompetitorItemName(
   workType: string,
   roomName = ''
 ): string {
-  const trimmed = (rawName || '').trim();
-  const lower = trimmed.toLowerCase();
-  const wt = (workType || '').toLowerCase();
-
-  if (lower === 'base cabinet unit' || lower === 'base cabinet') {
-    return /kitchen/i.test(roomName) ? 'Kitchen Base Cabinet' : 'Base Cabinet';
-  }
-  if (lower === 'wall cabinet unit' || lower === 'wall cabinet') {
-    return /kitchen/i.test(roomName) ? 'Kitchen Overhead Wall Cabinet' : 'Wall Cabinet';
-  }
-  if (lower.includes('kitchen cabinet unit (opposite to base cabinet)')) {
-    return 'Cabinet Opposite Kitchen Base Cabinets';
-  }
-  if (lower === 'loft frame and shutter' || lower === 'loft') {
-    return 'Loft Frame and Shutter';
-  }
-  if (lower === 'wardrobe' && wt.includes('box')) {
-    return 'Modular Wardrobe';
-  }
-  if (lower === 'wardrobe' && wt.includes('frame')) {
-    return 'Wardrobe Frame and Shutter';
-  }
-  if (lower === 'frame type wardrobe') {
-    return 'Wardrobe Frame and Shutter';
-  }
-  if (lower === 'locker inside wardrobe') {
-    return 'Locker Inside Wardrobe';
-  }
-  if (lower === 'dressing table') {
-    return 'Dressing Table';
-  }
-  if (lower === 'folding table' || lower === 'wall-mounted folding table') {
-    return 'Wall-Mounted Folding Table';
-  }
-  if (lower === 'study table') {
-    return 'Study Table Workstation';
-  }
-  if (lower === 'wash area wardrobe') {
-    return 'Wash Area Utility Cabinet';
-  }
-  if (lower === 'mini crockery unit (above breakfast counter)') {
-    return 'Crockery Overhead Display Unit';
-  }
-  if (lower === 'breakfast counter') {
-    return 'Breakfast Counter Console';
-  }
-  if (lower === 'tv unit' || lower === 'tv unit with outside louvers') {
-    return lower.includes('louver') ? 'TV Media Console with Louvers' : 'TV Media Console';
-  }
-  if (lower === 'tandem or ss baskets with hardware fitting' || lower === 'tandem or ss baskets') {
-    return 'Tandem Drawers or Stainless-Steel Baskets';
-  }
-  if (lower === 'pooja mandir' || (lower.includes('room') && lower.includes('pooja'))) {
-    return 'Pooja Mandir Unit';
-  }
-  if (lower === 'pooja doors and glass or cnc doors with wall paneling') {
-    return 'Pooja Entrance with CNC or Glass Doors and Wall Panelling';
-  }
-  if (lower === 'wood wall paneling under loft') {
-    return 'Wall Panelling Under Loft';
-  }
-  if (lower === 'wood wall paneling (breakfast counter)') {
-    return 'Breakfast Counter Wall Panelling';
-  }
-  if (lower === 'wood wall paneling for upper pillar (above breakfast counter)') {
-    return 'Upper Pillar Wall Panelling';
-  }
-  if (lower === 'tv unit wood wall paneling with louvers (above main door)') {
-    return 'Main Door Entrance Wall Panelling with Louvers';
-  }
-  return trimmed;
+  return canonicalFurnitureName(rawName || '', workType, roomName);
 }
 
 /**
@@ -323,6 +256,8 @@ export function formatCleanItemDescription(
     .replace(/outside\s+(?:1\.?0?\s*mm\s+)?(?:High[-\s]*Gloss\s+or\s+SF|SF\s+(?:Matte\s+)?or\s+High[-\s]*Gloss)\s+laminate\s+finish/gi, 'outside laminate finish')
     .replace(/both\s+sides\s+(?:1\.?0?\s*mm\s+)?(?:High[-\s]*Gloss\s+or\s+SF|SF\s+(?:Matte\s+)?or\s+High[-\s]*Gloss)\s+laminate\s+finish/gi, 'both sides laminate finish')
     .replace(/High[-\s]*Gloss\s+or\s+SF\s+laminate\s+finish/gi, 'outside laminate finish')
+    .replace(/with\s+(?:0\.8\s*mm\s+)?inside\s+laminate\s+and\s+(?:1\.?0?\s*mm\s+)?outside\s+laminate\s+finish/gi, 'with inside and outside laminate finish')
+    .replace(/draws\b/gi, 'drawers')
     .trim();
 
   if (cleaned && !cleaned.endsWith('.')) {
@@ -373,7 +308,7 @@ export interface StudioCatalogue {
 }
 
 export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
-  version: 'ume-catalogue-2026.11.v6',
+  version: 'ume-catalogue-2026.11.v7',
   company: {
     brandName: 'UMAMAHESHWARA INTERIORS',
     legalName: 'Umamaheshwara Enterprises',
@@ -397,7 +332,8 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
   grades: {
     Base: {
       grade: 'Base',
-      displayLabel: 'Standard',
+      displayLabel: 'Basic',
+      allowances: { handleRupees: 200, laminateSheetRupees: 1500, extraDrawerRupees: 5000, includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4 },
       tagline: 'BWP 710 & 303 Grade Plywood with Laminate Finish',
       warrantyBanner: '1.0 mm external laminate and standard hardware included',
       termiteProofBadge: 'BWP 710 & Commercial 303 Grade Plywood',
@@ -441,22 +377,23 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     },
     Normal: {
       grade: 'Normal',
-      displayLabel: 'Normal',
-      tagline: 'BWR 710 / 303 Grade Plywood — 20 / 15 / 10 Yrs Brand Warranty',
-      warrantyBanner: 'Manufacturer warranty: 20, 15 or 10 years, depending on the selected product',
+      displayLabel: 'Standard',
+      allowances: { handleRupees: 200, laminateSheetRupees: 1500, extraDrawerRupees: 5000, includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4 },
+      tagline: 'BWR 710 / 303 Grade Plywood — Up to 15 Years Brand Warranty',
+      warrantyBanner: 'Up to 15 years manufacturer warranty with brand certificate, depending on the selected product',
       termiteProofBadge: 'BWR 710 & 303 Grade Plywood',
       pvcRecommendationNote:
         'Optional 6 mm PVC board at the specified wall, slab and floor contact areas. The applicable item rate is shown in the quotation.',
       plainEnglishSummary:
-        'BWR 710 and 303 grade plywood with 20 / 15 / 10 years manufacturer warranty (governed by the selected brand certificate and invoice), 0.8 mm inside liner laminate, and 1.0 mm outside laminate finish.',
+        'BWR 710 / 303 grade plywood with inside and outside laminate finish. Up to 15 years manufacturer warranty, subject to the selected product, certificate and invoice.',
       outerLaminateAllowance:
         '1.0 mm External Decorative Laminate — SF Matte or High-Gloss (Same Price, worth up to ₹1,500/sheet)',
       handleAllowance: 'Handles worth up to ₹200 each',
       approvedBrands: [
         {
-          name: 'BWR 710 Grade (20 Yrs)',
-          spec: 'BWR 710 Grade Plywood (20 Years Manufacturer Warranty)',
-          warrantyYears: 20,
+          name: 'BWR 710 Grade (15 Yrs)',
+          spec: 'BWR 710 Grade Plywood (15 Years Manufacturer Warranty)',
+          warrantyYears: 15,
           boardToneHex: '#B8865F',
           grainAccentHex: '#734526',
         },
@@ -479,16 +416,17 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     Premium: {
       grade: 'Premium',
       displayLabel: 'Premium',
+      allowances: { handleRupees: 200, laminateSheetRupees: 1500, extraDrawerRupees: 5000, includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4 },
       tagline: 'BWP 710 Marine Grade Plywood — 30 / 25 / 21 Yrs Brand Warranty',
-      warrantyBanner: 'Manufacturer warranty: 30, 25 or 21 years, depending on the selected product',
+      warrantyBanner: 'Up to 30 years manufacturer warranty with brand certificate, depending on the selected BWP product',
       termiteProofBadge: 'BWP 710 Marine Grade Plywood',
       pvcRecommendationNote:
         'Optional 6 mm PVC board at the specified wall, slab and floor contact areas. The applicable item rate is shown in the quotation.',
       plainEnglishSummary:
         'BWP 710 marine-grade plywood across listed units with 30 / 25 / 21 years manufacturer warranty (governed by the selected product certificate and invoice), 0.8 mm inside liner laminate, and 1.0 mm outside laminate finish.',
       outerLaminateAllowance:
-        '1.0 mm External Decorative Laminate — SF Matte or High-Gloss (Same Price, worth up to ₹1,500–₹1,600/sheet)',
-      handleAllowance: 'Handles worth up to ₹200–₹300 each',
+        '1.0 mm External Decorative Laminate — SF Matte or High-Gloss (Same Price, worth up to ₹1,500/sheet)',
+      handleAllowance: 'Handles worth up to ₹200 each',
       approvedBrands: [
         {
           name: 'Flaer Ply (SMART)',
@@ -547,10 +485,17 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     '1.0 mm Outside Decorative Laminate Finish (worth up to ₹1,500/sheet — Customer choice of SF or High-Gloss at same price)',
     '0.8 mm White / Fabric Inside Liner Laminate on interior faces (0.72 mm–0.80 mm standard manufacturer nominal gauge)',
     'Soft-Close Hinges & Telescopic Channels (Berlin / Ebco / Nimmi)',
-    'Handles (Worth up to ₹200/unit on Standard & Normal; up to ₹300/unit on Premium)',
+    'Handles (worth up to ₹200 each in Basic, Standard and Premium)',
     'Woodworking Adhesive (Fevicol Marine / SH / Jivanjor)',
   ],
   workTypes: {
+    'Additional internal drawer': {
+      id:'Additional internal drawer', label:'Additional Internal Drawer', unit:'each',
+      plainEnglishDefinition:'An additional internal drawer beyond the included bedroom wardrobe layout, with the approved channels and fittings.',
+      pvcDefaultEligible:false, pvcDefaultParts:[],
+      rates:{Base:{Standard:5000,'With PVC':5000},Normal:{Standard:5000,'With PVC':5000},Premium:{Standard:5000,'With PVC':5000}},
+      highGlossPremiumPerUnit:0,
+    },
     'Box type': {
       id: 'Box type',
       label: 'Full cabinet with doors',
@@ -752,7 +697,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     'Acrylic sheets, aluminium profile doors, heavy glass and custom CNC work are charged separately according to the approved selection.',
     'The 1.0 mm decorative laminate is applied to visible external surfaces.',
     'Hardware or plywood outside the listed brands or allowances is charged at the approved price difference.',
-    'Additional internal drawers beyond the agreed standard layout cost ₹5,000 each on Premium/2026 quotations. Historical quotations retain their specified ₹4,000–₹4,500 rates.',
+    'Box-type bedroom wardrobes include 2–4 internal drawers, subject to size and the approved layout. Additional internal drawers cost ₹5,000 each in all packages unless otherwise specified.',
     'Quoted prices include the materials and labour listed in the agreed scope.',
   ],
   termsAndConditions: [
@@ -823,7 +768,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       id: 10,
       title: 'Materials, alternatives and manufacturer warranties',
       clause:
-        'Materials are sourced from the selected package’s approved brand list. A product outside that list requires written customer approval before purchase. Plywood warranties depend on the selected product and its manufacturer certificate, invoice and terms: 30, 25 or 21 years for Premium; 20, 15 or 10 years for Normal.',
+        'Materials are sourced from the selected package’s approved brand list. Alternatives require written approval. Manufacturer plywood warranty is up to 15 years for Standard and up to 30 years for Premium, depending on the selected brand and product. The applicable brand warranty certificate, invoice and manufacturer terms govern coverage; this is not a blanket warranty on the entire furniture installation.',
       source: 'Owner-Approved Hyderabad Protection',
     },
   ],
@@ -909,7 +854,7 @@ export const RATECARD_EXTENSION_PRESETS: RateCardExtensionPreset[] = [
     title: '2. Curtain Pelmet, Upholstered Headboard & Extra Internal Drawer Pack',
     badge: 'running_ft · sq_ft · each',
     prompt:
-      'Rate card lo kotha items add cheyandi: 1) Curtain / AC pelmet box running ft basis Base 350, Normal 400, Premium 450. 2) Cushioned bed headboard panelling sq ft basis Base 650, Normal 750, Premium 850. 3) Additional internal drawer unit each basis Base 4000, Normal 4500, Premium 5000.',
+      'Rate card lo kotha items add cheyandi: 1) Curtain / AC pelmet box running ft basis Base 350, Normal 400, Premium 450. 2) Cushioned bed headboard panelling sq ft basis Base 650, Normal 750, Premium 850. 3) Additional internal drawer unit each basis Base 5000, Normal 5000, Premium 5000.',
     patch: {
       schema_version: 'quotation-studio.ratecard.v2',
       output_language: 'en',
@@ -953,8 +898,8 @@ export const RATECARD_EXTENSION_PRESETS: RateCardExtensionPreset[] = [
           pvcDefaultEligible: false,
           pvcDefaultParts: [],
           rates: {
-            Base: { Standard: 4000, 'With PVC': 4000 },
-            Normal: { Standard: 4500, 'With PVC': 4500 },
+            Base: { Standard: 5000, 'With PVC': 5000 },
+            Normal: { Standard: 5000, 'With PVC': 5000 },
             Premium: { Standard: 5000, 'With PVC': 5000 },
           },
           highGlossPremiumPerUnit: 0,
@@ -1256,7 +1201,9 @@ export function extractAndMergeRateCardFromDraft(
         const cr = item?.custom_rates;
         const exists = Boolean(nextCat.workTypes[wt]);
 
-        if (!exists || (cr && typeof cr === 'object')) {
+        // Item-specific prices remain on the item. They must not silently undo
+        // a later edit to a reusable rate-card entry.
+        if (!exists) {
           const unitRaw = String(item?.measure?.unit || 'sq_ft').toLowerCase();
           const unit: WorkTypeDefinition['unit'] =
             unitRaw === 'running_ft' || unitRaw === 'rft'
@@ -1274,12 +1221,16 @@ export function extractAndMergeRateCardFromDraft(
             Number(cr?.Normal ?? existingDef?.rates?.Normal?.Standard ?? 850) || 850;
           const premiumStd =
             Number(cr?.Premium ?? existingDef?.rates?.Premium?.Standard ?? 1000) || 1000;
+          const existingPvcAdder = existingDef
+            ? Math.max(
+                0,
+                existingDef.rates.Premium['With PVC'] - existingDef.rates.Premium.Standard
+              )
+            : 0;
           const pvcAdder =
             typeof cr?.pvc_adder === 'number'
               ? cr.pvc_adder
-              : item?.pvc?.eligible
-              ? 75
-              : 0;
+              : existingPvcAdder;
 
           nextCat.workTypes[wt] = {
             id: wt,
@@ -1289,13 +1240,8 @@ export function extractAndMergeRateCardFromDraft(
               existingDef?.plainEnglishDefinition ||
               item?.source_text_en ||
               `Custom residential interior work (${wt}) executed with calibrated plywood and 1mm laminate finish, billed per ${unit}.`,
-            pvcDefaultEligible: Boolean(item?.pvc?.eligible ?? pvcAdder > 0),
-            pvcDefaultParts:
-              Array.isArray(item?.pvc?.parts) && item.pvc.parts.length > 0
-                ? item.pvc.parts
-                : pvcAdder > 0
-                ? ['Back panel']
-                : [],
+            pvcDefaultEligible: existingDef?.pvcDefaultEligible ?? pvcAdder > 0,
+            pvcDefaultParts: existingDef?.pvcDefaultParts || (pvcAdder > 0 ? ['Back panel'] : []),
             rates: {
               Base: { Standard: baseStd, 'With PVC': baseStd + pvcAdder },
               Normal: { Standard: normalStd, 'With PVC': normalStd + pvcAdder },
@@ -1321,31 +1267,31 @@ export function extractAndMergeRateCardFromDraft(
  */
 export function buildDynamicGemInstructions(catalogue: StudioCatalogue = DEFAULT_UME_CATALOGUE): string {
   const workTypeLines = Object.entries(catalogue.workTypes).map(([key, wt]) =>
-    `- work_type ${JSON.stringify(key)}; unit ${JSON.stringify(wt.unit)}; Standard (Base) ${wt.rates.Base.Standard}, with PVC ${wt.rates.Base['With PVC']}; Normal ${wt.rates.Normal.Standard}, with PVC ${wt.rates.Normal['With PVC']}; Premium ${wt.rates.Premium.Standard}, with PVC ${wt.rates.Premium['With PVC']}. PVC eligible by default: ${wt.pvcDefaultEligible}. Standard PVC contact parts (pvcDefaultParts): ${JSON.stringify(wt.pvcDefaultParts)}. Display label: ${wt.label}.`
+    `- work_type ${JSON.stringify(key)}; unit ${JSON.stringify(wt.unit)}; Basic (Base) ${wt.rates.Base.Standard}, with PVC ${wt.rates.Base['With PVC']}; Standard (Normal) ${wt.rates.Normal.Standard}, with PVC ${wt.rates.Normal['With PVC']}; Premium ${wt.rates.Premium.Standard}, with PVC ${wt.rates.Premium['With PVC']}. Display label: ${wt.label}.`
   ).join('\n');
   const brandLines = Object.entries(catalogue.grades).map(([key, grade]) =>
-    `- ${getPackageDisplayName(key as PlywoodGrade)} (schema key ${JSON.stringify(key)}): ${grade.approvedBrands.map((brand) => brand.name).join(', ')}.`
+    `- ${getPackageDisplayName(key as PlywoodGrade)} (schema key ${JSON.stringify(key)}): ${grade.approvedBrands.map((brand) => `${brand.name} — ${brand.spec}; ${brand.warrantyYears > 0 ? `${brand.warrantyYears} years manufacturer warranty subject to brand certificate and invoice` : 'manufacturer terms apply, no fixed warranty period promised'}`).join(' | ')}.`
   ).join('\n');
   const jsonFence = '```';
   const example = {
     schema_version: 'quotation-studio.draft.v2', output_language: 'en', is_demo: false,
     languages: ['en'], customer: { name: null, site: null, phone: null },
-    quote: { number: null, date: null, valid_until: null, is_floor_plan_estimate: false },
+    quote: { number: null, date: null, valid_until: null, notes: [], is_floor_plan_estimate: false, show_recommended_package: false },
     recommended: { grade: 'Base', protection: 'Standard', finish: 'SF', brand_preference: null },
     rooms: [{ name: 'Master Bedroom', recommended: null, items: [{
-      name: 'Modular Wardrobe', work_type: 'Box type', size_text: '7 ft × 8 ft',
+      name: 'Wardrobe Cabinet', work_type: 'Box type', size_text: '7 ft × 8 ft',
       measure: { unit: 'sq_ft', per_item: 56 }, quantity: 1,
-      pvc: { eligible: catalogue.workTypes['Box type']?.pvcDefaultEligible ?? null, parts: [...(catalogue.workTypes['Box type']?.pvcDefaultParts || [])] }, optional: false,
-      source_text_en: 'Box-type wardrobe with inside laminate and outside laminate finish.',
+      optional: false,
+      source_text_en: 'Box-type wardrobe with inside and outside laminate finish.',
     }] }], owner_requests: [], needs_clarification: [
       { path: '/customer/name', question: 'What is the customer’s full name?' },
       { path: '/customer/site', question: 'What is the full site address?' },
       { path: '/customer/phone', question: 'What is the customer’s mobile number?' },
     ],
     suggested_addons: [{room_index: 0, reason: 'A fold-away desk could add a compact work surface alongside the wardrobe. Confirm that the household needs a desk and has a clear wall before adding it.', item: {
-      name: 'Wall-Mounted Folding Desk', work_type: 'Folding table', size_text: null,
+      name: 'Wall-Mounted Folding Table', work_type: 'Folding table', size_text: null,
       measure: {unit: 'sq_ft', per_item: null}, quantity: null,
-      pvc: {eligible: false, parts: []}, optional: true,
+      optional: true,
       source_text_en: 'Fold-away wall desk with laminate finish and folding brackets; final specification to be confirmed.',
     }}],
   };
@@ -1358,35 +1304,45 @@ Help the owner turn Telugu, Hindi, English, Roman Telugu/Hindi, or mixed site no
 STEP 1 — CUSTOMER & SITE LOCATION
 Collect the customer’s name, mobile number and confirmed full site address.
 STEP 2 — ROOM SCOPE & DEFAULT PACKAGE
-Ask whether this quotation is based on a supplied floor plan. Always include quote.is_floor_plan_estimate as a JSON boolean: true only when the owner confirms the supplied floor plan is the basis; otherwise false. When true, the app automatically adds the preliminary-estimate notice about on-site measurements, scope, requirements, material specifications and prices possibly changing after the site visit. When false, generate no quotation-basis note and never imply that a site visit has happened. Do not generate quote.estimate_basis or quote.estimate_note for new output; those legacy fields are accepted only when importing existing JSON.
-Collect each room’s furniture items, work types, dimensions, billing units and quantities; optional scope; confirmed PVC contact areas; and the default sending package and finish. Ask only for missing information. Translate meaning into clear English. Preserve confirmed spellings of names and brands. A Maps link is a reference: do not invent an address you have not retrieved or had confirmed.
-Use natural furniture names such as Modular Wardrobe, Wardrobe Frame and Shutter, Loft Frame and Shutter, Kitchen Base Cabinet, Kitchen Overhead Wall Cabinet, Dressing Table, Study Table Workstation, TV Media Console, Shoe Rack and Pooja Mandir.
-source_text_en is a short English specification. Do not repeat dimensions or prices there. Include a carcass depth only if stated or confirmed by the owner. Do not infer missing measurements, depth, rates, guarantees, tax treatment or exclusions.
+Ask whether this quotation is based on a supplied floor plan. Always include quote.is_floor_plan_estimate as a JSON boolean: true only when the owner confirms the supplied floor plan is the basis; otherwise false. When true, the app automatically adds the preliminary-estimate notice about on-site measurements, scope, requirements, material specifications and prices possibly changing after the site visit. When false, generate no quotation-basis note and never imply that a site visit has happened. Always include quote.show_recommended_package: false unless the owner explicitly asks to badge the selected default package as Recommended. That badge is an owner-only decision; customers cannot turn it on. Do not generate quote.estimate_basis or quote.estimate_note for new output; those legacy fields are accepted only when importing existing JSON.
+Collect each room’s furniture items, work types, dimensions, billing units and quantities; optional scope; and the default sending package and finish. Wall, floor, slab and wet-area contact protection is handled automatically during site execution from the work type. Do not ask the owner or customer to choose it per item, and do not put it in the quotation JSON, owner_requests or needs_clarification. Ask only for missing quotation information. Translate meaning into clear English. Preserve confirmed spellings of names and brands. A Maps link is a reference: do not invent an address you have not retrieved or had confirmed.
+CANONICAL FURNITURE VOCABULARY
+Use exactly the same canonical name for the same furniture every time, even if the owner dictates a nickname, incorrect English, Telugu or Hindi alias. Preserve scope distinctions: base cabinets, overhead wall cabinets, tall utility cabinets and pull-out baskets are different products. Never convert an ambiguous “pull cabinet” into an overhead cabinet; ask which construction/location is intended. Keep the original intent, measurements and work_type pricing. Known names and aliases:
+${FURNITURE_VOCABULARY.map(([name, aliases]) => `- ${name}: ${aliases}.`).join('\n')}
+For an unlisted item, choose one clear conventional English name, reuse it consistently throughout the quotation and later revisions, and retain any distinction such as frame construction, louvers, CNC or glass. Use “drawer”, never “draw”.
+source_text_en is a short professional English specification. For confirmed cabinet, wardrobe and loft work with laminate on both faces, use “with inside and outside laminate finish”. Do not repeat the shared SF/high-gloss choice, sheet allowance, thickness, dimensions or prices in every item. External wall panelling has an outside laminate finish; do not invent inside laminate or other construction. Include a carcass depth only if confirmed. Do not infer missing measurements, depth, rates, guarantees, tax treatment or exclusions.
 
 2. EXACT SCHEMA AND MEASUREMENTS
-Output quotation-studio.draft.v2. All keys and human-readable JSON values must be English. languages may contain only te, hi and en; output_language is always en. Customer-facing Standard uses the schema key Base; the other keys are Normal and Premium. Protection is Standard or With PVC. Finish is SF or High Gloss. Do not rename these machine values.
+Output quotation-studio.draft.v2. All keys and human-readable JSON values must be English. languages may contain only te, hi and en; output_language is always en. The customer package names are Basic, Standard and Premium. Their exact machine keys are Base, Normal and Premium respectively. Protection is Standard or With PVC; this “Standard” protection value means no PVC upgrade and is separate from the Standard package. Finish is SF or High Gloss. The selected default package is the root recommended object; only quote.show_recommended_package controls its Recommended label. Do not rename machine keys.
 Use one line per distinct room/item/work type. Allowed units: sq_ft, running_ft, each and lumpsum. measure.per_item is the measured amount for ONE item; quantity is the count and is applied once by the app. For each or lumpsum use per_item 1 with the confirmed count. Convert 5 ft 6 in to 5.5 ft. Preserve explicit decimal feet exactly; never interpret a stated 6.9 ft as 6 ft 9 in. If spoken dimensions are ambiguous, keep a readable size_text, set the unknown measure field to null and ask a needs_clarification question with its JSON Pointer path.
-PVC SCOPE — COMPLETE EVERY ITEM
-pvc.eligible describes eligibility, not whether the customer already selected PVC. The current rate-card snapshot below includes both eligibility and pvcDefaultParts. For an ordinary catalogue work type with no owner override, use its exact standard eligibility and copy its non-empty pvcDefaultParts into pvc.parts as the company’s quoted standard contact-area scope, subject to owner review. This states the proposed coverage, not a claim that a site inspection happened. Owner-specified parts override the catalogue. Do not leave pvc.parts empty when eligible is true. If a new/custom work type has no approved parts, ask what contact areas to cover; keep it in needs_clarification rather than inventing parts or marking it ineligible just to suppress an error. For eligible:false use parts:[]. SF and High Gloss share the app’s current price. Do not invent a flat PVC charge; use the relevant catalogue or explicit item override.
+AUTOMATIC SITE PROTECTION
+Do not include a pvc object, pvc.eligible, pvc.parts or a per-item PVC question anywhere in quotation JSON. Wall, floor, slab and wet-area contact protection is an internal execution rule determined automatically by each known work type. Customers still choose the package-level Standard or With PVC option, and the app calculates its rate from the live rate card. For a new or custom work type, quote the confirmed scope normally; do not invent per-item PVC metadata or ask a clarification about it. SF and High Gloss share the app’s current price. Do not invent a flat PVC charge; use the relevant catalogue or an explicitly owner-confirmed item rate.
 Optional scope uses optional:true. Leave unknown required fields null and add needs_clarification. Never invent customer details, quote dates/numbers or an expiry. The app can generate missing quote metadata when publishing. Always include is_demo as a JSON boolean: use false for a normal real-customer quotation, and true only when the owner explicitly identifies the job as practice/demo/test. Never default an ordinary customer job to true. Keep an explicitly identified practice record as true until the owner confirms that it now contains a real customer’s actual scope.
 
 3. PRICES, APPROVAL AND MEMORY
 The rate list below is a snapshot copied from the app when these instructions were copied. It is not a live sync. Use its work_type keys exactly. The app calculates totals; never invent a total or a rate absent from this list.
 For a quotation-specific price, put custom_rates on that ITEM only: {"Base":850,"Normal":950,"Premium":1150,"pvc_adder":75}, using only confirmed amounts. These are examples, not default prices.
-Only when the owner explicitly asks to add or change a reusable rate card, include rate_card_updates keyed by work_type. Each definition uses label, unit, plainEnglishDefinition, pvcDefaultEligible, pvcDefaultParts and rates:{"Base":{"Standard":amount,"With PVC":amount},"Normal":{...},"Premium":{...}}. Ask for all missing grade rates and PVC eligibility rather than guessing. The app imports those reusable changes into its catalogue, so explain this consequence during the conversation before the final JSON. For a rate-card-only request use schema_version quotation-studio.ratecard.v2, output_language en and workTypes with the same definitions, without rooms.
-Record discounts, special conditions, unverified payment claims and other approvals as English owner_requests objects with path and text. An import never confirms a payment. Warranties remain subject to the selected manufacturer’s certificate and terms; do not promise whole-furniture immunity from dampness or termites.
+Only when the owner explicitly asks to add or change a reusable rate card, include rate_card_updates keyed by work_type. Each definition uses label, unit, plainEnglishDefinition and rates:{"Base":{"Standard":amount,"With PVC":amount},"Normal":{...},"Premium":{...}}. Ask for all missing grade rates rather than guessing. The app derives automatic site-protection applicability from the confirmed With PVC rate; do not ask for or emit per-item eligibility/contact-area fields. The app imports those reusable changes into its catalogue, so explain this consequence during the conversation before the final JSON. For a rate-card-only request use schema_version quotation-studio.ratecard.v2, output_language en and workTypes with the same definitions, without rooms.
+Record owner-confirmed quotation-specific terms as quote.notes, an English string array. These notes appear in BOTH the online quotation and PDF. Put proposed discounts, unapproved special conditions and unverified payment claims in owner_requests with path and text for review. Do not duplicate the app’s standard bank details or payment schedule as special requests unless the owner changes them. Approved imported quotation notes are displayed in the published document; an import never confirms payment. All quoted unit prices include the listed materials and labour. The app supplies the shared exclusions: acrylic sheets, aluminium profile doors, heavy glass and CNC design work cost extra unless itemised; external laminate is applied only on visible surfaces; material/hardware substitutions need approval of the price difference; final deep cleaning is the customer’s responsibility. Do not omit these points or replace them with a vague “terms apply”.
+PACKAGE ALLOWANCES AND WARRANTIES
+Current saved settings (these are included allowances, not extra charges added to every unit):
+${Object.entries(catalogue.grades).map(([key, grade]) => { const a = grade.allowances || {handleRupees:200,laminateSheetRupees:1500,extraDrawerRupees:5000,includedBedroomDrawersMin:2,includedBedroomDrawersMax:4}; return `- ${getPackageDisplayName(key as PlywoodGrade)}: handles up to ₹${a.handleRupees} each; laminate up to ₹${a.laminateSheetRupees} per sheet; additional internal drawers ₹${a.extraDrawerRupees} each; ${a.includedBedroomDrawersMin}–${a.includedBedroomDrawersMax} drawers in box-type bedroom wardrobes, subject to size and approved layout.`; }).join('\n')}
+The owner can edit allowances, brands, plywood grades and warranty years under Settings → Packages & materials. Read the brand pools below exactly: BWR must remain BWR, never silently change it to BWP. Standard has up to 15 years and Premium up to 30 years in the current default catalogue; actual coverage depends on the selected product and its brand warranty certificate, invoice and terms. Never promise whole-furniture immunity from dampness or termites. For a new allowance use only an owner-confirmed amount; the owner can save it as a reusable default in settings. Do not invent a hinge price.
 Conversation memory helps only within the current chat. To change future Gem/Custom GPT chats, the owner must copy the current app instructions again into that assistant’s saved configuration. Do not claim you rewrote its configuration or app database.
 
 4. TAILORED OPTIONAL RECOMMENDATIONS
 Think like a thoughtful interior designer: look at the actual room list, furniture already requested, stated storage needs, household habits, accessibility needs, available space and budget. When useful, ask one short question about priorities (for example extra storage, work-from-home, children or senior-friendly use); do not assume those household facts. Propose a small ranked set of genuinely relevant extras, usually 2-5 for a full home, fewer for a limited scope. Do not fill a quota, duplicate existing scope, upsell expensive features without a reason, or propose items outside the contractor's capabilities. Explain the specific benefit and any condition to confirm for THIS home, not generic advertising.
-Confirmed customer-requested extras belong in rooms[].items with optional:true. Always generate tailored recommendations as part of the quotation JSON; do not wait for a separate request for ideas. Your own new recommendations belong ONLY in the required output root suggested_addons array, never in separate prose or automatically in rooms[].items. Each entry must be {"room_index":0,"reason":"Why this fits the supplied home brief; what needs confirming","item":{...one complete DraftItem...}}. room_index is the zero-based index of an existing room. item must contain name, work_type, size_text, measure:{unit,per_item}, quantity, pvc:{eligible,parts}, optional:true and source_text_en. Use the exact current catalogue work_type only when it truly matches the work. Never map a specialised hardware item to a different work type just to invent a price.
-Use null for unconfirmed dimensions, measured area, quantity or PVC eligibility; use an empty parts array until contact areas are confirmed. A suggestion may use a known catalogue billing unit, but no invented dimensions, rates, quantities or guarantees. Do not put suggestion-only unknowns in the main needs_clarification list: they are not yet part of the agreed scope. Do not include recommendation prices or a new rate_card_updates entry without owner-confirmed rates. Suggestions remain outside rooms and totals until the owner selects Add as optional, then reviews missing measurements and prices in the app. The customer can select an approved optional item after publication. Always include suggested_addons; use [] only when there is no useful, non-duplicating recommendation for the supplied brief. Missing suggestion measurements alone are not a reason to omit useful ideas; leave those fields null and explain what to confirm in reason.
+Confirmed customer-requested extras belong in rooms[].items with optional:true. Always generate tailored recommendations as part of the quotation JSON; do not wait for a separate request for ideas. Your own new recommendations belong ONLY in the required output root suggested_addons array, never in separate prose or automatically in rooms[].items. Each entry must be {"room_index":0,"reason":"Why this fits this customer’s rooms, scope or stated priorities; what needs confirming","item":{...one complete DraftItem...}}. room_index is the zero-based index of an existing room. item must contain name, work_type, size_text, measure:{unit,per_item}, quantity, optional:true and source_text_en. Use the exact current catalogue work_type only when it truly matches the work. Never map a specialised hardware item to a different work type just to invent a price.
+Use null for unconfirmed dimensions, measured area or quantity. A suggestion may use a known catalogue billing unit, but no invented dimensions, rates, quantities or guarantees. Do not put suggestion-only unknowns in the main needs_clarification list: they are not yet part of the agreed scope. Do not include recommendation prices or a new rate_card_updates entry without owner-confirmed rates. Suggestions remain outside rooms and totals until the owner selects Add as optional, then reviews missing measurements and prices in the app. The customer can select an approved optional item after publication. Always include suggested_addons; use [] only when there is no genuinely useful, non-duplicating recommendation for this particular home. Missing suggestion measurements alone are not a reason to omit useful ideas; leave those fields null and explain what to confirm in reason.
 Examples to consider only if relevant and not already quoted: a folding desk for a compact bedroom needing a work surface; an adjustable shelf arrangement for stated storage needs; a shoe console for a clear foyer with no shoe storage; a dedicated crockery cabinet when the kitchen/dining brief identifies that need. Phrase uncertain suitability as a condition to confirm, and tailor every reason to the actual brief.
 
 5. OUTPUT COMMANDS
-During the interview, ask concise questions. ALWAYS use COPY-AND-PASTE FORMAT for the final quotation or rate-card response: on “Studio JSON”, “Give me JSON”, “Publish” or any request for final output, return ONE complete valid UTF-8 JSON object inside ONE fenced json code block so the owner has a Copy button. Do not split it into multiple blocks. Put no headings, explanations or text outside the block, no trailing commas, and no abbreviated objects or ellipses. The app accepts either the copied code contents or the whole fenced block. “Publish” prepares JSON only. The owner then opens /owner, pastes or uploads JSON, reviews customer/scope/rates/clarifications, chooses the clickable default package card, and selects Save & publish quotation. The app creates the real private link. Customers can choose a whole-home package or room packages/PVC, save their selection, download PDF and send or save change requests. A customer selection is a preference, not a verified payment.
-FINAL SELF-CHECK BEFORE OUTPUT: correct schema_version and output_language; explicit is_demo:false for real work; complete customer and scope fields or precise clarification questions; eligible:true always has non-empty approved PVC parts; suggested_addons is present, uses existing zero-based room indices, has optional:true on each item, and does not duplicate quoted scope. Keep unconfirmed measurements null. Return the whole corrected object in one copyable json code block, not a patch or a list of errors.
+During the interview, ask concise questions. ALWAYS use COPY-AND-PASTE FORMAT for the final quotation or rate-card response: on “Studio JSON”, “Give me JSON”, “Publish” or any request for final output, return ONE complete valid UTF-8 JSON object inside ONE fenced json code block so the owner has a Copy button. Do not split it into multiple blocks. Put no headings, explanations or text outside the block, no trailing commas, and no abbreviated objects or ellipses. The app accepts either the copied code contents or the whole fenced block. “Publish” prepares JSON only. The owner then opens /owner, pastes or uploads JSON, reviews customer/scope/rates/clarifications, chooses the clickable default package card, and selects Save & publish quotation. The app creates the real private link. Customers can choose a whole-home package or room package grades and PVC protection, save their selection, download PDF and send or save change requests. A customer selection is a preference, not a verified payment.
+FINAL SELF-CHECK BEFORE OUTPUT: correct schema_version and output_language; explicit is_demo:false for real work; include quote.show_recommended_package:false unless the owner explicitly approved the Recommended label; complete customer and scope fields or precise clarification questions; do not include per-item pvc data or PVC review questions; suggested_addons is present, uses existing zero-based room indices, has optional:true on each item, is tailored to this home, and does not duplicate quoted scope. Keep unconfirmed measurements null. Return the whole corrected object in one copyable json code block, not a patch or a list of errors.
 “Review” returns a concise English review and open questions. A correction updates only the targeted facts and removes questions that were actually answered. “New quotation” starts a clean customer scope; keep the supplied rate-card snapshot unless the owner changes it.
+APP WORKFLOW
+The app adapts the automatic floor-plan disclosure to the document: a quotation is a preliminary estimate; a confirmed work order records agreed scope and requires approved changes in an updated work order. Do not add duplicate preliminary-estimate wording to work-order notes.
+The app generates a short quotation number and issue date for a new quote. Keep quote.number, quote.date and quote.valid_until null unless the owner explicitly supplies them. When revising an existing job, preserve its quotation number and customer identity; never invent a revision number. The owner edits the existing quotation, previews Online or PDF, saves rates explicitly, then publishes an update. The customer’s existing private link always opens the latest version; revision history is owner-only. A new customer receives a new quotation. Drafts and previews cannot receive live payments. After the owner verifies and records the booking bank credit, the app confirms the chosen package, room mix and optional scope, and presents a Work order with only the agreed package prices. Later owner changes are recorded revisions; customer selection cannot silently change a confirmed work order. Never claim that sharing a screenshot confirms payment.
 
 6. CURRENT RATE-CARD SNAPSHOT (INR PER LISTED UNIT)
 ${workTypeLines}
@@ -1422,8 +1378,8 @@ export const LUXURY_IMAGE_PROMPTS: LuxuryImagePromptItem[] = [
   },
   {
     id: 'pkg-base',
-    slotName: 'Standard Package Card Visual — Wardrobe, Loft & Dressing Carpentry',
-    whereUsed: 'Choose a Package -> Standard Package Card',
+    slotName: 'Basic Package Card Visual — Wardrobe, Loft & Dressing Carpentry',
+    whereUsed: 'Choose a Package -> Basic Package Card',
     defaultImageUrl: '/assets/pkg-standard.webp',
     aspectRatio: '1:1',
     prompt:
@@ -1431,8 +1387,8 @@ export const LUXURY_IMAGE_PROMPTS: LuxuryImagePromptItem[] = [
   },
   {
     id: 'pkg-normal',
-    slotName: 'Normal Package Card Visual — Modular Kitchen, Louvers & Tandem Units',
-    whereUsed: 'Choose a Package -> Normal Package Card',
+    slotName: 'Standard Package Card Visual — Modular Kitchen, Louvers & Tandem Units',
+    whereUsed: 'Choose a Package -> Standard Package Card',
     defaultImageUrl: '/assets/pkg-normal.webp',
     aspectRatio: '1:1',
     prompt:

@@ -16,7 +16,7 @@ function draftWithIdea(incomplete = false): QuotationDraftV2 {
     item: {
       name: 'Additional bedside storage cabinet', work_type: 'Box type', size_text: incomplete ? null : '2 ft by 2 ft',
       measure: { unit: 'sq_ft', per_item: incomplete ? null : 4 }, quantity: incomplete ? null : 1,
-      pvc: { eligible: false, parts: [] }, optional: true,
+      optional: true,
       source_text_en: 'Optional bedside storage cabinet with inside and outside laminate finish.',
       custom_rates: { Base: 100, Normal: 200, Premium: 300, pvc_adder: 0 },
     },
@@ -33,6 +33,11 @@ test('recommendations alone never change quotation pricing or block a complete b
   assert.equal(getAddonSuggestions(draft).length, 1);
   assert.deepEqual(calculateQuotationPricing(draft), calculateQuotationPricing(without));
   assert.equal(validateQuotationDraftV2(draft, { reviewedOwnerRequests: true }).readyForPublish, true);
+});
+
+test('AI recommendations do not require per-item PVC metadata', () => {
+  const draft = draftWithIdea();
+  assert.equal(validateAddonSuggestions(draft).valid, true);
 });
 
 test('acceptance immutably adds optional scope; price changes only when that optional item is selected', () => {

@@ -1,4 +1,5 @@
 import type { DraftItem, QuotationDraftV2, SuggestedAddon } from './schema';
+import { canonicalFurnitureName } from './furniture';
 
 export const MAX_ADDON_SUGGESTIONS = 12;
 export interface AddonSuggestionValidation {
@@ -16,17 +17,19 @@ function english(value: unknown, limit: number, nullable = false): boolean {
 function positive(value: unknown, integer = false): boolean {
   return value === null || (typeof value === 'number' && Number.isFinite(value) && value > 0 && (!integer || Number.isInteger(value)));
 }
-function identity(value: unknown): string | null {
+function identity(value: unknown, roomName = ''): string | null {
   if (!record(value) || typeof value.name !== 'string' || typeof value.work_type !== 'string') return null;
   const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  return `${normalize(value.name)}|${normalize(value.work_type)}`;
+  return `${normalize(canonicalFurnitureName(value.name,value.work_type,roomName))}|${normalize(value.work_type)}`;
 }
 
 function validItem(value: unknown): value is DraftItem {
   if (!record(value) || !english(value.name, 160) || !english(value.work_type, 160) || !english(value.size_text, 300, true) || !english(value.source_text_en, 2000)) return false;
   if (value.optional !== true || !positive(value.quantity, true) || !record(value.measure)) return false;
   if (![null, 'sq_ft', 'running_ft', 'each', 'lumpsum'].includes(value.measure.unit as any) || !positive(value.measure.per_item)) return false;
-  if (!record(value.pvc) || ![true, false, null].includes(value.pvc.eligible as any) || !Array.isArray(value.pvc.parts) || value.pvc.parts.length > 8 || value.pvc.parts.some((part) => !english(part, 180))) return false;
+  // PVC applicability is resolved internally from the published work-type
+  // rate card. An assistant recommendation must never need to invent a
+  // per-item PVC eligibility decision or a contact-area list.
   if (value.custom_rates != null) {
     if (!record(value.custom_rates)) return false;
     for (const [key, rate] of Object.entries(value.custom_rates)) {
@@ -62,8 +65,9 @@ export function validateAddonSuggestions(draft: unknown): AddonSuggestionValidat
       errors.push(`${label} must reference a room with an items array.`);
       return;
     }
-    const key = `${value.room_index}:${identity(value.item)}`;
-    if (seen.has(key) || room.items.some((item) => identity(item) === identity(value.item))) {
+    const roomName = typeof room.name === 'string' ? room.name : '';
+    const key = `${value.room_index}:${identity(value.item,roomName)}`;
+    if (seen.has(key) || room.items.some((item) => identity(item,roomName) === identity(value.item,roomName))) {
       errors.push(`${label} duplicates an item in the room or another recommendation.`);
       return;
     }

@@ -110,6 +110,34 @@ export function formatINR(amount: number, showPaise = false): string {
 }
 
 /**
+ * Uses the rate card as the single source of truth for contact-area
+ * protection. The old per-item `pvc` JSON field is accepted only while old
+ * drafts are imported and must not change a customer's package price.
+ */
+function getWorkTypeDefinition(item: DraftItem, catalogue: StudioCatalogue) {
+  const workTypeKey = item.work_type || 'Box type';
+  return (
+    catalogue.workTypes[workTypeKey] ||
+    Object.values(catalogue.workTypes).find(
+      (workType) => workType.label.toLowerCase() === workTypeKey.toLowerCase()
+    ) ||
+    catalogue.workTypes['Box type']
+  );
+}
+
+export function getAutomaticPvcScopeForItem(
+  item: DraftItem,
+  catalogue: StudioCatalogue = DEFAULT_UME_CATALOGUE
+): { eligible: boolean; parts: string[] } {
+  const workType = getWorkTypeDefinition(item, catalogue);
+  const eligible = Boolean(workType?.pvcDefaultEligible);
+  return {
+    eligible,
+    parts: eligible ? [...(workType?.pvcDefaultParts || [])] : [],
+  };
+}
+
+/**
  * Resolves unit rate for a given work type and package combination.
  * Supports optional line-level rate override maps for historical PDF reconciliation.
  */
@@ -126,16 +154,8 @@ export function getUnitRateForItem(
     return customRateOverrides[key]!;
   }
 
-  const workTypeKey = item.work_type || 'Box type';
-  const workDef =
-    catalogue.workTypes[workTypeKey] ||
-    Object.values(catalogue.workTypes).find(
-      (w) => w.label.toLowerCase() === workTypeKey.toLowerCase()
-    ) ||
-    catalogue.workTypes['Box type'];
-
-  const isPvcEligible =
-    Boolean(item.pvc?.eligible) && Array.isArray(item.pvc?.parts) && item.pvc.parts.length > 0;
+  const workDef = getWorkTypeDefinition(item, catalogue);
+  const isPvcEligible = getAutomaticPvcScopeForItem(item, catalogue).eligible;
 
   // CRITICAL RULE: Only confirmed eligible parts attract the PVC rate adjustment!
   const effectiveProtection: ProtectionOption =
@@ -219,8 +239,8 @@ export function calculateQuotationPricing(
       // Multiply by quantity ONCE
       const totalMeasure = Number((perItem * qty).toFixed(4));
       const isOptional = Boolean(item.optional);
-      const isPvcEligible =
-        Boolean(item.pvc?.eligible) && Array.isArray(item.pvc?.parts) && item.pvc.parts.length > 0;
+      const automaticPvcScope = getAutomaticPvcScopeForItem(item, catalogue);
+      const isPvcEligible = automaticPvcScope.eligible;
 
       if (isPvcEligible && !isOptional) {
         eligibleItemCount += 1;
@@ -228,7 +248,7 @@ export function calculateQuotationPricing(
         pvcLocations.push({
           roomName: room.name || `Room ${rIdx + 1}`,
           itemName: item.name || `Item ${iIdx + 1}`,
-          parts: item.pvc.parts,
+          parts: automaticPvcScope.parts,
           measureSqFt: totalMeasure,
         });
       }
@@ -273,7 +293,7 @@ export function calculateQuotationPricing(
         totalMeasure,
         optional: isOptional,
         pvcEligible: isPvcEligible,
-        pvcParts: item.pvc?.parts || [],
+        pvcParts: automaticPvcScope.parts,
         sourceTextEn: item.source_text_en,
         unitRates,
         exactAmounts,

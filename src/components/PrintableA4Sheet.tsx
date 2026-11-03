@@ -19,12 +19,15 @@ import {
   ResolvedPackageSelection,
 } from '../lib/schema';
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
+import { documentTerms, materialLines, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import {
   DeterministicQrCode,
   UmeLogoMark,
 } from './BrandMark';
 
 interface PrintableA4SheetProps {
+  isPreview?: boolean;
+  isWorkOrder?: boolean;
   publicId: string;
   revision: number;
   draft: QuotationDraftV2;
@@ -162,15 +165,23 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
             addShell();
           }
         }
-        for (const row of rows) {
+        for (const [rowIndex, row] of rows.entries()) {
           const copy = row.cloneNode(true);
           tableBody.append(copy);
           if (overflows()) {
             tableBody.removeChild(copy);
+            // Do not leave only a total or one final row on a continuation.
+            const previousTableBody = tableBody;
+            const carry = rowIndex === rows.length - 1 && tableBody.children.length > 1
+              ? tableBody.lastElementChild : null;
+            if (carry) carry.remove();
             if (!tableBody.children.length) shell.remove();
             newPage(true);
             addShell();
+            if (carry) tableBody.append(carry);
             tableBody.append(copy);
+            // A very tall final row may need the whole fresh page for itself.
+            if (carry && overflows()) { carry.remove(); previousTableBody.append(carry); }
             if (overflows()) {
               tableBody.removeChild(copy);
               // A single long note must continue across rows/pages, never clip.
@@ -219,6 +230,21 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
         body.append(copy);
         if (!overflows()) return;
         copy.remove();
+        // If a complete table fits on a fresh page, move it intact instead of
+        // stranding its last row/total after an avoidable page break.
+        if (block.querySelector('tbody')) {
+          const probePage = document.createElement('section');
+          probePage.className = 'pdf-page';
+          const probeBody = document.createElement('div');
+          probeBody.className = 'pdf-page-body';
+          probePage.append(probeBody); measurementHost.append(probePage);
+          if (letterhead) probeBody.append(letterhead.cloneNode(true));
+          if (sectionHeading) probeBody.append(sectionHeading.cloneNode(true));
+          probeBody.append(copy);
+          const fits = probeBody.scrollHeight <= probeBody.clientHeight + 1;
+          copy.remove(); probePage.remove();
+          if (fits) { newPage(true); body.append(copy); return; }
+        }
         if (block.querySelector('tbody') && appendTable(block)) return;
         if (body.children.length > 1) newPage(true);
         body.append(copy);
@@ -261,7 +287,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
       }
       // An exceptionally tall first block can cause a provisional empty page.
       for (let index = created.length - 1; index >= 0; index--) {
-        if (!created[index].firstElementChild?.children.length) {
+        if (!Array.from(created[index].firstElementChild?.children || []).some(element => !element.classList.contains('pdf-letterhead') && !element.classList.contains('pdf-section-heading'))) {
           created[index].remove();
           created.splice(index, 1);
         }
@@ -297,7 +323,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
   }, [children, reference]);
 
   return (
-    <div ref={viewportRef} className="quote-document" role="document" aria-label="A4 quotation preview">
+    <div ref={viewportRef} className="quote-document" data-document-title={reference} role="document" aria-label="A4 document preview">
       <div ref={sourceRef} className="pdf-source-layout" aria-hidden="true" inert>{children}</div>
       <div ref={pagesRef} className="pdf-pages" />
     </div>
@@ -305,6 +331,8 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
 }
 
 export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
+  isPreview = false,
+  isWorkOrder = false,
   publicId,
   revision,
   draft,
@@ -328,10 +356,14 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   const milestones = calculateMilestoneSchedule(calc.grandTotal, verifiedPaidRupees);
   const activeGradeInfo = catalogue.grades[wholeHomeSelection.grade];
   const activeGradeDisplayName = getPackageDisplayName(wholeHomeSelection.grade);
+  const ownerRecommendedGrade = !isWorkOrder && draft.quote.show_recommended_package
+    ? draft.recommended?.grade || null
+    : null;
   const quoteRef = draft.quote.number || 'Quotation draft';
   const estimateBasisLabel = getQuotationBasisLabel(draft.quote);
-  const estimateNote = getQuotationEstimateNote(draft.quote);
-  const revCode = String(revision).padStart(2, '0');
+  const estimateNote = getQuotationEstimateNote(draft.quote, isWorkOrder ? 'work_order' : 'quotation');
+  const documentLabel = isWorkOrder ? 'Work order' : 'Quotation';
+  const documentGrades = isWorkOrder ? snapshot.rooms.map(room => (mixByRoom ? roomSelections[room.roomIndex] || wholeHomeSelection : wholeHomeSelection).grade) : ALL_GRADES;
   const origin = typeof window !== 'undefined' ? window.location.origin : `https://${catalogue.company.domain}`;
   const shareUrl = `${origin}/q/${publicId}`;
 
@@ -359,18 +391,17 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
     stage3Cumulative + milestones.laminateCompletion10Percent;
 
   return (
-    <A4Document reference={`${quoteRef} · Rev ${revCode}`}>
+    <A4Document reference={`${documentLabel} ${quoteRef}`}>
       {/* PAGE 1: LETTERHEAD, CLIENT DETAILS & SIDE-BY-SIDE 3-PACKAGE SUMMARY */}
       <div className="pdf-flow-section" data-page-label="Quotation overview">
         <header className="pdf-letterhead">
           <UmeLogoMark size="pdf" />
           <div className="pdf-company">
             <div className="pdf-company-title">
-              <p>{catalogue.company.brandName}</p>
-              <span>QUOTATION</span>
+              <p>{catalogue.company.legalName.toUpperCase()}</p>
+              <span>{isWorkOrder ? 'WORK ORDER' : 'QUOTATION'}</span>
             </div>
-            <p className="pdf-enterprise">{catalogue.company.legalName}</p>
-            <p className="pdf-designers">{catalogue.company.subtitle}</p>
+            <p className="pdf-enterprise">INTERIOR DESIGNERS</p>
           </div>
           <div className="pdf-contact">
             <p>{catalogue.company.address}<br /><strong>Phone:</strong> {catalogue.company.phone}</p>
@@ -379,21 +410,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </header>
 
         {/* Non-Overflowing 4-Column Quotation Reference & Validity Metadata Bar */}
-        <div className="grid grid-cols-4 gap-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-3.5 text-xs">
+        <div className="grid grid-cols-3 gap-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-3.5 text-xs">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
-              Quotation No.
+              {documentLabel} No.
             </p>
             <p className="font-mono font-bold text-[#18221D] break-words mt-0.5">
               {quoteRef}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
-              Revision
-            </p>
-            <p className="font-mono font-bold text-[#18221D] mt-0.5">
-              Rev {revCode}
             </p>
           </div>
           <div className="min-w-0">
@@ -406,10 +429,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
-              Valid Until
+              {isWorkOrder ? 'Scope status' : 'Valid until'}
             </p>
             <p className="font-mono font-bold text-[#1C3A2F] mt-0.5">
-              {draft.quote.valid_until || 'Not set'}
+              {isWorkOrder ? 'Confirmed' : draft.quote.valid_until || 'Not set'}
             </p>
           </div>
         </div>
@@ -443,17 +466,22 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   ? 'Packages selected by room'
                   : `${activeGradeDisplayName} Package${
                       wholeHomeSelection.protection === 'With PVC'
-                        ? ' (+6mm PVC Board at Contact Areas)'
+                        ? ' (+6mm PVC Protection)'
                         : ''
                     }`}
               </p>
               <p className="text-[11px] text-[#1C3A2F] font-semibold mt-0.5">
                 {mixByRoom ? 'Grades and PVC options vary by room. Manufacturer warranties follow the selected product’s certificate and terms.' : `${activeGradeInfo.termiteProofBadge} · ${activeGradeInfo.warrantyBanner}`}
               </p>
+              {ownerRecommendedGrade && (
+                <p className="text-[10px] font-bold uppercase tracking-wide text-[#76541C] mt-2">
+                  Recommended by UME: {getPackageDisplayName(ownerRecommendedGrade)} Package
+                </p>
+              )}
             </div>
 
             <div className="pt-3 border-t border-[#E5DFD3] flex items-baseline justify-between gap-2">
-              <span className="text-xs font-bold text-[#1C3A2F]">Quotation total</span>
+              <span className="text-xs font-bold text-[#1C3A2F]">{documentLabel} total</span>
               <span className="text-xl font-bold text-[#18221D] font-mono tabular-nums">
                 {formatINR(calc.grandTotal, true)}
               </span>
@@ -468,6 +496,8 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </section>
         )}
 
+        <p className="text-[11px] font-semibold">Prices include materials and labour for the listed scope.</p>
+        {!isWorkOrder && <>
         {/* All 3 Packages Side-by-Side Executive Comparison Strip */}
         <div className="space-y-2 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
@@ -482,6 +512,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               const pvcTotal =
                 snapshot.baseWholeHomeTotals[makeComboKey(g, 'With PVC', wholeHomeSelection.finish)] || 0;
               const isSelected = !mixByRoom && wholeHomeSelection.grade === g;
+              const isOwnerRecommended = ownerRecommendedGrade === g;
 
               return (
                 <div
@@ -489,16 +520,25 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   className={`p-3.5 rounded-lg border text-xs ${
                     isSelected
                       ? 'bg-[#E4EFE7] border-2 border-[#1C3A2F]'
+                      : isOwnerRecommended
+                      ? 'bg-[#FFFCF6] border-[#B69258]'
                       : 'bg-[#FAF8F4] border-[#E5DFD3]'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-sm text-[#18221D]">{dispName} Package</p>
-                    {isSelected && (
-                      <span className="px-1.5 py-0.5 bg-[#1C3A2F] text-[#E6CBA8] rounded text-[9px] font-bold uppercase">
-                        Selected
-                      </span>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <p className="font-bold text-sm text-[#18221D] whitespace-nowrap">{dispName} Package</p>
+                    <span className="inline-flex flex-wrap items-center gap-1">
+                      {isOwnerRecommended && (
+                        <span className="px-1.5 py-0.5 bg-[#F0E3C8] text-[#76541C] rounded text-[9px] font-bold uppercase whitespace-nowrap">
+                          Recommended
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="px-1.5 py-0.5 bg-[#1C3A2F] text-[#E6CBA8] rounded text-[9px] font-bold uppercase whitespace-nowrap">
+                          Selected
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <p className="text-[10px] font-semibold text-[#1C3A2F] mt-0.5">
                     {gInfo.termiteProofBadge}
@@ -533,9 +573,9 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <thead>
                 <tr className="bg-[#1C3A2F] text-white">
                   <th className="py-2.5 px-3 font-semibold">Room and items</th>
+                  <th className="py-2.5 px-2.5 text-right font-semibold">Basic</th>
                   <th className="py-2.5 px-2.5 text-right font-semibold">Standard</th>
-                  <th className="py-2.5 px-2.5 text-right font-semibold">Normal</th>
-                  <th className="py-2.5 px-2.5 text-right font-semibold text-[#E6CBA8]">
+                  <th className="py-2.5 px-2.5 text-right font-semibold">
                     Premium (BWP)
                   </th>
                   <th className="py-2.5 px-2.5 font-semibold">Selected package</th>
@@ -561,13 +601,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       <td className="py-2.5 px-3 font-bold text-[#18221D]">
                         0{r.roomIndex + 1}. {r.name} ({r.items.filter((i) => !i.optional).length} units)
                       </td>
-                      <td className="py-2.5 px-2.5 text-right font-mono tabular-nums text-[#4A524D]">
+                      <td className={`py-2.5 px-2.5 text-right font-mono tabular-nums ${rSel.grade === 'Base' ? 'pdf-selected-cell' : 'text-[#4A524D]'}`}>
                         {formatINR(stdRoom)}
                       </td>
-                      <td className="py-2.5 px-2.5 text-right font-mono tabular-nums text-[#4A524D]">
+                      <td className={`py-2.5 px-2.5 text-right font-mono tabular-nums ${rSel.grade === 'Normal' ? 'pdf-selected-cell' : 'text-[#4A524D]'}`}>
                         {formatINR(normRoom)}
                       </td>
-                      <td className="py-2.5 px-2.5 text-right font-mono tabular-nums font-semibold text-[#18221D]">
+                      <td className={`py-2.5 px-2.5 text-right font-mono tabular-nums ${rSel.grade === 'Premium' ? 'pdf-selected-cell' : 'text-[#4A524D]'}`}>
                         {formatINR(premRoom)}
                       </td>
                       <td className="py-2.5 px-2.5 text-[#1C3A2F] font-semibold">
@@ -605,11 +645,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
         </div>
 
+        </>}
+
         <div className="pdf-total-summary print-avoid-break">
           <span>Selected scope <strong>{formatINR(calc.baseScopeTotal)}</strong></span>
           {calc.optionalSelectedTotal > 0 && <span>Optional work <strong>+{formatINR(calc.optionalSelectedTotal)}</strong></span>}
           {calc.discountRupees > 0 && <span>Approved discount <strong>−{formatINR(calc.discountRupees)}</strong></span>}
-          <span>Quotation total <strong>{formatINR(calc.grandTotal)}</strong></span>
+          <span>{documentLabel} total <strong>{formatINR(calc.grandTotal)}</strong></span>
         </div>
 
         {/* Material & Laminate Specifications */}
@@ -618,7 +660,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             Included materials, laminate and hardware
           </p>
           <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-[#4A524D] list-disc list-inside">
-            {catalogue.commonMaterials.map((m, idx) => (
+            {materialLines(catalogue, documentGrades).map((m, idx) => (
               <li key={idx} className="leading-snug">
                 {m}
               </li>
@@ -672,19 +714,15 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </div>
 
                 <table className="pdf-scope-table w-full text-left border-collapse text-[10.5px]">
-                  <colgroup><col style={{ width: '33%' }} /><col style={{ width: '15%' }} /><col style={{ width: '10%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /></colgroup>
+                  {isWorkOrder ? <colgroup><col style={{width:'44%'}}/><col style={{width:'20%'}}/><col style={{width:'16%'}}/><col style={{width:'20%'}}/></colgroup> : <colgroup><col style={{ width: '33%' }} /><col style={{ width: '15%' }} /><col style={{ width: '12%' }} /><col style={{ width: '13.333%' }} /><col style={{ width: '13.333%' }} /><col style={{ width: '13.334%' }} /></colgroup>}
                   <thead>
                     <tr className="bg-[#1C3A2F] text-white">
-                      <th className="py-2 px-3 font-semibold w-[40%]">
+                      <th className="py-2 px-3 font-semibold">
                         Furniture and specification
                       </th>
                       <th className="py-2 px-2 font-semibold">Dimensions</th>
                       <th className="py-2 px-2 text-right font-semibold">Area / quantity</th>
-                      <th className="py-2 px-2 text-right font-semibold">Standard</th>
-                      <th className="py-2 px-2 text-right font-semibold">Normal</th>
-                      <th className="py-2 px-3 text-right font-semibold text-[#E6CBA8]">
-                        Premium (BWP)
-                      </th>
+                      {(isWorkOrder ? [rSel.grade] : ALL_GRADES).map(grade => <th key={grade} className={`py-2 px-2 text-right font-semibold ${rSel.grade === grade ? 'pdf-selected-heading' : ''}`}>{isWorkOrder ? 'Agreed amount' : getPackageDisplayName(grade)}</th>)}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E5DFD3]">
@@ -738,20 +776,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                                 ? `${item.quantity} ${item.quantity === 1 ? 'item' : 'items'}`
                                 : `${item.totalMeasure.toFixed(2)} ${uLabel}`}
                             </td>
-                            <td className="py-2 px-2 text-right font-mono tabular-nums whitespace-nowrap">
-                              <div className="font-semibold">{formatINR(stdAmt)}</div>
-                              <div className="text-[9.5px] text-[#5C645F]">@{formatINR(stdRate)}</div>
-                            </td>
-                            <td className="py-2 px-2 text-right font-mono tabular-nums whitespace-nowrap">
-                              <div className="font-semibold">{formatINR(normAmt)}</div>
-                              <div className="text-[9.5px] text-[#5C645F]">@{formatINR(normRate)}</div>
-                            </td>
-                            <td className="py-2 px-3 text-right font-bold font-mono tabular-nums whitespace-nowrap text-[#1C3A2F]">
-                              <div>{formatINR(premAmt)}</div>
-                              <div className="text-[9.5px] font-normal text-[#5C645F]">
-                                @{formatINR(premRate)}
-                              </div>
-                            </td>
+                            {(isWorkOrder ? [rSel.grade] : ALL_GRADES).map(grade => { const combo = makeComboKey(grade,rSel.protection,rSel.finish); return <td key={grade} className={`py-2 px-2 text-right font-mono tabular-nums ${rSel.grade === grade ? 'pdf-selected-cell' : ''}`}><div className="font-semibold">{formatINR(item.exactAmounts[combo] || 0)}</div><div className="text-[9.5px] text-[#5C645F]">@{formatINR(item.unitRates[combo] || 0)}</div></td>; })}
                           </tr>
                         );
                       })}
@@ -956,15 +981,19 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </dl>
           </div>
           <div className="pdf-bank-qrs">
-            {!milestones.requiresOwnerSmallOrderRule && (
+            {!isPreview && !milestones.requiresOwnerSmallOrderRule && (
               <DeterministicQrCode
                 value={`upi://pay?${new URLSearchParams({ pa: catalogue.company.bank.upiId, pn: catalogue.company.bank.accountName, am: String(milestones.bookingRequired), cu: 'INR', tn: `Booking ${quoteRef}` }).toString()}`}
                 size={94} label="UPI booking" />
             )}
-            <DeterministicQrCode value={shareUrl} size={94} label="Online quotation" />
+            {!isPreview ? <DeterministicQrCode value={shareUrl} size={94} label="Online quotation" /> : <p className="max-w-[110px] text-[10px] leading-relaxed">Unpublished preview. Payment and quotation QR codes are added after publication.</p>}
           </div>
         </section>
 
+        <section className="space-y-3 text-[11px]" data-pdf-flow-group>
+          {[...new Set(documentGrades)].map(grade => <div className="pdf-plywood-spec print-avoid-break" key={grade}><h3 className="font-bold">{getPackageDisplayName(grade)} · Plywood options and manufacturer warranty</h3><ul>{catalogue.grades[grade].approvedBrands.map((brand,index) => <li key={index}><strong>{brand.name}</strong> · {brand.spec} · {brand.warrantyYears > 0 ? `${brand.warrantyYears} years, subject to brand certificate and invoice` : 'Warranty under the selected manufacturer’s terms'}</li>)}</ul></div>)}
+          <div className="pdf-scope-notes print-avoid-break"><h3 className="font-bold">Scope, inclusions and additional charges</h3><ul>{[...scopeNotes(catalogue,documentGrades),...quotationCustomerNotes(draft)].map((note,index) => <li key={index}>{note}</li>)}</ul></div>
+        </section>
         {/* Notes & Terms and Conditions (Includes 0.8mm / 0.72mm Laminate Gauge Note) */}
         <div className="space-y-2.5 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
@@ -973,8 +1002,8 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[10.5px] text-[#18221D] leading-snug">
             <strong>Laminate thickness and finish:</strong> Internal liner laminate is <strong>0.8 mm nominal thickness</strong> (manufacturer sheet gauge: <strong>0.72–0.80 mm</strong>). External decorative laminate is <strong>1.0 mm</strong>, in the selected SF matte or high-gloss finish at the same quoted price.
           </div>
-          <div className="pdf-terms grid grid-cols-2 gap-x-6 gap-y-2 text-[10.5px] text-[#5C645F] leading-snug">
-            {catalogue.termsAndConditions.map((t) => (
+          <div className="pdf-terms grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] text-[#4A524D] leading-relaxed">
+            {documentTerms(catalogue,documentGrades,isWorkOrder).map((t) => (
               <div key={t.id}>
                 <strong className="text-[#18221D]">
                   {t.id}. {milestones.requiresOwnerSmallOrderRule && t.id === 1 ? 'Booking confirmation' : milestones.requiresOwnerSmallOrderRule && t.id === 2 ? 'Work-start confirmation' : t.title}:

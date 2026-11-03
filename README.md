@@ -21,12 +21,14 @@ Customer quotations open at `/q/<private-token>`. `/studio` remains a legacy own
 
 1. Copy the current **Assistant instructions** into one Gemini Gem or Custom GPT. They include the current reusable rate card. Copy them again after changing reusable rates.
 2. Paste/upload the assistant's `quotation-studio.draft.v2` JSON, or start a blank quotation.
-3. Review customer details, measurements, work types, optional items, PVC eligibility, rates and open questions. Tick **This quotation is based on the supplied floor plan** only when that is true. No missing measurements are guessed. `Base` is the schema name for the customer-facing **Standard** package.
+3. Review customer details, measurements, work types, optional items, rates and open questions. Tick **This quotation is based on the supplied floor plan** only when that is true. New quotation numbers and dates are generated automatically. Public package names are **Basic / Standard / Premium**; their stable JSON keys remain `Base / Normal / Premium`.
 4. Review **Suggested for this home** recommendations returned in `suggested_addons`. Add useful ideas as optional items or dismiss them. Unaccepted suggestions never enter the scope or totals; accepted ideas still need confirmed measurements and prices.
-5. Choose a default package using the clickable package cards or dropdown. Select **Save & publish quotation** for a private link; use revision mode when replacing an earlier quotation.
-6. Review saved customer selections and messages in **Quotations & selections**. Verify payment screenshots received on WhatsApp against the bank statement, then record confirmed receipts in **Payments**. A screenshot never counts as verified payment by itself.
+5. Choose the starting package, and optionally tick **Show this as our recommended package**. The customer's active selection is highlighted separately. Check **Preview online** and **Preview PDF** before publication; previews do not send live payment requests. Use **Save draft** to retain an unfinished quotation privately.
+6. Edit reusable rates under **Rates and reusable work types**, then select **Save rate card & apply to draft**. Publish a quotation/update to apply them to the customer's document. Quote-specific custom rates remain separate from the reusable catalogue.
+7. Open an existing quotation from **Quotations**, edit it and select **Publish update**. Revision numbering is automatic and owner-only. Existing customer links open the latest version. Search by name, site or number, filter by status/date and use pagination; newest records appear first.
+8. Verify screenshots received in WhatsApp against the bank statement, then **Record verified payment** in **Payments**. A verified booking confirms the chosen package, room mix and optional work as a **Work order**, which displays only agreed prices and scope. Later owner changes create recorded revisions and retain payment credits. A screenshot alone never verifies payment.
 
-Customers can compare three packages, mix room grades, add eligible PVC, select optional work, save choices, request changes, and print/save a quotation PDF. Contact-request saving is labelled **Save**.
+Customers can compare three packages, mix room grades, choose the package-level PVC upgrade, select optional work, save choices, request changes, and print/save a quotation PDF. Contact-request saving is labelled **Save**. Item-level PVC eligibility/parts are not part of new quotation JSON or customer documents; the work-type rate card handles protection internally.
 
 ## Quotation basis and notes
 
@@ -39,6 +41,10 @@ In assistant JSON, use the preferred boolean `quote.is_floor_plan_estimate`: `tr
 ## Business, bank and account settings
 
 After owner sign-in, open **Settings → Business** to edit the display/legal names, description, proprietor, website, contact numbers and business address. Open **Payment details** for the bank, branch, account holder/name, account number, IFSC, UPI ID and UPI payment limit. Select **Save details** to persist changes. Subsequent customer quotation loads and PDF previews use the saved business and payment details.
+
+**Settings → Packages & materials** edits plywood brands, series, grades, manufacturer warranty years, included drawer limits and allowances. Defaults in all packages: handles ₹200 each, external laminate ₹1,500 per sheet, extra internal drawers ₹5,000 each, and 2–4 drawers in box-type bedroom wardrobes depending on size and approved layout. Other reusable allowances can be added. Published revisions retain their material/rate snapshot; new publications use updated settings. Business and payment recipients always use the current saved details.
+
+The PDF heading is **UMAMAHESHWARA ENTERPRISES / INTERIOR DESIGNERS**. Quotations state that materials and labour are included. Shared exclusions, visible-surface laminate, drawer limits, approved extra charges and quotation-specific `quote.notes` appear online and in PDF. Furniture aliases are normalized through one canonical vocabulary, also embedded in the assistant instructions.
 
 Every payment QR code is generated from the saved UPI ID and account holder name. The customer QR uses the entered payment amount; the PDF booking QR uses the quotation's booking amount. The PDF's online quotation QR uses the current hosting origin. Field-format checks do not verify a bank account or recipient; confirm the details with the bank before saving. Automated tests decode the actual PDF QR with edited recipient details. No live bank transaction was performed.
 
@@ -81,8 +87,8 @@ Copy the current **Assistant instructions** into your Gemini Gem or Custom GPT b
 
 The instructions require one complete JSON object inside one copyable fenced `json` block, with no surrounding prose. The loader accepts either the copied JSON contents or the complete fenced block. Final quotation output always includes `suggested_addons`, using `[]` when no useful recommendation fits the actual brief.
 
-Each recommendation contains an existing zero-based `room_index`, a tailored `reason`, and a complete `item` with `optional: true`. Unknown dimensions and quantities stay null; no rates or household facts are invented. Recommendations stay outside the quotation scope and totals until the owner adds them as optional and confirms missing measurements, quantities, PVC scope and rates. Confirmed customer-requested optional work belongs directly in `rooms[].items`.
+Each recommendation contains an existing zero-based `room_index`, a tailored `reason`, and a complete `item` with `optional: true`. Unknown dimensions and quantities stay null; no rates or household facts are invented. Recommendations stay outside the quotation scope and totals until the owner adds them as optional and confirms missing measurements, quantities and rates. Confirmed customer-requested optional work belongs directly in `rooms[].items`.
 
-Eligible catalogue work types include the standard PVC contact parts from the current instructions. For an existing draft with missing parts, review the list and choose **Use reviewed standard PVC scope**. Explicit practice records require real-customer confirmation before publication; omitting `is_demo` from a legacy import does not itself make the job a demo.
+New JSON must omit per-item `pvc`, `pvc.eligible` and `pvc.parts`; legacy copies are removed during normalization. Customer PVC package choices remain available. Explicit practice records require real-customer confirmation before publication; omitting `is_demo` from a legacy import does not itself make the job a demo.
 
 Account recovery and runtime secret changes are covered in the deployment guide. The user enters passwords directly in **Settings → Account** or the relevant private Cloudflare settings; no password is included in documentation.

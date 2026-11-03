@@ -44,9 +44,9 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
     546034
   );
 
-  // Verify customer package display names: Standard, Normal, Premium
-  assert.equal(getPackageDisplayName('Base'), 'Standard');
-  assert.equal(getPackageDisplayName('Normal'), 'Normal');
+  // Public package names change without changing historical rate keys or totals.
+  assert.equal(getPackageDisplayName('Base'), 'Basic');
+  assert.equal(getPackageDisplayName('Normal'), 'Standard');
   assert.equal(getPackageDisplayName('Premium'), 'Premium');
 
   // Verify UPI ID is 9177389543@oksbi
@@ -84,7 +84,7 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
       'Box type',
       'Kitchen'
     ),
-    'Box-type kitchen base cabinet unit with 0.8mm inside laminate and outside laminate finish.'
+    'Box-type kitchen base cabinet unit with inside and outside laminate finish.'
   );
 
   assert.equal(
@@ -93,11 +93,11 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
   );
   assert.equal(
     standardizeCompetitorItemName('Tandem or SS baskets', 'Tandem or SS baskets', 'Kitchen'),
-    'Tandem Drawers or Stainless-Steel Baskets'
+    'Tandem Drawers / Stainless-Steel Pull-Out Baskets'
   );
   assert.equal(
     standardizeCompetitorItemName('Kitchen cabinet unit (opposite to base cabinet)', 'Box type', 'Kitchen'),
-    'Cabinet Opposite Kitchen Base Cabinets'
+    'Kitchen Full-Height Utility Cabinet'
   );
 
   // With PVC adds PVC substitution ONLY to eligible items (Folding table, Tandem baskets, Pooja CNC doors stay unchanged)
@@ -120,6 +120,27 @@ test('J. Karthik Peerzadiguda quote reproduces ₹5,27,445 to the rupee', () => 
     lineRateOverrides: KARTHIK_HISTORICAL_RATE_OVERRIDES,
   });
   assert.equal(snapshot.baseWholeHomeTotals[makeComboKey('Base', 'Standard', 'SF')], 527445);
+});
+
+test('package-level PVC pricing follows the work-type rate card, not legacy per-item metadata', () => {
+  const draft = structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
+  const boxType = draft.rooms[0].items[1];
+  const foldingTable = draft.rooms[0].items[3];
+
+  // These legacy fields must not allow an owner/assistant to suppress or
+  // force package-level protection on a particular line.
+  boxType.pvc = { eligible: false, parts: [] };
+  foldingTable.pvc = { eligible: true, parts: ['Invented legacy contact area'] };
+
+  const snapshot = calculateQuotationPricing(draft);
+  assert.equal(
+    snapshot.rooms[0].items[1].unitRates[makeComboKey('Premium', 'With PVC', 'SF')],
+    1325
+  );
+  assert.equal(
+    snapshot.rooms[0].items[3].unitRates[makeComboKey('Premium', 'With PVC', 'SF')],
+    snapshot.rooms[0].items[3].unitRates[makeComboKey('Premium', 'Standard', 'SF')]
+  );
 });
 
 test('Room mixing, optional add-ons, and flat discount calculate deterministically', () => {

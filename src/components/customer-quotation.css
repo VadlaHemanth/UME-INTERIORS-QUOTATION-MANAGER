@@ -47,9 +47,9 @@
   .customer-quotation .detail-price-table td:nth-child(n+2)::before,
   .customer-quotation .milestone-table td:nth-child(n+2)::before { display: block; margin-bottom: 5px; font-size: 11px; font-family: var(--font-sans); font-weight: 600; line-height: 1.4; color: #5c645e; letter-spacing: 0; }
   .customer-quotation .room-comparison-table td:nth-child(3)::before,
-  .customer-quotation .detail-price-table td:nth-child(4)::before { content: 'Standard'; }
+  .customer-quotation .detail-price-table td:nth-child(4)::before { content: 'Basic'; }
   .customer-quotation .room-comparison-table td:nth-child(4)::before,
-  .customer-quotation .detail-price-table td:nth-child(5)::before { content: 'Normal'; }
+  .customer-quotation .detail-price-table td:nth-child(5)::before { content: 'Standard'; }
   .customer-quotation .room-comparison-table td:nth-child(5)::before,
   .customer-quotation .detail-price-table td:nth-child(6)::before { content: 'Premium'; }
   .customer-quotation .room-comparison-table td:nth-child(n+3) button { padding: 6px 4px; width: 100%; font-size: 13px; white-space: nowrap; }
@@ -61,8 +61,8 @@
   .customer-quotation .detail-price-table td:nth-child(n+4) { font-size: 13px; padding: 8px 4px; border-radius: 6px; }
   .customer-quotation .detail-price-table td[colspan] { grid-column: 1 / -1; }
   .customer-quotation .detail-price-table tr:last-child td:not([colspan]) { grid-column: auto; font-size: 13px; }
-  .customer-quotation .detail-price-table tr:last-child td:nth-child(2)::before { content: 'Standard'; }
-  .customer-quotation .detail-price-table tr:last-child td:nth-child(3)::before { content: 'Normal'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(2)::before { content: 'Basic'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(3)::before { content: 'Standard'; }
   .customer-quotation .detail-price-table tr:last-child td:nth-child(4)::before { content: 'Premium'; }
   .customer-quotation .milestone-table td:first-child { grid-column: 1 / -1; }
   .customer-quotation .milestone-table td:nth-child(2)::before { content: 'Instalment'; }
@@ -293,3 +293,46 @@
 @media print {
   .selection-mobile-bar, .selection-end-actions { display: none !important; }
 }
+.plywood-specifications { display: grid; gap: 10px; }
+.plywood-specifications details { padding: 12px 0; border-top: 1px solid #d8d0c2; }
+.plywood-specifications summary { font-size: 13px; font-weight: 600; cursor: pointer; min-height: 28px; }
+.plywood-specifications ul { display: grid; gap: 12px; padding-top: 16px; }
+.plywood-specifications li { display: grid; gap: 4px; font-size: 13px; line-height: 1.55; }
+.plywood-specifications li span { color: #4a524d; }
+.quotation-notes-list { list-style: disc; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; line-height: 1.65; }
+.work-order-content { max-width:1120px; margin:0 auto; padding:24px; display:grid; gap:24px; }
+.work-order-toolbar { padding:20px clamp(16px,3vw,40px); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; background:white; }
+.work-order-toolbar h1 { font-size:24px; font-weight:700; }
+.work-order-toolbar p { margin-top:5px; font-size:13px; }
+.work-order-toolbar > div:last-child { display:flex; flex-wrap:wrap; gap:8px; }
+.work-order-toolbar button { padding:12px 16px; border:1px solid #d8d0c2; border-radius:8px; }
+.work-order-toolbar button:last-child { background:#1c3a2f; color:white; }
+.work-order-summary { display:grid; grid-template-columns:1fr 1fr; gap:24px; background:#e4efe7; padding:24px; border-radius:12px; }
+.work-order-summary h2, .work-order-room h2, .work-order-terms h2 { font-size:18px; font-weight:700; }
+.work-order-summary p { font-size:14px; margin-top:10px; }
+.work-order-summary dl { display:grid; gap:12px; }
+.work-order-summary dl > div { display:flex; justify-content:space-between; gap:12px; }
+.work-order-summary dd { font-weight:700; font-variant-numeric:tabular-nums; }
+.work-order-notice { font-size:14px; line-height:1.7; }
+.work-order-room, .work-order-terms { background:white; padding:24px; border-radius:12px; }
+.work-order-room header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; padding-bottom:18px; }
+.work-order-room header span { font-size:13px; }
+.work-order-room article { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:18px; padding-block:16px; border-top:1px solid #e5dfd3; }
+.work-order-room article h3 { font-size:15px; font-weight:600; }
+.work-order-room article p { font-size:13px; line-height:1.6; margin-top:6px; color:#4a524d; }
+.work-order-room article strong { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.work-order-terms ul { list-style:disc; padding-left:20px; }
+.work-order-terms :is(li,p) { font-size:14px; line-height:1.7; margin-top:14px; }
+.work-order-terms a { display:inline-flex; padding:12px 16px; background:#1c3a2f; color:white; margin:16px 12px 0 0; border-radius:8px; font-size:14px; }
+@media(min-width:769px) { .work-order-terms a.mobile-upi-button { display:none; } }
+@media(max-width:640px) { .work-order-content { padding:16px; gap:18px; } .work-order-summary { grid-template-columns:1fr; padding:18px; } .work-order-room, .work-order-terms { padding:18px; } .work-order-toolbar button { font-size:13px; min-height:44px; } .work-order-room article { gap:12px; } }
+.work-order-proof { display:grid; gap:14px; margin-top:24px; padding-top:20px; border-top:1px solid #e5dfd3; }
+.work-order-proof input { font-size:16px; }
+.quote-estimate-disclosure { font-size:12px; line-height:1.65; color:#48534b; }
+.quote-estimate-disclosure summary { display:grid; grid-template-columns:18px minmax(0,1fr) 16px; gap:10px; align-items:start; cursor:pointer; }
+.quote-estimate-disclosure summary strong { display:block; color:#1c3a2f; }
+.quote-estimate-disclosure summary small { display:block; margin-top:3px; font-size:12px; }
+.quote-estimate-disclosure summary svg { margin-top:3px; }
+.quote-estimate-disclosure > p { margin-top:12px; white-space:pre-line; }
+.quote-estimate-disclosure[open] summary > svg:last-child { transform:rotate(180deg); }
+@media(max-width:640px) { .scope-room-heading > label { flex-basis:100%; } .scope-item > header { display:grid; grid-template-columns:minmax(0,1fr) 44px; } .scope-item > header .scope-delete { font-size:0; width:44px; justify-content:center; padding:10px; } }

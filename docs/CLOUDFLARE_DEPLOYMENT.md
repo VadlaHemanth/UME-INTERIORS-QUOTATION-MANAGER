@@ -70,6 +70,8 @@ In Cloudflare, select **Workers & Pages → quotation → Settings → Domains &
 
 ## Future updates
 
+The current release includes private drafts, automatic owner-only revisions, quotation material snapshots and confirmed work orders. These fields use the existing JSON runtime store; no new database or migration is required for this update. Refresh the Gem/Custom GPT's saved instructions from the app after deployment. Package names displayed to users are Basic, Standard and Premium; JSON keys remain Base, Normal and Premium.
+
 Local source changes are not live until this deployment procedure completes. The QA notes distinguish local checks from previously deployed behavior.
 
 ```powershell
