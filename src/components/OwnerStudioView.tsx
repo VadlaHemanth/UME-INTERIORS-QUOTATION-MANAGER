@@ -58,6 +58,7 @@ import { indiaDate, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkO
 import { CustomerQuotationView } from './CustomerQuotationView';
 import { canonicalFurnitureName, FURNITURE_VOCABULARY } from '../lib/furniture';
 import { packageAllowances } from '../lib/commercial-spec';
+import { prepareQuotationDraft, reviewedQuotationNotes } from '../lib/quotation-presentation';
 import { RoomScopeEditor } from './RoomScopeEditor';
 
 export interface PublishedQuoteSummary {
@@ -255,6 +256,12 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const [quotePage, setQuotePage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [previewMode, setPreviewMode] = useState<'online' | 'pdf' | null>(null);
+  const editorScrollBeforePreview=useRef(0);
+  const openPreview=(mode:'online'|'pdf')=>{
+    if (previewMode===null) editorScrollBeforePreview.current=window.scrollY;
+    setPreviewMode(mode);requestAnimationFrame(()=>window.scrollTo({top:0,left:0,behavior:'instant'}));
+  };
+  const closePreview=()=>{setPreviewMode(null);requestAnimationFrame(()=>window.scrollTo({top:editorScrollBeforePreview.current,left:0,behavior:'instant'}));};
   const [savingRates, setSavingRates] = useState(false);
   const [paymentQuote, setPaymentQuote] = useState('');
   const [verifiedAmount, setVerifiedAmount] = useState(50000);
@@ -322,10 +329,20 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const pendingOwnerReviewCount = reviewedOwnerRequests ? 0 : workingDraft.owner_requests.length;
   const publishGateCount = ordinaryValidationIssues.length + pendingOwnerReviewCount;
 
-  const previewSnapshot = useMemo(
-    () => calculateQuotationPricing(workingDraft, editableCatalogue),
-    [workingDraft, editableCatalogue]
-  );
+  const previewDraft = useMemo(()=>{
+    const draft=prepareQuotationDraft(workingDraft,editableCatalogue);
+    for (const room of draft.rooms) for (const item of room.items) if (item.work_type && JSON.stringify(editableCatalogue.workTypes[item.work_type]?.rates)!==JSON.stringify(catalogue.workTypes[item.work_type]?.rates)) item.custom_rates=null;
+    draft.quote.notes=reviewedQuotationNotes(draft,reviewedOwnerRequests);
+    const previous=quotes.find(quote=>quote.publicId===supersedeId && quote.status!=='Draft');
+    if (previous) {
+      draft.quote.date=indiaDate();
+      if (draft.quote.valid_until===previous.draft.quote.valid_until) draft.quote.valid_until=quoteExpiry(draft.quote.date);
+    }
+    draft.quote.date ||= indiaDate();
+    draft.quote.valid_until ||= quoteExpiry(draft.quote.date);
+    return draft;
+  },[workingDraft,editableCatalogue,catalogue,reviewedOwnerRequests,quotes,supersedeId]);
+  const previewSnapshot=useMemo(()=>calculateQuotationPricing(previewDraft,editableCatalogue),[previewDraft,editableCatalogue]);
 
   const syncDraft = (next: QuotationDraftV2) => {
     const withAutomaticProtection = applyStandardPvcScopes(next, editableCatalogue);
@@ -626,7 +643,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   };
 
   return (
-    <div className={`owner-studio min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16 ${previewMode === null ? 'no-print' : ''}`}>
+    <div className={`min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16 ${previewMode === null ? 'owner-studio no-print' : 'owner-preview-host'}`}>
       <datalist id="ume-furniture-names">{FURNITURE_VOCABULARY.map(([name]) => <option key={name} value={name}/>)}</datalist>
       <datalist id="ume-worktypes-datalist">
         {Object.keys(editableCatalogue.workTypes).map((wt) => (
@@ -635,7 +652,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       </datalist>
 
       {/* Studio Header & Unified Segmented Navigation */}
-      <div className="bg-white border-b border-[#E5DFD3] no-print">
+      <div hidden={previewMode !== null} className="bg-white border-b border-[#E5DFD3] no-print">
         <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -707,8 +724,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       </div>
 
       {previewMode && <section className="owner-preview">
-        <div className="owner-preview-toolbar no-print"><div><strong>Unpublished preview</strong><p>Check the customer experience before publishing. Changes here are temporary.</p></div><div><button type="button" onClick={() => setPreviewMode('online')} aria-pressed={previewMode === 'online'}>Online</button><button type="button" onClick={() => setPreviewMode('pdf')} aria-pressed={previewMode === 'pdf'}>PDF</button><button type="button" onClick={() => setPreviewMode(null)}>Back to editor</button></div></div>
-        <CustomerQuotationView key={previewMode} publicId="preview" revision={1} status="Draft" isPreview initialPrintPreview={previewMode === 'pdf'} draft={{...workingDraft,quote:{...workingDraft.quote,notes:[...(workingDraft.quote.notes || []), ...(reviewedOwnerRequests ? workingDraft.owner_requests.map(r => r.text) : [])]}}} snapshot={previewSnapshot} catalogue={editableCatalogue} approvedDiscountRupees={approvedDiscount} verifiedPaidRupees={0} pendingPaymentsCount={0} defaultSentPackage={{grade:workingDraft.recommended?.grade || 'Base', protection:workingDraft.recommended?.protection || 'Standard', finish:'SF',brand_preference:workingDraft.recommended?.brand_preference || null}} initialSelection={{wholeHomeSelection:{grade:workingDraft.recommended?.grade || 'Base',protection:workingDraft.recommended?.protection || 'Standard',finish:'SF',brand_preference:null},mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],acceptedTermsAt:null}} onSaveSelection={async()=>{}} onSubmitPayment={async()=>({ok:false,error:'Publish the quotation before requesting payment.'})}/>
+        <div className="owner-preview-toolbar no-print"><div><strong>Unpublished preview</strong><p>Check the customer experience before publishing. Changes here are temporary.</p></div><div><button type="button" onClick={() => openPreview('online')} aria-pressed={previewMode === 'online'}>Online</button><button type="button" onClick={() => openPreview('pdf')} aria-pressed={previewMode === 'pdf'}>PDF</button><button type="button" onClick={closePreview}>Back to editor</button></div></div>
+        <CustomerQuotationView key={previewMode} publicId="preview" revision={1} status="Draft" isPreview initialPrintPreview={previewMode === 'pdf'} draft={previewDraft} snapshot={previewSnapshot} catalogue={editableCatalogue} approvedDiscountRupees={Math.max(0,Math.round(approvedDiscount))} verifiedPaidRupees={0} pendingPaymentsCount={0} defaultSentPackage={{grade:workingDraft.recommended?.grade || 'Base', protection:workingDraft.recommended?.protection || 'Standard', finish:workingDraft.recommended?.finish || 'SF',brand_preference:workingDraft.recommended?.brand_preference || null}} initialSelection={{wholeHomeSelection:{grade:workingDraft.recommended?.grade || 'Base',protection:workingDraft.recommended?.protection || 'Standard',finish:workingDraft.recommended?.finish || 'SF',brand_preference:workingDraft.recommended?.brand_preference || null},mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],acceptedTermsAt:null}} onSaveSelection={async()=>{}} onSubmitPayment={async()=>({ok:false,error:'Publish the quotation before requesting payment.'})}/>
       </section>}
       <div hidden={previewMode !== null} className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 no-print">
         {activeTab !== 'unified_studio' && publishResult && !publishResult.ok && (
@@ -1434,8 +1451,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
                     <div className="owner-publish-actions">
                     {(!supersedeId || quotes.find(q => q.publicId === supersedeId)?.status === 'Draft') && <button type="button" disabled={savingDraft} onClick={async()=>{setSavingDraft(true);try{const saved=await onSaveOwnerDraft(workingDraft,supersedeId || undefined,approvedDiscount);syncDraft(saved.draft);setSupersedeId(saved.publicId);setPublishResult({ok:true,message:'Draft saved. It appears in Quotations and remains private until published.'});}catch(error){setPublishResult({ok:false,message:error instanceof Error?error.message:'Could not save draft.'});}finally{setSavingDraft(false);}}}>{savingDraft?'Saving…':'Save draft'}</button>}
-                    <button type="button" onClick={() => {setPreviewMode('online'); window.scrollTo({top:0});}}>Preview online</button>
-                    <button type="button" onClick={() => {setPreviewMode('pdf'); window.scrollTo({top:0});}}>Preview PDF</button>
+                    <button type="button" onClick={() => openPreview('online')}>Preview online</button>
+                    <button type="button" onClick={() => openPreview('pdf')}>Preview PDF</button>
                     <button
                       type="button"
                       onClick={handlePublishClick}
@@ -1708,7 +1725,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {if(q.status === 'Draft'){setSupersedeId(q.publicId);setApprovedDiscount(q.approvedDiscountRupees);syncDraft(structuredClone(q.draft));setPreviewMode('online');}else onOpenCustomerQuote(q.publicId);}}
+                          onClick={() => {if(q.status === 'Draft'){setSupersedeId(q.publicId);setApprovedDiscount(q.approvedDiscountRupees);syncDraft(structuredClone(q.draft));openPreview('online');}else onOpenCustomerQuote(q.publicId);}}
                           className="px-3.5 py-2 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-xs font-bold cursor-pointer"
                         >
                           {q.status === 'Draft' ? 'Preview draft' : q.workOrder ? 'Open work order' : 'Open quotation'}

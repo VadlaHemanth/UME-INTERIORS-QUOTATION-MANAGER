@@ -42,6 +42,10 @@ interface PrintableA4SheetProps {
   onReturnToInteractiveSelector?: () => void;
 }
 
+function PreviewQrSpace({label}:{label:string}) {
+  return <figure className="qr-code inline-flex flex-col items-center shrink-0 m-0"><div className="pdf-qr-placeholder">Unpublished preview</div><figcaption className="mt-1 text-[10px] text-center font-medium text-[#5C645F]">{label}</figcaption></figure>;
+}
+
 /** The preview and native PDF share these exact measured A4 page nodes. */
 function A4Document({ children, reference }: { children: React.ReactNode; reference: string }) {
   const sourceRef = useRef<HTMLDivElement>(null);
@@ -981,12 +985,12 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </dl>
           </div>
           <div className="pdf-bank-qrs">
-            {!isPreview && !milestones.requiresOwnerSmallOrderRule && (
+            {!milestones.requiresOwnerSmallOrderRule && (isPreview ? <PreviewQrSpace label="UPI booking"/> : (
               <DeterministicQrCode
                 value={`upi://pay?${new URLSearchParams({ pa: catalogue.company.bank.upiId, pn: catalogue.company.bank.accountName, am: String(milestones.bookingRequired), cu: 'INR', tn: `Booking ${quoteRef}` }).toString()}`}
                 size={94} label="UPI booking" />
-            )}
-            {!isPreview ? <DeterministicQrCode value={shareUrl} size={94} label="Online quotation" /> : <p className="max-w-[110px] text-[10px] leading-relaxed">Unpublished preview. Payment and quotation QR codes are added after publication.</p>}
+            ))}
+            {!isPreview ? <DeterministicQrCode value={shareUrl} size={94} label="Online quotation" /> : <PreviewQrSpace label="Online quotation"/>}
           </div>
         </section>
 

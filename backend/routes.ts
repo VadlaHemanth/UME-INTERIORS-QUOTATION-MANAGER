@@ -1,12 +1,12 @@
 import { validateCompanySettings } from '../src/lib/company-settings';
 import { KARTHIK_HISTORICAL_RATE_OVERRIDES } from '../src/lib/historicalData';
-import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, formatCleanItemDescription, standardizeCompetitorItemName, getPackageDisplayName, mergeRateCardJsonIntoCatalogue, type StudioCatalogue } from '../src/lib/catalogue';
+import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, getPackageDisplayName, mergeRateCardJsonIntoCatalogue, type StudioCatalogue } from '../src/lib/catalogue';
 import { calculateMilestoneSchedule, calculateQuotationPricing, computeCustomerSelectionTotal, type PricedQuotationSnapshot } from '../src/lib/pricing';
-import { applyStandardPvcScopes } from '../src/lib/pvc-scope';
 import { type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
 import { randomHex, type OwnerAccount } from './auth';
 import { carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
 import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
+import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
 
 export interface PaymentLedgerEntry {
   id: string;
@@ -131,14 +131,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
   }
   const quotesStore = new Map(state.quotes.map((record) => [record.publicId, record]));
   const paymentLedger = state.ledger;
-  const prepareDraft = (draft: QuotationDraftV2) => {
-    const next = applyStandardPvcScopes(draft, activeCatalogue);
-    for (const room of next.rooms) for (const item of room.items) {
-      item.name = standardizeCompetitorItemName(item.name || '', item.work_type || '', room.name || '');
-      if (item.source_text_en) item.source_text_en = formatCleanItemDescription(item.source_text_en,item.name,item.work_type || '',room.name || '');
-    }
-    return next;
-  };
+  const prepareDraft = (draft: QuotationDraftV2) => prepareQuotationDraft(draft,activeCatalogue);
   const allRecords = () => Array.from(quotesStore.values());
   const visibleRecords = () => allRecords().filter(record => !record.deletedAt);
   const latest = (id: string) => {
@@ -831,7 +824,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     }
     if (!previous && allRecords().some(q => q.draft.quote.number === finalizedDraft.quote.number)) finalizedDraft.quote.number = nextQuoteNumber(allRecords(), now);
     delete finalizedDraft.rate_card_updates;
-    finalizedDraft.quote.notes = [...new Set([...(finalizedDraft.quote.notes || []), ...(reviewedOwnerRequests ? finalizedDraft.owner_requests.filter(r => !/feedback|discount|payment.*claim/i.test(r.text)).map(r => r.text) : [])])];
+    finalizedDraft.quote.notes = reviewedQuotationNotes(finalizedDraft,Boolean(reviewedOwnerRequests));
     if (previous) finalizedDraft.quote.date = todayStr;
     if (previous && finalizedDraft.quote.valid_until === previous.draft.quote.valid_until) finalizedDraft.quote.valid_until = quoteExpiry(todayStr);
     if (!finalizedDraft.quote.date) {

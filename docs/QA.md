@@ -1,5 +1,11 @@
 # Release verification — 4 November 2026
 
+## PDF corners and unpublished preview follow-up
+
+The suite passes **72/72 tests**, including a new comparison of unpublished preparation with actual publication: furniture vocabulary, reviewed customer notes and priced room scopes match, without changing the editor draft. Rounded PDF table wrappers clip their child backgrounds at the same outer radius, including continuation tables.
+
+The unpublished Online/PDF views now sit outside the studio's font/control styling. Browser checks compare computed customer and PDF styles before and after publication at 390, 768 and 1440 pixels, with zero style differences on the checked headings, package controls, table cells, figures and bank panel. Both mobile print paths generate eight A4 pages for the fixture, with no body overflow, one letterhead per physical page and no leaked editor content. Inactive QR placeholders preserve the published payment-panel geometry. Screenshots and rendered pages are checked for clean corners and aligned grids. This is tested with synthetic records in a separate local database.
+
 ## Materials and deletion follow-up
 
 The suite passes **71/71 tests**. Additional coverage verifies automatic drawer charges at Basic ₹4,000 / Standard ₹5,000 / Premium ₹6,000 without AI notes; changed reusable drawer rates flowing into publication; edited material wording in actual PDF source markup and public catalogue responses; migration of old shipped defaults while retaining custom prices; and owner-only, explicitly confirmed deletion across a complete revision series. Deletion revokes customer links and preserves payment history. Tests also prevent deleted records from being restored by a stale draft or publication request.

@@ -5,6 +5,7 @@ import { emptyState, type StudioState, type PublishedQuotationRecord } from './r
 import { createOwner, issueSession, validSession, verifyPassword } from './auth';
 import { VIDYA_SAGAR_REDDY_DRAFT } from '../src/lib/historicalData';
 import { calculateQuotationPricing } from '../src/lib/pricing';
+import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
 
 const environment = { OWNER_USERNAME: 'owner', OWNER_PASSWORD: 'A-private-local-password-123' };
 function memoryStore(initial = emptyState()): StateStore {
@@ -73,6 +74,28 @@ test('saved material wording and drawer rates reach new publications without AI-
   assert.deepEqual(publicData.catalogue.materialWording,catalogue.materialWording);
   assert.deepEqual(publicData.catalogue.commonMaterials,catalogue.commonMaterials);
   assert.equal((await store.load()).state.quotes[0].catalogueSnapshot!.materialWording,undefined,'earlier document snapshot stays unchanged');
+});
+
+test('unpublished presentation and publication share vocabulary, reviewed notes and prices',async()=>{
+  const store=memoryStore();
+  const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const catalogue=(await store.load()).state.catalogue;
+  const draft=structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
+  draft.rooms[0].items[1].name='Inside Wardrobe Box Locker';
+  draft.rooms[0].items[1].source_text_en='Box-type internal locker with inside laminate and outside laminate finish.';
+  draft.quote.notes=['Confirm access before installation.'];
+  draft.owner_requests=[{path:'/quote/terms_notes',text:'Customer will confirm the installation layout.'},{path:'/discount',text:'Discount requested; needs approval.'},{path:'/payment',text:'Unverified payment claim.'}];
+  const before=structuredClone(draft);
+  const preview=prepareQuotationDraft(draft,catalogue);preview.quote.notes=reviewedQuotationNotes(preview,true);
+  assert.deepEqual(draft,before,'preparing a preview must not alter the editor draft');
+  assert.equal(preview.rooms[0].items[1].name,'Internal Wardrobe Locker');
+  assert.deepEqual(preview.quote.notes,['Confirm access before installation.','Customer will confirm the installation layout.']);
+  const response=await handleApi(request('/api/studio/publish','POST',{draft,reviewedOwnerRequests:true},cookie),store,environment);
+  assert.equal(response.status,201);
+  const published=(await response.json() as any).record;
+  assert.deepEqual(published.draft.rooms,preview.rooms);
+  assert.deepEqual(published.draft.quote.notes,preview.quote.notes);
+  assert.deepEqual(published.snapshot.rooms,calculateQuotationPricing(preview,catalogue).rooms);
 });
 
 test('password hashing, tampered sessions, expiry and owner version invalidation', async () => {
