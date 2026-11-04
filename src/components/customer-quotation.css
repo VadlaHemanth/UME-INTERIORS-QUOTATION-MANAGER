@@ -1,4 +1,6 @@
 /* Customer workspace: readable controls and comparison cards at every width. */
+.quote-delete-button { min-height:44px; padding:10px 14px; color:#96372e; border:1px solid #dcc8bf; border-radius:8px; font-size:12px; font-weight:600; background:#fff; }
+.quote-delete-button:disabled { opacity:.6; cursor:wait; }
 .customer-quotation { min-width: 0; overflow-wrap: anywhere; }
 .customer-quotation :where(section, form, .quotation-workspace > *, .quotation-summary, input, select, textarea) { min-width: 0; }
 .customer-quotation :where(input, select, textarea) { max-width: 100%; }

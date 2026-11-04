@@ -1,4 +1,12 @@
-# Release verification — 3 November 2026
+# Release verification — 4 November 2026
+
+## Materials and deletion follow-up
+
+The suite passes **71/71 tests**. Additional coverage verifies automatic drawer charges at Basic ₹4,000 / Standard ₹5,000 / Premium ₹6,000 without AI notes; changed reusable drawer rates flowing into publication; edited material wording in actual PDF source markup and public catalogue responses; migration of old shipped defaults while retaining custom prices; and owner-only, explicitly confirmed deletion across a complete revision series. Deletion revokes customer links and preserves payment history. Tests also prevent deleted records from being restored by a stale draft or publication request.
+
+Material settings use labeled, wrapping text areas, consistent panel padding and a single-column layout on small screens. Unsaved wording survives settings-tab changes and triggers the leave warning. The new defaults apply to new quotations and published revisions; previous material snapshots remain unchanged.
+
+Production-bundle Chromium checks at 320, 390, 768 and 1440 pixels found zero page overflow, clipped settings labels or runtime errors, including a long unbroken plywood product name. The form saved edited wording and retained it across tab changes. A quotation with empty quote.notes generated an eight-page PDF containing all three automatic drawer rates and Fevicol/Jeevanjor wording; page bodies did not overflow, and every page had the same visible letterhead. Browser tests exercised native delete cancellation and confirmed deletion using synthetic records in a separate local database. No customer quotation was deleted in production.
 
 ## Current release
 

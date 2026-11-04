@@ -120,6 +120,7 @@ export interface LedgerEntrySummary {
 }
 
 interface OwnerStudioViewProps {
+  onDeleteQuote: (publicId: string) => Promise<void>;
   onSaveOwnerDraft: (draft: QuotationDraftV2, publicId?: string, discount?: number) => Promise<PublishedQuoteSummary>;
   catalogue: StudioCatalogue;
   quotes: PublishedQuoteSummary[];
@@ -204,6 +205,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   onUpdateCatalogue,
   onVerifyOrRejectPayment,
   onRecordVerifiedPayment,
+  onDeleteQuote,
 }) => {
   const [activeTab, setActiveTab] = useState<
     'unified_studio' | 'quotes' | 'gem_instructions' | 'ledger'
@@ -243,6 +245,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
   // Tab 2: Quotes CMS search & filter
   const [quoteSearch, setQuoteSearch] = useState<string>('');
+  const [deletingQuoteId, setDeletingQuoteId] = useState<string | null>(null);
+  const [deleteQuoteError, setDeleteQuoteError] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
   const [expandedQuoteDetailsId, setExpandedQuoteDetailsId] = useState<string | null>(null);
@@ -1517,6 +1521,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
               </button>
             </div>
 
+            {deleteQuoteError && <p role="alert" className="text-sm text-[#96372e]">{deleteQuoteError}</p>}
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><span>{filteredQuotes.length} quotation{filteredQuotes.length === 1 ? '' : 's'} · newest first</span><div className="flex items-center gap-3"><button type="button" disabled={quotePage <= 1} onClick={() => setQuotePage(page => page-1)}>Previous</button><span>Page {Math.min(quotePage,quotePageCount)} of {quotePageCount}</span><button type="button" disabled={quotePage >= quotePageCount} onClick={() => setQuotePage(page => page+1)}>Next</button></div></div>
             {filteredQuotes.length === 0 && <p className="p-6 text-sm">No quotations match these filters. Change the dates, search or status to try again.</p>}
             <div className="space-y-4">
@@ -1718,6 +1723,17 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           <History className="w-3.5 h-3.5" />
                           {isExpanded ? 'Hide Activity' : 'History & Links'}
                         </button>
+                        <button type="button" className="quote-delete-button" disabled={deletingQuoteId !== null} onClick={async()=>{
+                          if (!window.confirm(`Delete ${q.draft.quote.number || 'this quotation'} for ${q.draft.customer.name || 'this customer'}? All revisions will be removed from the studio and every customer link will stop working. Existing payment history stays recorded.`)) return;
+                          setDeletingQuoteId(q.publicId);setDeleteQuoteError('');
+                          try {
+                            const editingDeleted = supersedeId && seriesIds(quotes,q.publicId).has(supersedeId);
+                            await onDeleteQuote(q.publicId);
+                            if (editingDeleted) { setSupersedeId('');syncDraft(createEmptyOwnerDraft(quotes));setPreviewMode(null); }
+                            setExpandedQuoteDetailsId(null);
+                          } catch(error) { setDeleteQuoteError(error instanceof Error ? error.message : 'Could not delete the quotation.'); }
+                          finally { setDeletingQuoteId(null); }
+                        }}>{deletingQuoteId===q.publicId?'Deleting…':'Delete quotation'}</button>
                       </div>
                     </div>
 

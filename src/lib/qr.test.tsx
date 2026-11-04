@@ -70,6 +70,8 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
     catalogue.company.bank.upiId = 'edited.payments@bank';
     catalogue.company.bank.accountName = 'Edited Interior Account / Test Recipient';
     const draft = structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
+    draft.quote.notes=[];draft.owner_requests=[];
+    catalogue.materialWording={materialsAndLabour:'Materials and installation labour are included.',externalLaminate:'Approved external laminate finish.',internalLaminate:'Approved internal liner finish.',handles:'Included handles'};
     draft.quote.number = 'UME-TEST-EDITED-BANK';
     const snapshot = calculateQuotationPricing(draft, catalogue);
     const html = renderToStaticMarkup(<PrintableA4Sheet
@@ -79,6 +81,11 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
       approvedDiscountRupees={0} verifiedPaidRupees={0}
     />);
     const svg = /<svg\b[^>]*\baria-label="UPI booking"[^>]*>[\s\S]*?<\/svg>/.exec(html)?.[0];
+    assert.match(html,/Basic ₹4,000 each; Standard ₹5,000 each; Premium ₹6,000 each/);
+    assert.match(html,/Materials and installation labour are included/);
+    assert.match(html,/Approved external laminate finish/);
+    assert.match(html,/Fevicol and Jeevanjor/);
+    assert.doesNotMatch(html,/Fevicol Marine|Jivanjor|\bSH\b/);
     assert.ok(svg, 'the real PDF source markup must contain its booking QR');
     const decoded = scanRenderedSvgQr(svg);
     assert.ok(decoded, 'the actual PDF booking QR must be scannable');

@@ -19,7 +19,7 @@ import {
   ResolvedPackageSelection,
 } from '../lib/schema';
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
-import { documentTerms, materialLines, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { documentTerms, materialLines, materialWording, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import {
   DeterministicQrCode,
   UmeLogoMark,
@@ -496,7 +496,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </section>
         )}
 
-        <p className="text-[11px] font-semibold">Prices include materials and labour for the listed scope.</p>
+        <p className="text-[11px] font-semibold">{materialWording(catalogue).materialsAndLabour}</p>
         {!isWorkOrder && <>
         {/* All 3 Packages Side-by-Side Executive Comparison Strip */}
         <div className="space-y-2 print-avoid-break">
@@ -1000,7 +1000,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             Specifications and terms
           </p>
           <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[10.5px] text-[#18221D] leading-snug">
-            <strong>Laminate thickness and finish:</strong> Internal liner laminate is <strong>0.8 mm nominal thickness</strong> (manufacturer sheet gauge: <strong>0.72–0.80 mm</strong>). External decorative laminate is <strong>1.0 mm</strong>, in the selected SF matte or high-gloss finish at the same quoted price.
+            <strong>Laminate thickness and finish:</strong> {materialWording(catalogue).internalLaminate} {materialWording(catalogue).externalLaminate}
           </div>
           <div className="pdf-terms grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] text-[#4A524D] leading-relaxed">
             {documentTerms(catalogue,documentGrades,isWorkOrder).map((t) => (

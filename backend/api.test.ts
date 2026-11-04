@@ -20,6 +20,61 @@ function request(path: string, method = 'GET', body?: unknown, cookie?: string, 
 }
 function cookieFrom(response: Response): string { return response.headers.get('set-cookie')!.split(';')[0]; }
 
+test('owner deletion revokes every revision link, hides records and retains payment history',async()=>{
+  const store=memoryStore(paymentFixture());
+  const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const initial=(await store.load()).state.quotes[0];
+  const route=`/api/studio/quotes/${initial.publicId}`;
+  assert.equal((await handleApi(request(route,'DELETE',{confirmDelete:true}),store,environment)).status,401);
+  assert.equal((await handleApi(request(route,'DELETE',{},cookie),store,environment)).status,400);
+  const revised=await handleApi(request(`${route}/default-package`,'PATCH',{defaultSentPackage:{grade:'Base',protection:'Standard',finish:'SF',brand_preference:null}},cookie),store,environment);
+  assert.equal(revised.status,200);
+  const current=(await revised.json() as any).quote;
+  assert.equal((await handleApi(request(`/api/studio/quotes/${current.publicId}/verified-payment`,'POST',{amountRupees:50000,reference:'DELETE-TEST-RECEIPT'},cookie),store,environment)).status,201);
+  const ledger=structuredClone((await store.load()).state.ledger);
+  const removed=await handleApi(request(route,'DELETE',{confirmDelete:true},cookie),store,environment);
+  assert.equal(removed.status,200);
+  assert.deepEqual((await removed.json() as any).quotes,[]);
+  for(const id of [initial.publicId,current.publicId]) {
+    assert.equal((await handleApi(request(`/api/quotes/${id}`),store,environment)).status,404);
+    assert.equal((await handleApi(request('/api/quotes/lookup','POST',{codeOrLink:id}),store,environment)).status,404);
+    assert.equal((await handleApi(request(`/api/quotes/${id}/selection`,'PATCH',{}),store,environment)).status,404);
+  }
+  const bootstrap=await (await handleApi(request('/api/studio/bootstrap','GET',undefined,cookie),store,environment)).json() as any;
+  assert.deepEqual(bootstrap.quotes,[]);assert.deepEqual(bootstrap.ledger,ledger);
+  const stored=(await store.load()).state;
+  assert.ok(stored.quotes.every(q=>q.deletedAt));assert.deepEqual(stored.ledger,ledger);
+  assert.equal((await handleApi(request('/api/studio/publish','POST',{draft:current.draft,supersedePublicId:current.publicId,reviewedOwnerRequests:true},cookie),store,environment)).status,404);
+  const draftResponse=await handleApi(request('/api/studio/drafts','POST',{draft:{...current.draft,quote:{number:null,date:null,valid_until:null}}},cookie),store,environment);
+  assert.equal(draftResponse.status,200);
+  const draft=(await draftResponse.json() as any).record;
+  assert.equal((await handleApi(request(`/api/studio/quotes/${draft.publicId}`,'DELETE',{confirmDelete:true},cookie),store,environment)).status,200);
+  assert.equal((await handleApi(request('/api/studio/drafts','POST',{draft:draft.draft,publicId:draft.publicId},cookie),store,environment)).status,404);
+});
+
+test('saved material wording and drawer rates reach new publications without AI-generated notes',async()=>{
+  const store=memoryStore(paymentFixture());
+  const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const initial=(await store.load()).state;
+  const catalogue=structuredClone(initial.catalogue);
+  catalogue.materialWording={materialsAndLabour:'Materials and installation labour are included.',externalLaminate:'Approved decorative laminate finish.',internalLaminate:'Approved internal liner finish.',handles:'Included handles'};
+  catalogue.commonMaterials=['Woodworking adhesive: Fevicol and Jeevanjor.','Approved soft-close hardware.'];
+  assert.equal((await handleApi(request('/api/studio/catalogue','PUT',{...catalogue,materialWording:{...catalogue.materialWording,internalLaminate:''}},cookie),store,environment)).status,400);
+  assert.equal((await handleApi(request('/api/studio/catalogue','PUT',catalogue,cookie),store,environment)).status,200);
+  const draft=structuredClone(initial.quotes[0].draft);draft.quote.notes=[];draft.owner_requests=[];
+  const drawer=structuredClone(catalogue.workTypes['Additional internal drawer']);drawer.rates.Base={Standard:4250,'With PVC':4250};
+  draft.rate_card_updates={'Additional internal drawer':drawer};
+  const published=await handleApi(request('/api/studio/publish','POST',{draft,supersedePublicId:initial.quotes[0].publicId,reviewedOwnerRequests:true},cookie),store,environment);
+  assert.equal(published.status,201);
+  const next=(await published.json() as any).record;
+  assert.equal(next.catalogueSnapshot.grades.Base.allowances.extraDrawerRupees,4250);
+  assert.deepEqual(next.draft.quote.notes,[]);
+  const publicData=await (await handleApi(request(`/api/quotes/${next.publicId}`),store,environment)).json() as any;
+  assert.deepEqual(publicData.catalogue.materialWording,catalogue.materialWording);
+  assert.deepEqual(publicData.catalogue.commonMaterials,catalogue.commonMaterials);
+  assert.equal((await store.load()).state.quotes[0].catalogueSnapshot!.materialWording,undefined,'earlier document snapshot stays unchanged');
+});
+
 test('password hashing, tampered sessions, expiry and owner version invalidation', async () => {
   const owner = await createOwner('owner', environment.OWNER_PASSWORD);
   assert.notEqual(owner.passwordHash, environment.OWNER_PASSWORD);

@@ -6,7 +6,7 @@ import { applyStandardPvcScopes } from '../src/lib/pvc-scope';
 import { type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
 import { randomHex, type OwnerAccount } from './auth';
 import { carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
-import { packageAllowances } from '../src/lib/commercial-spec';
+import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
 
 export interface PaymentLedgerEntry {
   id: string;
@@ -44,6 +44,7 @@ export interface CustomerFeedbackEntry {
 
 export interface PublishedQuotationRecord {
   publicId: string;
+  deletedAt?: string;
   revision: number;
   previousPublicId?: string;
   supersededByPublicId?: string;
@@ -95,6 +96,7 @@ export interface ApiRouter {
   post(path: string, handler: (req: ApiContext, res: ApiReply) => void): void;
   put(path: string, handler: (req: ApiContext, res: ApiReply) => void): void;
   patch(path: string, handler: (req: ApiContext, res: ApiReply) => void): void;
+  delete(path: string, handler: (req: ApiContext, res: ApiReply) => void): void;
 }
 export function emptyState(): StudioState { return { catalogue: structuredClone(DEFAULT_UME_CATALOGUE), quotes: [], ledger: [] }; }
 
@@ -138,7 +140,11 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     return next;
   };
   const allRecords = () => Array.from(quotesStore.values());
-  const latest = (id: string) => latestRecord(allRecords(), id);
+  const visibleRecords = () => allRecords().filter(record => !record.deletedAt);
+  const latest = (id: string) => {
+    const record = latestRecord(allRecords(), id);
+    return record?.deletedAt ? undefined : record;
+  };
   const paid = (id: string) => {
     const ids = seriesIds(allRecords(), id);
     return paymentLedger.filter(p => ids.has(p.publicId) && p.status === 'Verified Paid').reduce((sum, p) => sum + p.amountRupees, 0);
@@ -214,7 +220,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       }
     }
 
-    if (!matchedRecord || latest(matchedRecord.publicId)?.status === 'Draft') {
+    if (!matchedRecord || !latest(matchedRecord.publicId) || latest(matchedRecord.publicId)?.status === 'Draft') {
       res.status(404).json({
         error:
           'No quotation matched that access code. Please check the private quotation link sent to your WhatsApp by UME Interiors.',
@@ -249,9 +255,21 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
   app.get('/api/studio/bootstrap', (_req, res) => {
     res.json({
       catalogue: activeCatalogue,
-      quotes: Array.from(quotesStore.values()),
+      quotes: visibleRecords(),
       ledger: paymentLedger,
     });
+  });
+
+  app.delete('/api/studio/quotes/:publicId', (req, res) => {
+    if (req.body.confirmDelete !== true) { res.status(400).json({error:'Confirm deletion of this quotation and all its revisions.'}); return; }
+    const record = latest(req.params.publicId);
+    if (!record) { res.status(404).json({error:'Quotation not found.'}); return; }
+    const ids = seriesIds(allRecords(),record.publicId);
+    const deletedAt = new Date().toISOString();
+    for (const id of ids) { const previous = quotesStore.get(id); if (previous) previous.deletedAt = deletedAt; }
+    // Retain the private financial/history records while revoking every customer link.
+    saveDbToDisk();
+    res.json({ok:true,quotes:visibleRecords(),ledger:paymentLedger});
   });
 
   // Public shell branding contains no bank, rate-card or owner-session data.
@@ -260,12 +278,13 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     const validation = validateQuotationDraftV2(draft, {reviewedOwnerRequests:false});
     if (!validation.validForDraft) { res.status(422).json({error:'Check the draft format before saving.',validation}); return; }
     const existing = req.body.publicId ? quotesStore.get(req.body.publicId) : undefined;
+    if (req.body.publicId && (!existing || existing.deletedAt)) { res.status(404).json({error:'Draft not found.'}); return; }
     if (existing && existing.status !== 'Draft') { res.status(409).json({error:'Publish an update to save changes to an already published quotation.'}); return; }
     const defaultPackage: ResolvedPackageSelection = {grade:draft.recommended?.grade || 'Base',protection:draft.recommended?.protection || 'Standard',finish:draft.recommended?.finish || 'SF',brand_preference:draft.recommended?.brand_preference || null};
     draft.quote.number ||= nextQuoteNumber(allRecords()); draft.quote.date ||= indiaDate();
     const record: PublishedQuotationRecord = {publicId:existing?.publicId || `ume${randomHex(16)}`,revision:0,status:'Draft',publishedAt:new Date().toISOString(),viewsCount:0,lastViewedAt:null,draft,snapshot:calculateQuotationPricing(draft,activeCatalogue),approvedDiscountRupees:Math.max(0,Number(req.body.approvedDiscountRupees)||0),defaultSentPackage:defaultPackage,lastCustomerSelection:{wholeHomeSelection:defaultPackage,mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],acceptedTermsAt:null},catalogueSnapshot:structuredClone(activeCatalogue)};
     quotesStore.set(record.publicId,record); saveDbToDisk();
-    res.json({record,quotes:allRecords()});
+    res.json({record,quotes:visibleRecords()});
   });
 
   // Public shell branding contains no bank, rate-card or owner-session data.
@@ -292,6 +311,9 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (!updated || !updated.workTypes || !updated.grades) {
       res.status(400).json({ error: 'Invalid catalogue payload.' });
       return;
+    }
+    if (!Array.isArray(updated.commonMaterials) || updated.commonMaterials.length > 40 || updated.commonMaterials.some(line => typeof line !== 'string' || !line.trim() || line.length > 2000) || (updated.materialWording && Object.keys(DEFAULT_MATERIAL_WORDING).some(key => { const value = updated.materialWording![key as keyof typeof DEFAULT_MATERIAL_WORDING]; return typeof value !== 'string' || !value.trim() || value.length > 2000; }))) {
+      res.status(400).json({error:'Enter a material specification in each field (up to 2,000 characters), or remove an unused material.'}); return;
     }
     for (const grade of Object.values(updated.grades)) {
       const allowance = packageAllowances(grade);
@@ -327,7 +349,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
         typeof rateCardJson === 'string' ? JSON.parse(rateCardJson) : rateCardJson;
       const merged = mergeRateCardJsonIntoCatalogue(activeCatalogue, parsed);
       if (applyImmediately) {
-        activeCatalogue = merged.catalogue;
+        activeCatalogue = syncDrawerAllowances(merged.catalogue);
         saveDbToDisk();
       }
       res.json({
@@ -399,7 +421,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     res.json({
       ok: true,
       quote: rec,
-      quotes: Array.from(quotesStore.values()),
+      quotes: visibleRecords(),
     });
   });
 
@@ -426,7 +448,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (draft && Array.isArray(draft.rooms)) {
       const normalizedDraft = prepareDraft(draft);
       const autoMerged = extractAndMergeRateCardFromDraft(activeCatalogue, normalizedDraft);
-      activeCatalogue = autoMerged.catalogue;
+      activeCatalogue = syncDrawerAllowances(autoMerged.catalogue);
       rec.draft = structuredClone(normalizedDraft);
       delete rec.draft.rate_card_updates;
       rec.draft.quote.number = previous.draft.quote.number;
@@ -486,7 +508,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       ok: true,
       quote: rec,
       catalogue: activeCatalogue,
-      quotes: Array.from(quotesStore.values()),
+      quotes: visibleRecords(),
     });
   });
 
@@ -741,7 +763,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     }
 
     saveDbToDisk();
-    res.json({ entry, ledger: paymentLedger, quotes: Array.from(quotesStore.values()) });
+    res.json({ entry, ledger: paymentLedger, quotes: visibleRecords() });
   });
 
   // Screenshots arrive in WhatsApp. The owner records the matching bank credit here.
@@ -760,7 +782,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     const calc = computeCustomerSelectionTotal(record.snapshot, {...record.lastCustomerSelection, approvedDiscountRupees:record.approvedDiscountRupees});
     if (paid(record.publicId) >= Math.min(50000, calc.grandTotal * .5)) finalize(record);
     saveDbToDisk();
-    res.status(201).json({entry, quote:record, ledger:paymentLedger, quotes:allRecords()});
+    res.status(201).json({entry, quote:record, ledger:paymentLedger, quotes:visibleRecords()});
   });
 
   // Publish or Revise a Validated v2 Draft directly from JSON (Creates cryptographic 128-bit publicId & immutable snapshot)
@@ -791,9 +813,10 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       return;
     }
 
+    if (supersedePublicId && !latest(supersedePublicId)) { res.status(404).json({error:'The quotation to update no longer exists.'}); return; }
     // Automatically extract and persist any rate_card_updates or new work types from the draft into activeCatalogue
     const autoMerged = extractAndMergeRateCardFromDraft(activeCatalogue, normalizedDraft);
-    activeCatalogue = autoMerged.catalogue;
+    activeCatalogue = syncDrawerAllowances(autoMerged.catalogue);
 
     const now = new Date();
     const todayStr = indiaDate(now);
@@ -889,7 +912,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     res.status(201).json({
       record,
       shareUrl: `/q/${publicId}`,
-      quotes: Array.from(quotesStore.values()),
+      quotes: visibleRecords(),
       catalogue: activeCatalogue,
     });
   });

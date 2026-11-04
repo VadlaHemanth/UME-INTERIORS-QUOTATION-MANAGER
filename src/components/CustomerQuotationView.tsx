@@ -50,7 +50,7 @@ import { DeterministicQrCode } from './BrandMark';
 import { printQuotation } from '../lib/print-quotation';
 import { PrintableA4Sheet } from './PrintableA4Sheet';
 import './customer-quotation.css';
-import { materialLines, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { documentTerms, materialLines, materialWording, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
 import { WorkOrderView } from './WorkOrderView';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
@@ -865,7 +865,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
               </details>
             )}
 
-            <p className="text-[13px] font-semibold">Prices include materials and labour for the listed scope.</p>
+            <p className="text-[13px] font-semibold">{materialWording(catalogue).materialsAndLabour}</p>
             {/* Choose Your Package (Shown ONCE right here in the Hero Section) */}
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2231,11 +2231,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 Materials & execution terms
               </p>
               <div className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-xl text-[#18221D] leading-relaxed">
-                <strong>Laminate Thickness & Finish Note:</strong> All internal balancing/liner laminate is industry-standard <strong>0.8 mm</strong> category (actual factory sheet gauge ranges from <strong>0.72 mm to 0.80 mm</strong> as per standard ISI/market tolerance). All visible outside laminate is <strong>1.0 mm</strong> thickness in the customer’s chosen finish (SF Matte or High-Gloss at the same price).
+                <strong>Laminate thickness and finish:</strong> {materialWording(catalogue).internalLaminate} {materialWording(catalogue).externalLaminate}
               </div>
               <ul className="quotation-notes-list">{[...materialLines(catalogue,ALL_GRADES),...scopeNotes(catalogue,ALL_GRADES),...quotationCustomerNotes(draft)].map((note,index) => <li key={index}>{note}</li>)}</ul>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[13px] text-[#4A524D]">
-                {catalogue.termsAndConditions.map((t) => (
+                {documentTerms(catalogue,ALL_GRADES).map((t) => (
                   <div key={t.id} className="leading-snug">
                     <strong className="text-[#18221D]">
                       {t.id}. {t.title}:

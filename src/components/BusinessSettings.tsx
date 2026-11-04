@@ -34,11 +34,13 @@ export function BusinessSettings({ company, catalogue, onSaveCatalogue, ownerUse
   const [accountBusy, setAccountBusy] = useState(false);
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
+  const [materialsDirty,setMaterialsDirty] = useState(false);
+  const [materialsBusy,setMaterialsBusy] = useState(false);
   const [leavePrompt, setLeavePrompt] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const accountDirty = username !== ownerUsername || Boolean(currentPassword || newPassword || confirmPassword);
-  const busy = companyBusy || accountBusy;
+  const busy = companyBusy || accountBusy || materialsBusy;
 
   useEffect(() => { headingRef.current?.focus(); }, []);
   useEffect(() => {
@@ -47,11 +49,11 @@ export function BusinessSettings({ company, catalogue, onSaveCatalogue, ownerUse
     setSaved(structuredClone(company));
   }, [company]);
   useEffect(() => {
-    if (!dirty && !accountDirty) { setLeavePrompt(false); return; }
+    if (!dirty && !accountDirty && !materialsDirty) { setLeavePrompt(false); return; }
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty, accountDirty]);
+  }, [dirty, accountDirty, materialsDirty]);
 
   const update = (key: string, value: string | number) => {
     setDraft(previous => key.startsWith('bank.')
@@ -66,7 +68,7 @@ export function BusinessSettings({ company, catalogue, onSaveCatalogue, ownerUse
   };
   const requestClose = () => {
     if (busy) return;
-    if (dirty || accountDirty) setLeavePrompt(true);
+    if (dirty || accountDirty || materialsDirty) setLeavePrompt(true);
     else onClose();
   };
   const saveCompany = async (event: React.FormEvent) => {
@@ -135,7 +137,8 @@ export function BusinessSettings({ company, catalogue, onSaveCatalogue, ownerUse
         <p>Business and payment details appear on customer quotations.</p>
       </nav>
       <div className="business-settings-panel">
-        {section === 'materials' ? <MaterialSettings catalogue={catalogue} onSave={onSaveCatalogue}/> : section !== 'account' ? <form onSubmit={saveCompany} noValidate>
+        <div hidden={section !== 'materials'}><MaterialSettings catalogue={catalogue} onSave={onSaveCatalogue} onDirtyChange={setMaterialsDirty} onBusyChange={setMaterialsBusy}/></div>
+        {section !== 'materials' && (section !== 'account' ? <form onSubmit={saveCompany} noValidate>
           <div className="business-section-heading"><h2>{section === 'business' ? 'Business details' : 'Payment details'}</h2><p>{section === 'business' ? 'Your business identity, address and customer contact details.' : 'The account and UPI ID customers use to pay for their project.'}</p></div>
           {section === 'business' ? <div className="business-fields">
             {field('brandName', 'Display business name', { autoComplete: 'organization', wide: true })}
@@ -177,7 +180,7 @@ export function BusinessSettings({ company, catalogue, onSaveCatalogue, ownerUse
             {accountMessage && <p className="settings-status settings-status-success" role="status"><Check size={17}/>{accountMessage}</p>}
             <div className="business-save-actions"><span>{accountDirty ? 'Unsaved account changes' : 'Owner sign-in'}</span><div><button type="button" className="settings-cancel" disabled={!accountDirty || accountBusy} onClick={() => { setUsername(ownerUsername); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setAccountError(''); setAccountMessage(''); }}>Cancel changes</button><button type="submit" className="settings-save" disabled={accountBusy}>{accountBusy ? 'Updating…' : 'Save sign-in details'}</button></div></div>
           </div>
-        </form>}
+        </form>)}
       </div>
     </div>
   </section>;

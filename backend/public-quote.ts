@@ -82,6 +82,7 @@ export function publicCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
     grades: structuredClone(catalogue.grades),
     pvcSpec: structuredClone(catalogue.pvcSpec),
     commonMaterials: [...catalogue.commonMaterials],
+    materialWording: catalogue.materialWording ? {...catalogue.materialWording} : undefined,
     notesAndExclusions: [...catalogue.notesAndExclusions],
     termsAndConditions: structuredClone(catalogue.termsAndConditions),
     highGlossSheetUpgradeDelta: catalogue.highGlossSheetUpgradeDelta,

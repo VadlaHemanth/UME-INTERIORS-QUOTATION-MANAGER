@@ -333,6 +333,14 @@ export default function App() {
     setQuotes(data.quotes); setLedger(data.ledger);
   };
 
+  const handleDeleteQuote = async (publicId: string) => {
+    const response = await fetch(`/api/studio/quotes/${publicId}`, {method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmDelete:true})});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not delete the quotation. Please try again.');
+    setQuotes(data.quotes); setLedger(data.ledger);
+    if (customerQuoteRecord && !data.quotes.some((record: PublishedQuoteSummary) => record.publicId === customerQuoteRecord.publicId)) setCustomerQuoteRecord(null);
+  };
+
   const handleSubmitPayment = async (payload: {
     utrReference: string;
     method: 'UPI / PhonePe' | 'NEFT / RTGS / IMPS';
@@ -682,6 +690,7 @@ export default function App() {
             onUpdateCatalogue={handleUpdateCatalogue}
             onVerifyOrRejectPayment={handleVerifyOrRejectPayment}
             onRecordVerifiedPayment={handleRecordVerifiedPayment}
+            onDeleteQuote={handleDeleteQuote}
           /></Suspense></div>
         )}
       </main>

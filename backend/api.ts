@@ -130,7 +130,7 @@ export async function handleApi(request: Request, store: StateStore, env: ApiEnv
       if (/\/feedback$/.test(path) && typeof body.message === 'string' && body.message.length > 5000) return json({ error: 'Keep your message within 5,000 characters.' }, 400);
       type Route = { method: string; path: string; handler: (req: ApiContext, res: ApiReply) => void };
       const routes: Route[] = [];
-      const app = Object.fromEntries(['get', 'post', 'put', 'patch'].map((verb) => [verb, (routePath: string, handler: Route['handler']) => routes.push({ method: verb.toUpperCase(), path: routePath, handler })])) as unknown as ApiRouter;
+      const app = Object.fromEntries(['get', 'post', 'put', 'patch', 'delete'].map((verb) => [verb, (routePath: string, handler: Route['handler']) => routes.push({ method: verb.toUpperCase(), path: routePath, handler })])) as unknown as ApiRouter;
       registerDataRoutes(app, state, markChanged);
       const route = routes.find((route) => route.method === method && new RegExp(`^${route.path.replace(/:[^/]+/g, '([^/]+)')}$`).test(path));
       if (!route) return json({ error: 'API route not found.' }, 404);
