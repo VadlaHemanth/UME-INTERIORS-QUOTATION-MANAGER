@@ -1,5 +1,9 @@
 # Release verification — 4 November 2026
 
+## Assistant content-ownership follow-up
+
+The instruction contract explicitly separates app-generated document sections from AI-generated scope. Ordinary JSON examples keep quote.notes and owner_requests empty; genuine job-specific notes, physical extra work and unresolved exceptions remain supported. The conflicting instruction to include standard exclusions was removed. Reference material, exclusion and term lists now come from the same rendering helpers used by the quotation/PDF and reflect edited settings. New regression tests check this boundary, saved custom wording and rates, the single copyable JSON block, and that exporting instructions does not modify settings. This verifies the app's handoff contract; an external Gem must be updated with the copied instructions to receive it.
+
 ## PDF corners and unpublished preview follow-up
 
 The suite passes **72/72 tests**, including a new comparison of unpublished preparation with actual publication: furniture vocabulary, reviewed customer notes and priced room scopes match, without changing the editor draft. Rounded PDF table wrappers clip their child backgrounds at the same outer radius, including continuation tables.
