@@ -1,5 +1,6 @@
 import type { GradeInfo, StudioCatalogue } from './catalogue';
 import type { PlywoodGrade, QuotationDraftV2 } from './schema';
+import { applyApprovedCoreRates } from './rate-card';
 
 export interface PackageAllowances {
   handleRupees: number;
@@ -90,12 +91,17 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
 
 /** Upgrade the old shipped defaults once; retain owner-entered brands and rates. */
 export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
-  if (catalogue.version === 'ume-catalogue-2026.11.v9') return catalogue;
+  if (catalogue.version === 'ume-catalogue-2026.11.v10') return catalogue;
   const next = structuredClone(catalogue);
+  if(catalogue.version==='ume-catalogue-2026.11.v9') {
+    applyApprovedCoreRates(next);
+    next.version='ume-catalogue-2026.11.v10';
+    return next;
+  }
   if (catalogue.version === 'ume-catalogue-2026.11.v8') {
     if (next.company.brandName === 'UMAMAHESHWARA INTERIORS') next.company.brandName = 'UME Interiors';
     next.version = 'ume-catalogue-2026.11.v9';
-    return next;
+    return upgradeCatalogue(next);
   }
   // This release changes the shipped defaults without resetting custom amounts.
   if (catalogue.version === 'ume-catalogue-2026.11.v7') {

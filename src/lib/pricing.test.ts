@@ -1,5 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DEFAULT_UME_CATALOGUE as CURRENT_CATALOGUE} from './catalogue';
+import {packageRates} from './rate-card';
+
+// Published historical arithmetic is checked against its original material rates.
+const historicalCatalogue=structuredClone(CURRENT_CATALOGUE);
+for(const [key,rates] of Object.entries({
+  'Box type':[950,1000,1250,75],
+  'Frame type':[700,800,1000,75],
+  'Loft - frame and shutter':[700,800,1000,75],
+  'Low roof - frame and shutter':[700,800,1000,75],
+  'Wood wall paneling':[400,500,550,50],
+  'Wood wall paneling (under wall cabinet)':[400,450,550,50],
+  'Louvers wall paneling':[550,600,650,50],
+  'Wall mount bed':[950,1000,1200,75],
+}))historicalCatalogue.workTypes[key].rates=packageRates(...rates as [number,number,number,number]);
 import {
   calculateMilestoneSchedule,
   calculateQuotationPricing,
@@ -28,7 +43,7 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
     STANDARD_DEPTH_SCHEDULE_INCHES,
     standardizeCompetitorItemName,
   } = await import('./catalogue');
-  const snapshot = calculateQuotationPricing(VIDYA_SAGAR_REDDY_DRAFT);
+  const snapshot = calculateQuotationPricing(VIDYA_SAGAR_REDDY_DRAFT,historicalCatalogue);
 
   // Historical PDF 1: Premium · Standard · SF = ₹7,32,965
   assert.equal(snapshot.baseWholeHomeTotals[makeComboKey('Premium', 'Standard', 'SF')], 732965);
@@ -135,7 +150,7 @@ test('package-level PVC pricing follows the work-type rate card, not legacy per-
   const snapshot = calculateQuotationPricing(draft);
   assert.equal(
     snapshot.rooms[0].items[1].unitRates[makeComboKey('Premium', 'With PVC', 'SF')],
-    1325
+    1450
   );
   assert.equal(
     snapshot.rooms[0].items[3].unitRates[makeComboKey('Premium', 'With PVC', 'SF')],
@@ -144,7 +159,7 @@ test('package-level PVC pricing follows the work-type rate card, not legacy per-
 });
 
 test('Room mixing, optional add-ons, and flat discount calculate deterministically', () => {
-  const snapshot = calculateQuotationPricing(VIDYA_SAGAR_REDDY_DRAFT);
+  const snapshot = calculateQuotationPricing(VIDYA_SAGAR_REDDY_DRAFT,historicalCatalogue);
 
   // Whole-home Premium Standard SF with no add-ons
   const baseCalc = computeCustomerSelectionTotal(snapshot, {

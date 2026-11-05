@@ -6,6 +6,7 @@ import { createOwner, issueSession, validSession, verifyPassword } from './auth'
 import { VIDYA_SAGAR_REDDY_DRAFT } from '../src/lib/historicalData';
 import { calculateQuotationPricing } from '../src/lib/pricing';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
+import {DEFAULT_UME_CATALOGUE} from '../src/lib/catalogue';
 
 const environment = { OWNER_USERNAME: 'owner', OWNER_PASSWORD: 'A-private-local-password-123' };
 function memoryStore(initial = emptyState()): StateStore {
@@ -20,6 +21,22 @@ function request(path: string, method = 'GET', body?: unknown, cookie?: string, 
   return new Request(`https://studio.example${path}`, { method, headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(cookie ? { Cookie: cookie } : {}), ...(origin ? { Origin: origin } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 }
 function cookieFrom(response: Response): string { return response.headers.get('set-cookie')!.split(';')[0]; }
+
+test('publication blocks a new work type until its package rates are confirmed',async()=>{
+  const store=memoryStore(paymentFixture());
+  const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  await handleApi(request('/api/studio/bootstrap','GET',undefined,cookie),store,environment);
+  const before=(await store.load()).state;
+  const draft=structuredClone(before.quotes[0].draft);
+  draft.rooms[0].items[0].work_type='Unpriced custom furniture';
+  delete draft.rooms[0].items[0].custom_rates;
+  const response=await handleApi(request('/api/studio/publish','POST',{draft,reviewedOwnerRequests:true},cookie),store,environment);
+  assert.equal(response.status,422);
+  assert.match((await response.json() as any).error,/Confirm and save rates/);
+  const after=(await store.load()).state;
+  assert.deepEqual(after.quotes,before.quotes);
+  assert.deepEqual(after.catalogue,before.catalogue);
+});
 
 test('owner deletion revokes every revision link, hides records and retains payment history',async()=>{
   const store=memoryStore(paymentFixture());
@@ -472,12 +489,16 @@ test('owner business settings persist edited payment recipient and stale rate-ca
   const quote = await handleApi(request('/api/quotes/ume-test-api'), store, environment);
   assert.equal((await quote.json() as any).catalogue.company.bank.upiId, company.bank.upiId);
   const staleRateCard = structuredClone(original);
+  staleRateCard.version='ume-catalogue-2026.11.v9';
   staleRateCard.workTypes['Box type'].rates.Base.Standard = 975;
   const saveRates = await handleApi(request('/api/studio/catalogue', 'PUT', staleRateCard, cookie), store, environment);
   assert.equal(saveRates.status, 200);
   const saved = (await store.load()).state;
   assert.deepEqual(saved.catalogue.company, company);
   assert.equal(saved.catalogue.workTypes['Box type'].rates.Base.Standard, 975);
+  assert.equal(saved.catalogue.version,DEFAULT_UME_CATALOGUE.version);
+  await handleApi(request('/api/studio/bootstrap','GET',undefined,cookie),store,environment);
+  assert.equal((await store.load()).state.catalogue.workTypes['Box type'].rates.Base.Standard,975);
   assert.deepEqual(saved.quotes[0].snapshot, paymentFixture().quotes[0].snapshot);
   assert.equal(saved.catalogue.company.bank.accountNumber, '001234567890');
 });

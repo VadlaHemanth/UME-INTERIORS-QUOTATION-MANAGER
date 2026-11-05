@@ -19,6 +19,11 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions, /work_type "Box type"; unit "sq_ft"; Basic \(Base\) 987,/);
   assert.match(instructions, /signs in at \/owner/);
   assert.match(instructions, /not a live sync/);
+  assert.match(instructions,/ONE CONSOLIDATED REVIEW BEFORE FINAL JSON/);
+  assert.match(instructions,/do not interview rate by rate/);
+  assert.match(instructions,/The AI CAN generate a reusable rate-card addition\/change in JSON/);
+  assert.match(instructions,/For ordinary quotations, reuse the saved rates/);
+  assert.ok(instructions.includes('| Box type | sq_ft | 987 | 1150 | 1350 |'));
   assert.match(instructions, /Standard: Up to 20 years plywood warranty/);
   assert.match(instructions, /Do not generate these labels in JSON, quote.notes or owner_requests/);
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;

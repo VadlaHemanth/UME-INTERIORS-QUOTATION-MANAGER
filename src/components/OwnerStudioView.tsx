@@ -60,6 +60,7 @@ import { canonicalFurnitureName, FURNITURE_VOCABULARY } from '../lib/furniture';
 import { packageAllowances } from '../lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../lib/quotation-presentation';
 import { RoomScopeEditor } from './RoomScopeEditor';
+import { RateCardEditor } from './RateCardEditor';
 
 export interface PublishedQuoteSummary {
   publicId: string;
@@ -233,15 +234,16 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   } | null>(null);
 
   // Inline Quick-Add Work Element Form inside the Unified Studio
-  const [showFullRateCardTable, setShowFullRateCardTable] = useState<boolean>(false);
+  const [showFullRateCardTable, setShowFullRateCardTable] = useState<boolean>(true);
   const [newWorkLabel, setNewWorkLabel] = useState<string>('');
   const [newWorkUnit, setNewWorkUnit] = useState<'sq_ft' | 'running_ft' | 'each' | 'lumpsum'>(
     'sq_ft'
   );
-  const [newWorkBase, setNewWorkBase] = useState<number>(850);
-  const [newWorkNormal, setNewWorkNormal] = useState<number>(950);
-  const [newWorkPremium, setNewWorkPremium] = useState<number>(1100);
-  const [newWorkPvcAdder, setNewWorkPvcAdder] = useState<number>(75);
+  const [newWorkBase, setNewWorkBase] = useState('');
+  const [newWorkNormal, setNewWorkNormal] = useState('');
+  const [newWorkPremium, setNewWorkPremium] = useState('');
+  const [newWorkPvcAdder, setNewWorkPvcAdder] = useState('0');
+  const [savingNewWork,setSavingNewWork]=useState(false);
   const [newWorkDescription, setNewWorkDescription] = useState<string>('');
 
   // Tab 2: Quotes CMS search & filter
@@ -263,6 +265,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   };
   const closePreview=()=>{setPreviewMode(null);requestAnimationFrame(()=>window.scrollTo({top:editorScrollBeforePreview.current,left:0,behavior:'instant'}));};
   const [savingRates, setSavingRates] = useState(false);
+  const [rateFeedback,setRateFeedback]=useState<{ok:boolean;message:string}|null>(null);
   const [paymentQuote, setPaymentQuote] = useState('');
   const [verifiedAmount, setVerifiedAmount] = useState(50000);
   const [verifiedReference, setVerifiedReference] = useState('');
@@ -469,8 +472,12 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
   const handleAddCustomWorkElementForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if(savingNewWork)return;
     const cleanLabel = newWorkLabel.trim();
     if (!cleanLabel) return;
+    if(editableCatalogue.workTypes[cleanLabel]) {setRateFeedback({ok:false,message:'This work type already exists. Edit its rates in the list above.'});return;}
+    const amounts=[newWorkBase,newWorkNormal,newWorkPremium,newWorkPvcAdder];
+    if(amounts.some(value=>!value.trim()||!Number.isFinite(Number(value))||Number(value)<0)) {setRateFeedback({ok:false,message:'Enter all three confirmed package rates and the PVC extra. Use 0 when no extra applies.'});return;}
 
     const pvcAdd = Math.max(0, Number(newWorkPvcAdder) || 0);
     const baseStd = Math.max(0, Number(newWorkBase) || 0);
@@ -483,7 +490,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       unit: newWorkUnit,
       plainEnglishDefinition:
         newWorkDescription.trim() ||
-        `Custom interior work (${cleanLabel}) executed with calibrated plywood and 1mm laminate finish, billed per ${newWorkUnit}.`,
+        `Custom interior work: ${cleanLabel}. Billing unit: ${newWorkUnit}.`,
       pvcDefaultEligible: pvcAdd > 0,
       pvcDefaultParts: pvcAdd > 0 ? ['Back panel'] : [],
       rates: {
@@ -497,15 +504,19 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     const nextCat = structuredClone(editableCatalogue);
     nextCat.workTypes[cleanLabel] = newDef;
     setPublishResult(null);
+    setRateFeedback(null);setSavingNewWork(true);
     try {
       await onUpdateCatalogue(nextCat);
       setEditableCatalogue(nextCat);
       setNewWorkLabel('');
       setNewWorkDescription('');
+      setNewWorkBase('');setNewWorkNormal('');setNewWorkPremium('');setNewWorkPvcAdder('0');
+      setRateFeedback({ok:true,message:`Saved ${cleanLabel}. Copy the refreshed assistant instructions to use it in future chats.`});
       setPublishResult({ ok: true, message: `Saved "${cleanLabel}" to the rate card. Copy the updated assistant instructions to use it in future chats.` });
     } catch (error) {
+      setRateFeedback({ok:false,message:error instanceof Error ? error.message : 'Unable to save this work type. Your form is preserved; please try again.'});
       setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to save this work type. Your form is preserved; please try again.' });
-    }
+    } finally {setSavingNewWork(false);}
   };
 
   const handlePublishClick = async () => {
@@ -582,7 +593,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const quotePageCount = Math.max(1, Math.ceil(filteredQuotes.length / pageSize));
   const visibleQuotes = filteredQuotes.slice((Math.min(quotePage, quotePageCount) - 1) * pageSize, Math.min(quotePage, quotePageCount) * pageSize);
   const saveRateCard = async () => {
-    setSavingRates(true); setPublishResult(null);
+    if(savingRates)return;
+    setSavingRates(true); setPublishResult(null); setRateFeedback(null);
     try {
       const next = structuredClone(workingDraft);
       delete next.rate_card_updates;
@@ -592,8 +604,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       }
       await onUpdateCatalogue(editableCatalogue);
       syncDraft(next);
+      setRateFeedback({ok:true,message:'Rate card saved and applied to this draft. Publish an update to change an existing customer quotation.'});
       setPublishResult({ok:true,message:'Rate card saved. This draft now uses the updated rates. Publish an update to apply them to the customer quotation.'});
-    } catch(error) { setPublishResult({ok:false,message:error instanceof Error ? error.message : 'Could not save rates.'}); }
+    } catch(error) { const message=error instanceof Error ? error.message : 'Could not save rates. Your edits are preserved; try again.'; setRateFeedback({ok:false,message}); setPublishResult({ok:false,message}); }
     finally { setSavingRates(false); }
   };
 
@@ -748,7 +761,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
                 <div className="space-y-3.5">
                   <div className="p-3 bg-[#E4EFE7] border border-[#C5DEC9] rounded-xl text-xs text-[#1C3A2F] leading-relaxed">
-                    <strong>One-Paste Auto Rate Card Memory:</strong> When your Gem outputs a quotation with new items (like a <em>Wall-mounted study table</em> or <em>Folding table</em>) or custom Box/Frame rates inside <code>rate_card_updates</code>, pasting it here <strong>automatically saves those new items into your Rate Card</strong> and builds the quote in one step!
+                    <strong>Quotations use your saved rate card.</strong> Your assistant should reuse existing work types. Only approved reusable additions or changes belong in <code>rate_card_updates</code>; importing them saves those rates for future quotes. Item-level <code>custom_rates</code> affect only that quotation. New work needs all three confirmed package rates before publication.
                   </div>
 
                   {/* Quick Toolbar: Paste from Clipboard + Upload .json File */}
@@ -1215,87 +1228,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </button>
                   </div>
 
-                  <button type="button" className="owner-action-primary" disabled={savingRates} onClick={() => void saveRateCard()}>{savingRates ? 'Saving rates…' : 'Save rate card & apply to draft'}</button>
-                  {/* Inline Editable Rates Table for Active Quote Work Types (or Full Catalogue) */}
-                  <div className="overflow-x-auto border border-[#C5DEC9] rounded-lg bg-white max-h-60 overflow-y-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead className="sticky top-0 bg-[#1C3A2F] text-white">
-                        <tr>
-                          <th className="py-2 px-3 font-semibold">Work Type (Unit)</th>
-                          <th className="py-2 px-2 text-right font-semibold">Basic (₹)</th>
-                          <th className="py-2 px-2 text-right font-semibold">Standard (₹)</th>
-                          <th className="py-2 px-2 text-right font-semibold">Premium (₹)</th>
-                          <th className="py-2 px-2 text-right font-semibold">+PVC Extra (₹)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#EAE4D8]">
-                        {(showFullRateCardTable
-                          ? Object.keys(editableCatalogue.workTypes)
-                          : activeDraftWorkTypes
-                        ).map((wtKey) => {
-                          const wt = editableCatalogue.workTypes[wtKey];
-                          if (!wt) return null;
-                          const currentPvcAdder = Math.max(
-                            0,
-                            wt.rates.Premium['With PVC'] - wt.rates.Premium.Standard
-                          );
-                          return (
-                            <tr key={wt.id} className="hover:bg-[#FAF8F4]">
-                              <td className="py-2 px-3 font-bold text-[#18221D]">
-                                {wt.label}{' '}
-                                <span className="text-[10px] font-mono font-normal text-[#5C645F]">
-                                  ({wt.unit})
-                                </span>
-                              </td>
-                              {(['Base', 'Normal', 'Premium'] as PlywoodGrade[]).map((g) => (
-                                <td key={`${wt.id}-${g}`} className="py-1.5 px-2 text-right">
-                                  <input
-                                    type="number"
-                                    aria-label={`${wt.label} ${getPackageDisplayName(g)} rate`}
-                                    value={wt.rates[g].Standard}
-                                    onChange={(e) => {
-                                      const newStd = Number(e.target.value) || 0;
-                                      const oldDiff = Math.max(
-                                        0,
-                                        wt.rates[g]['With PVC'] - wt.rates[g].Standard
-                                      );
-                                      const next = structuredClone(editableCatalogue);
-                                      next.workTypes[wt.id].rates[g].Standard = newStd;
-                                      next.workTypes[wt.id].rates[g]['With PVC'] =
-                                        newStd + oldDiff;
-                                      setEditableCatalogue(next);
-                                    }}
-                                    className="w-20 px-2 py-1 text-right font-mono tabular-nums text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded"
-                                  />
-                                </td>
-                              ))}
-                              <td className="py-1.5 px-2 text-right">
-                                <input
-                                  type="number"
-                                  aria-label={`${wt.label} PVC Extra rate`}
-                                  value={currentPvcAdder}
-                                  onChange={(e) => {
-                                    const newAdder = Math.max(0, Number(e.target.value) || 0);
-                                    const next = structuredClone(editableCatalogue);
-                                    const targetWt = next.workTypes[wt.id];
-                                    targetWt.pvcDefaultEligible = newAdder > 0;
-                                    (['Base', 'Normal', 'Premium'] as PlywoodGrade[]).forEach(
-                                      (g) => {
-                                        targetWt.rates[g]['With PVC'] =
-                                          targetWt.rates[g].Standard + newAdder;
-                                      }
-                                    );
-                                    setEditableCatalogue(next);
-                                  }}
-                                  className="w-16 px-2 py-1 text-right font-mono tabular-nums text-xs bg-[#E4EFE7] border border-[#C5DEC9] text-[#1C3A2F] font-bold rounded"
-                                />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <RateCardEditor catalogue={editableCatalogue} workTypeKeys={showFullRateCardTable ? Object.keys(editableCatalogue.workTypes) : activeDraftWorkTypes} disabled={savingRates||savingNewWork} onChange={next=>{setRateFeedback(null);setEditableCatalogue(next);}}/>
+
+                  <div className="owner-rate-actions"><button type="button" className="owner-action-primary" disabled={savingRates||savingNewWork} onClick={() => void saveRateCard()}>{savingRates ? 'Saving rates…' : 'Save rate card & apply to draft'}</button>{rateFeedback?<p role={rateFeedback.ok?'status':'alert'}>{rateFeedback.message}</p>:JSON.stringify(editableCatalogue.workTypes)!==JSON.stringify(catalogue.workTypes)?<p>Unsaved rate changes</p>:<p>Rate card is saved.</p>}</div>
 
                   {/* One-Line Quick Add New Work Element to Rate Card Memory */}
                   <form
@@ -1309,6 +1244,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       <input
                         type="text"
                         aria-label="New work type name"
+                        required
+                        maxLength={200}
                       value={newWorkLabel}
                         onChange={(e) => setNewWorkLabel(e.target.value)}
                         placeholder="e.g., Wall-mounted study table"
@@ -1321,9 +1258,10 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
+                        min="0" step="0.01" inputMode="decimal" required
                         aria-label="New work type Basic rate in rupees"
                       value={newWorkBase}
-                        onChange={(e) => setNewWorkBase(Number(e.target.value) || 0)}
+                        onChange={(e) => setNewWorkBase(e.target.value)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
                     </div>
@@ -1333,9 +1271,10 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
+                        min="0" step="0.01" inputMode="decimal" required
                         aria-label="New work type Standard rate in rupees"
                       value={newWorkNormal}
-                        onChange={(e) => setNewWorkNormal(Number(e.target.value) || 0)}
+                        onChange={(e) => setNewWorkNormal(e.target.value)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
                     </div>
@@ -1345,9 +1284,10 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
+                        min="0" step="0.01" inputMode="decimal" required
                         aria-label="New work type Premium rate in rupees"
                       value={newWorkPremium}
-                        onChange={(e) => setNewWorkPremium(Number(e.target.value) || 0)}
+                        onChange={(e) => setNewWorkPremium(e.target.value)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
                     </div>
@@ -1357,20 +1297,24 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       </label>
                       <input
                         type="number"
+                        min="0" step="0.01" inputMode="decimal" required
                         aria-label="New work type PVC extra rate in rupees"
                       value={newWorkPvcAdder}
-                        onChange={(e) => setNewWorkPvcAdder(Number(e.target.value) || 0)}
+                        onChange={(e) => setNewWorkPvcAdder(e.target.value)}
                         className="w-full px-1.5 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
                     </div>
                     <div className="sm:col-span-2">
                       <button
                         type="submit"
+                        disabled={savingNewWork||savingRates}
                         className="w-full py-1.5 px-2.5 bg-[#1C3A2F] text-[#E6CBA8] rounded-lg text-xs font-bold cursor-pointer"
                       >
-                        + Save Rate
+                        {savingNewWork?'Saving…':'+ Save work type'}
                       </button>
                     </div>
+                    <label className="owner-field sm:col-span-3">Billing unit<select aria-label="New work type billing unit" value={newWorkUnit} onChange={event=>setNewWorkUnit(event.target.value as typeof newWorkUnit)}><option value="sq_ft">Per sq.ft</option><option value="running_ft">Per running ft</option><option value="each">Each</option><option value="lumpsum">Lump sum</option></select></label>
+                    <label className="owner-field sm:col-span-9">Work specification<textarea aria-label="New work type specification" value={newWorkDescription} maxLength={2000} rows={2} onChange={event=>setNewWorkDescription(event.target.value)} placeholder="Describe the work and confirmed materials. Optional."/></label>
                   </form>
                 </details>
 

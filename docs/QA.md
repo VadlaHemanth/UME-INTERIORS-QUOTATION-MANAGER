@@ -1,5 +1,15 @@
 # Release verification — 5 November 2026
 
+## Mobile rate editor and owner-approved defaults
+
+The owner corrected Box type from the initial spoken values using a screenshot: Basic ₹950, Standard ₹1,150, Premium ₹1,350, with ₹100/sq.ft PVC extra. Frame rates are ₹750/₹900/₹1,050 with ₹60 PVC; loft and low-roof closures share those base rates with ₹75 PVC. Folding tables remain ₹700/₹800/₹1,000 with zero PVC; plywood wall panelling (including below wall cabinets) uses ₹400/₹500/₹550 plus ₹150 PVC; Pooja CNC/glass doors remain ₹700/₹800/₹850 with zero PVC. Other shipped work types keep their base prices with zero PVC extra. The one-time v10 update preserves custom work types, company/bank details and plywood settings. Published pricing snapshots stay unchanged; the defaults apply to new quotations and owner-published updates.
+
+Mobile rates use labeled two-column fields rather than a narrow, nested scrolling table. All work types are visible initially, with search and an active-work filter. Amounts can be cleared/replaced using the keyboard; save state, errors and retry stay beside the editor. Linked frame edits retain distinct PVC extras. New work supports billing unit and specification and requires confirmed prices rather than prefilled guesses. Old browser payloads cannot downgrade the catalogue version and trigger a second reset.
+
+Instructions distinguish ordinary quotation JSON, item-only custom rates and reusable rate-card changes. The AI reuses saved known rates; it generates rate-card JSON only for confirmed additions/changes. A consolidated saved-rate table, quotation-rate table and scope review precede the single final copyable JSON response; answered questions are not repeated. Imports reject missing rate values instead of fabricating them, and publication blocks an unpriced new work type.
+
+All 80 tests pass. Chromium browser checks at 320, 390, 768 and 1440 pixels verify layout and input sizes. Synthesized touch taps and native keyboard input exercise editing, save/reload persistence, linked frame rates, failed-save preservation and retry, search empty state, and new-work units/specifications, with no runtime errors. This is browser touch emulation, not a physical Android test.
+
 ## Package warranty labels and display name
 
 Standard and Premium package choices now show a shared shield label in the online quotation and PDF. The label uses the maximum warranty among that quotation's saved plywood products: up to 15 years for Standard and 30 years for Premium in the current catalogue. The owner confirmed 15 years after the saved products were checked. A nearby sentence explains manufacturer/product conditions; the full brand details remain available. Empty or zero-year lists do not invent a warranty. Instructions explain that the app generates these labels automatically and must not receive duplicate JSON notes.

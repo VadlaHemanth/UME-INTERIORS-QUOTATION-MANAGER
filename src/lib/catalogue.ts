@@ -1,5 +1,6 @@
 import { FinishOption, PlywoodGrade, ProtectionOption } from './schema';
 import { canonicalFurnitureName, FURNITURE_VOCABULARY } from './furniture';
+import { packageRates } from './rate-card';
 import { documentTerms, materialLines, packageAllowances, packageWarrantyLabel, scopeNotes, type MaterialWording, type PackageAllowances } from './commercial-spec';
 
 export interface WorkTypeDefinition {
@@ -309,7 +310,7 @@ export interface StudioCatalogue {
 }
 
 export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
-  version: 'ume-catalogue-2026.11.v9',
+  version: 'ume-catalogue-2026.11.v10',
   company: {
     brandName: 'UME Interiors',
     legalName: 'Umamaheshwara Enterprises',
@@ -505,11 +506,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Full plywood cabinet body (top, bottom, two sides and back) with internal shelves, 0.8mm inside laminate, and hinged or sliding shutters with 1mm outside laminate finish. Billed by front area (height × width).',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Back panel', 'Bottom floor-contact panel'],
-      rates: {
-        Base: { Standard: 950, 'With PVC': 1025 },
-        Normal: { Standard: 1000, 'With PVC': 1075 },
-        Premium: { Standard: 1250, 'With PVC': 1325 },
-      },
+      rates: packageRates(950, 1150, 1350, 100),
       highGlossPremiumPerUnit: 0,
     },
     'Frame type': {
@@ -520,11 +517,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Plywood frame fixed to an existing wall recess or stone shelves, with laminated doors at the front. Billed by front area (height × width).',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact perimeter frame'],
-      rates: {
-        Base: { Standard: 700, 'With PVC': 775 },
-        Normal: { Standard: 800, 'With PVC': 875 },
-        Premium: { Standard: 1000, 'With PVC': 1075 },
-      },
+      rates: packageRates(750, 900, 1050, 60),
       highGlossPremiumPerUnit: 0,
     },
     'Loft - frame and shutter': {
@@ -535,11 +528,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Overhead storage closure above a concrete loft slab or wardrobe top, with a plywood frame and hinged doors with 0.8mm inside laminate and 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall and slab-contact perimeter frame'],
-      rates: {
-        Base: { Standard: 700, 'With PVC': 775 },
-        Normal: { Standard: 800, 'With PVC': 875 },
-        Premium: { Standard: 1000, 'With PVC': 1075 },
-      },
+      rates: packageRates(750, 900, 1050, 75),
       highGlossPremiumPerUnit: 0,
     },
     'Low roof - frame and shutter': {
@@ -550,11 +539,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Storage frame and doors below a sunken slab or low-ceiling ledge, finished with 0.8mm inside laminate and 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Sunken slab & wall-contact frame'],
-      rates: {
-        Base: { Standard: 700, 'With PVC': 775 },
-        Normal: { Standard: 800, 'With PVC': 875 },
-        Premium: { Standard: 1000, 'With PVC': 1075 },
-      },
+      rates: packageRates(750, 900, 1050, 75),
       highGlossPremiumPerUnit: 0,
     },
     'Folding table': {
@@ -565,11 +550,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         '18" depth wall-mounted collapsible study or utility table finished on both top and bottom faces with 1mm outside laminate finish and heavy-duty folding brackets.',
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
-      rates: {
-        Base: { Standard: 700, 'With PVC': 700 },
-        Normal: { Standard: 800, 'With PVC': 800 },
-        Premium: { Standard: 1000, 'With PVC': 1000 },
-      },
+      rates: packageRates(700, 800, 1000, 0),
       highGlossPremiumPerUnit: 0,
     },
     'Wood wall paneling': {
@@ -580,11 +561,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Flat plywood wall cladding installed under lofts, around pillars, main door jambs, or breakfast counters, finished on the visible face with 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact backing sheet'],
-      rates: {
-        Base: { Standard: 400, 'With PVC': 450 },
-        Normal: { Standard: 500, 'With PVC': 550 },
-        Premium: { Standard: 550, 'With PVC': 600 },
-      },
+      rates: packageRates(400, 500, 550, 150),
       highGlossPremiumPerUnit: 0,
     },
     'Wood wall paneling (under wall cabinet)': {
@@ -595,11 +572,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Plywood panelling below kitchen wall cabinets finished with 1mm outside laminate finish.',
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact backing'],
-      rates: {
-        Base: { Standard: 400, 'With PVC': 450 },
-        Normal: { Standard: 450, 'With PVC': 500 },
-        Premium: { Standard: 550, 'With PVC': 600 },
-      },
+      rates: packageRates(400, 500, 550, 150),
       highGlossPremiumPerUnit: 0,
     },
     'Louvers wall paneling': {
@@ -608,13 +581,9 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       unit: 'sq_ft',
       plainEnglishDefinition:
         'Decorative fluted louvre wall panelling with 1 mm external laminate, for TV units or above the main entrance.',
-      pvcDefaultEligible: true,
+      pvcDefaultEligible: false,
       pvcDefaultParts: ['Wall-contact backing panel'],
-      rates: {
-        Base: { Standard: 550, 'With PVC': 600 },
-        Normal: { Standard: 600, 'With PVC': 650 },
-        Premium: { Standard: 650, 'With PVC': 700 },
-      },
+      rates: packageRates(550, 600, 650, 0),
       highGlossPremiumPerUnit: 0,
     },
     'Pooja CNC / glass door paneling': {
@@ -625,11 +594,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
         'Pooja room entrance frame and double doors with CNC-cut decorative screens or glass panels and 1mm outside laminate finish.',
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
-      rates: {
-        Base: { Standard: 700, 'With PVC': 700 },
-        Normal: { Standard: 800, 'With PVC': 800 },
-        Premium: { Standard: 850, 'With PVC': 850 },
-      },
+      rates: packageRates(700, 800, 850, 0),
       highGlossPremiumPerUnit: 0,
     },
     'Tandem or SS baskets': {
@@ -653,13 +618,9 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       unit: 'sq_ft',
       plainEnglishDefinition:
         'Space-saving wall-mounted hydraulic/folding bed frame with 0.8mm inside laminate and 1mm outside laminate finish.',
-      pvcDefaultEligible: true,
+      pvcDefaultEligible: false,
       pvcDefaultParts: ['Wall-contact back frame'],
-      rates: {
-        Base: { Standard: 950, 'With PVC': 1025 },
-        Normal: { Standard: 1000, 'With PVC': 1075 },
-        Premium: { Standard: 1200, 'With PVC': 1275 },
-      },
+      rates: packageRates(950, 1000, 1200, 0),
       highGlossPremiumPerUnit: 0,
     },
     'Mirror wall paneling': {
@@ -925,33 +886,35 @@ function normalizeSingleWorkType(keyHint: string, raw: any): WorkTypeDefinition 
       ? 'lumpsum'
       : 'sq_ft';
 
-  const pvcAdder = Number(raw?.pvcAdder ?? raw?.pvc_adder ?? 0) || 0;
+  const confirmedRate=(value:unknown,name:string)=>{if((typeof value!=='number'&&typeof value!=='string')||String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0)throw new Error(`Enter a confirmed non-negative ${name} rate for ${label}. Provide Basic, Standard and Premium together.`);return Number(value);};
+  const pvcAdder = confirmedRate(raw?.pvcAdder ?? raw?.pvc_adder ?? 0,'PVC extra');
   const baseStd =
-    Number(raw?.rates?.Base?.Standard ?? raw?.baseRate ?? raw?.base ?? 750) || 750;
+    confirmedRate(raw?.rates?.Base?.Standard ?? raw?.baseRate ?? raw?.base,'Basic');
   const basePvc =
-    Number(
+    confirmedRate(
       raw?.rates?.Base?.['With PVC'] ??
         raw?.basePvcRate ??
         (pvcAdder > 0 ? baseStd + pvcAdder : baseStd)
-    ) || baseStd;
+    ,'Basic with PVC');
 
   const normalStd =
-    Number(raw?.rates?.Normal?.Standard ?? raw?.normalRate ?? raw?.normal ?? 850) || 850;
+    confirmedRate(raw?.rates?.Normal?.Standard ?? raw?.normalRate ?? raw?.normal,'Standard');
   const normalPvc =
-    Number(
+    confirmedRate(
       raw?.rates?.Normal?.['With PVC'] ??
         raw?.normalPvcRate ??
         (pvcAdder > 0 ? normalStd + pvcAdder : normalStd)
-    ) || normalStd;
+    ,'Standard with PVC');
 
   const premiumStd =
-    Number(raw?.rates?.Premium?.Standard ?? raw?.premiumRate ?? raw?.premium ?? 1000) || 1000;
+    confirmedRate(raw?.rates?.Premium?.Standard ?? raw?.premiumRate ?? raw?.premium,'Premium');
   const premiumPvc =
-    Number(
+    confirmedRate(
       raw?.rates?.Premium?.['With PVC'] ??
         raw?.premiumPvcRate ??
         (pvcAdder > 0 ? premiumStd + pvcAdder : premiumStd)
-    ) || premiumStd;
+    ,'Premium with PVC');
+  if(basePvc<baseStd||normalPvc<normalStd||premiumPvc<premiumStd)throw new Error(`With-PVC rates for ${label} cannot be below the base rates.`);
 
   const pvcDefaultEligible =
     typeof raw?.pvcDefaultEligible === 'boolean'
@@ -968,7 +931,7 @@ function normalizeSingleWorkType(keyHint: string, raw: any): WorkTypeDefinition 
       String(
         raw?.plainEnglishDefinition ||
           raw?.description ||
-          `Custom residential interior work (${label}) executed in calibrated plywood and 1mm laminate finish, billed per ${unit}.`
+          `Custom interior work: ${label}. Billing unit: ${unit}.`
       ).trim(),
     pvcDefaultEligible,
     pvcDefaultParts: Array.isArray(raw?.pvcDefaultParts)
@@ -1180,16 +1143,12 @@ export function extractAndMergeRateCardFromDraft(
   // 1. Check top-level rate_card_updates or workTypes in the pasted JSON
   const updatesObj = rawJson.rate_card_updates || rawJson.workTypes;
   if (updatesObj && typeof updatesObj === 'object') {
-    try {
       const merged = mergeRateCardJsonIntoCatalogue(
         nextCat,
         Array.isArray(updatesObj) ? updatesObj : { workTypes: updatesObj }
       );
       nextCat = merged.catalogue;
       merged.addedOrUpdatedKeys.forEach((k) => addedOrUpdated.add(k));
-    } catch {
-      // Continue to item-level extraction
-    }
   }
 
   // 2. Scan rooms[].items[] for any new work_type or inline custom_rates
@@ -1205,6 +1164,7 @@ export function extractAndMergeRateCardFromDraft(
         // Item-specific prices remain on the item. They must not silently undo
         // a later edit to a reusable rate-card entry.
         if (!exists) {
+          if(!cr||(['Base','Normal','Premium'] as const).some(grade=>typeof cr[grade]!=='number'||!Number.isFinite(cr[grade])||cr[grade]<0))continue;
           const unitRaw = String(item?.measure?.unit || 'sq_ft').toLowerCase();
           const unit: WorkTypeDefinition['unit'] =
             unitRaw === 'running_ft' || unitRaw === 'rft'
@@ -1217,11 +1177,11 @@ export function extractAndMergeRateCardFromDraft(
 
           const existingDef = nextCat.workTypes[wt];
           const baseStd =
-            Number(cr?.Base ?? existingDef?.rates?.Base?.Standard ?? 750) || 750;
+            cr.Base;
           const normalStd =
-            Number(cr?.Normal ?? existingDef?.rates?.Normal?.Standard ?? 850) || 850;
+            cr.Normal;
           const premiumStd =
-            Number(cr?.Premium ?? existingDef?.rates?.Premium?.Standard ?? 1000) || 1000;
+            cr.Premium;
           const existingPvcAdder = existingDef
             ? Math.max(
                 0,
@@ -1240,7 +1200,7 @@ export function extractAndMergeRateCardFromDraft(
             plainEnglishDefinition:
               existingDef?.plainEnglishDefinition ||
               item?.source_text_en ||
-              `Custom residential interior work (${wt}) executed with calibrated plywood and 1mm laminate finish, billed per ${unit}.`,
+              `Custom interior work: ${wt}. Billing unit: ${unit}.`,
             pvcDefaultEligible: existingDef?.pvcDefaultEligible ?? pvcAdder > 0,
             pvcDefaultParts: existingDef?.pvcDefaultParts || (pvcAdder > 0 ? ['Back panel'] : []),
             rates: {
@@ -1273,6 +1233,11 @@ export function buildDynamicGemInstructions(catalogue: StudioCatalogue = DEFAULT
   const brandLines = Object.entries(catalogue.grades).map(([key, grade]) =>
     `- ${getPackageDisplayName(key as PlywoodGrade)} (schema key ${JSON.stringify(key)}): ${grade.approvedBrands.map((brand) => `${brand.name} — ${brand.spec}; ${brand.warrantyYears > 0 ? `${brand.warrantyYears} years manufacturer warranty subject to brand certificate and invoice` : 'manufacturer terms apply, no fixed warranty period promised'}`).join(' | ')}.`
   ).join('\n');
+  const reviewRateTable=[
+    '| Work type | Unit | Basic (₹) | Standard (₹) | Premium (₹) | PVC extra (₹) |',
+    '|---|---|---:|---:|---:|---|',
+    ...Object.entries(catalogue.workTypes).map(([key,work])=>{const grades=['Base','Normal','Premium'] as const;const extras=grades.map(grade=>work.rates[grade]['With PVC']-work.rates[grade].Standard);const extra=new Set(extras).size===1?String(extras[0]):grades.map((grade,index)=>`${getPackageDisplayName(grade)}: ${extras[index]}`).join('; ');return `| ${key.replace(/\|/g,'/')} | ${work.unit} | ${grades.map(grade=>work.rates[grade].Standard).join(' | ')} | ${extra} |`;})
+  ].join('\n');
   const jsonFence = '```';
   const example = {
     schema_version: 'quotation-studio.draft.v2', output_language: 'en', is_demo: false,
@@ -1351,8 +1316,19 @@ Optional scope uses optional:true. Leave unknown required fields null and add ne
 
 3. PRICES, APPROVAL AND MEMORY
 The rate list below is a snapshot copied from the app when these instructions were copied. It is not a live sync. Use its work_type keys exactly. The app calculates totals; never invent a total or a rate absent from this list.
+RATE-CARD RESPONSIBILITY
+For ordinary quotations, reuse the saved rates for existing work types. Do not regenerate the rate card, attach redundant rate_card_updates or ask the same saved-rate questions for each item. A box-type cabinet, wardrobe or utility unit uses the saved Box type entry. Loft and low-roof frame-and-shutter closures use the same Basic/Standard/Premium base rates as Frame type, while keeping their own saved PVC extras. Folding tables, plywood wall panelling and Pooja CNC/glass doors use their own entries. Do not infer construction from an ambiguous nickname. The app adds the listed PVC extra once per measured billing unit, not a second time in the base rate or as a separate lump-sum item. Other zero-extra entries stay zero unless the owner approves a change.
+The AI CAN generate a reusable rate-card addition/change in JSON when the owner explicitly requests it and confirms every rate. The AI must NOT invent rates for a new work type. Collect all missing Basic, Standard, Premium, unit and PVC-extra values together in one table, showing “Needs confirmation” in unknown cells. Missing rates must stay unresolved; never fill 750/850/1000 or any other fallback merely to make JSON look complete.
+ONE CONSOLIDATED REVIEW BEFORE FINAL JSON
+1. During review, show the saved default rate card in a Markdown table with these columns: Work type | Unit | Basic (₹) | Standard (₹) | Premium (₹) | PVC extra (₹). The reference table below contains the current saved values.
+2. Show one “Rates for this quotation” table containing the work types actually used, in the same column order. Use confirmed saved defaults automatically and clearly mark only an approved override or a proposed change. Include all adjustments together; do not interview rate by rate or repeat questions already answered.
+3. Show a concise final quotation review table: Room | Furniture | Dimensions / billing quantity | Count | Work type | Included / optional. State the selected default package, finish, PVC choice, floor-plan checkbox and owner-approved Recommended flag. Keep suggested additions separate from included/optional quoted work until accepted. The app computes the monetary totals; do not invent a final quotation total.
+4. Ask for ONE consolidated confirmation/correction of these tables and any remaining unanswered facts. If the owner already confirmed them or explicitly requests the final JSON using confirmed facts, do not ask again. Preserve confirmed rates across later corrections unless the owner changes them.
+5. These review tables belong in the conversational REVIEW message BEFORE the final JSON response. After confirmation, the final response is still exactly one complete copyable fenced JSON block, without tables or explanatory text outside it. Do not insert review tables into JSON fields or quote.notes.
+CURRENT SAVED DEFAULT RATE CARD — REVIEW REFERENCE, NOT JSON NOTES
+${reviewRateTable}
 For a quotation-specific price, put custom_rates on that ITEM only: {"Base":850,"Normal":950,"Premium":1150,"pvc_adder":75}, using only confirmed amounts. These are examples, not default prices.
-Only when the owner explicitly asks to add or change a reusable rate card, include rate_card_updates keyed by work_type. Each definition uses label, unit, plainEnglishDefinition and rates:{"Base":{"Standard":amount,"With PVC":amount},"Normal":{...},"Premium":{...}}. Ask for all missing grade rates rather than guessing. The app derives automatic site-protection applicability from the confirmed With PVC rate; do not ask for or emit per-item eligibility/contact-area fields. The app imports those reusable changes into its catalogue, so explain this consequence during the conversation before the final JSON. For a rate-card-only request use schema_version quotation-studio.ratecard.v2, output_language en and workTypes with the same definitions, without rooms.
+Only when the owner explicitly asks to add or change a reusable rate card, include rate_card_updates keyed by work_type. Each definition uses label, unit, plainEnglishDefinition and rates:{"Base":{"Standard":amount,"With PVC":amount},"Normal":{...},"Premium":{...}}. Ask for all missing grade rates together in the consolidated review table rather than guessing or asking line by line. The app derives automatic site-protection applicability from the confirmed With PVC rate; do not ask for or emit per-item eligibility/contact-area fields. The app imports those reusable changes into its catalogue, so explain this consequence during the conversation before the final JSON. For a rate-card-only request use schema_version quotation-studio.ratecard.v2, output_language en and workTypes with the same definitions, without rooms.
 quote.notes is an English string array for explicitly approved job-specific facts only. These notes appear in BOTH the online quotation and PDF. Keep it [] when there is nothing unique to add. Put proposed discounts, genuine unapproved exceptions and unverified payment claims in owner_requests with path and text for review; keep that array [] otherwise. The standard material, plywood, drawer, glass/CNC, bank, payment and execution sections are already rendered automatically and must not be copied into either array. An imported note never changes a calculated charge, bank QR, milestone schedule or payment-verification status.
 PACKAGE ALLOWANCES AND WARRANTIES
 AUTOMATIC DOCUMENT NOTES: The app always prints the saved additional-drawer charges and included wardrobe drawer limits in the online quotation and PDF, even when quote.notes is empty. Do not generate these standard notes through AI, put them in owner_requests, or repeat them in quote.notes. The current defaults are Basic ₹4,000, Standard ₹5,000 and Premium ₹6,000 per additional internal drawer; saved owner settings below take priority. Only add an actual extra drawer as an item when the owner requests that work. Never add the charge to every wardrobe automatically.

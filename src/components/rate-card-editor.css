@@ -1,0 +1,41 @@
+.rate-editor { display:grid; gap:12px; min-width:0; }
+.rate-editor-search { display:grid; gap:6px; max-width:360px; font-size:12px; font-weight:600; }
+.rate-editor-search input { width:100%; min-height:44px; border:1px solid #b9cbbd; border-radius:8px; padding:10px 12px; background:#fff; font-weight:400; }
+.rate-editor-help,.rate-editor-empty { font-size:12px; line-height:1.6; color:#345340; }
+.rate-editor-table-wrap { border:1px solid #c5d6c9; border-radius:8px; overflow-x:auto; background:#fff; }
+.rate-editor-table { width:100%; min-width:640px; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+.rate-editor-table thead { background:#1c3a2f; color:#fff; }
+.rate-editor-table th { padding:12px 10px; text-align:left; font-weight:600; }
+.rate-editor-table th:first-child { width:30%; }
+.rate-editor-table td { padding:12px 8px; vertical-align:top; border-top:1px solid #e5eae4; }
+.rate-editor-name strong { display:block; color:#18221d; font-weight:600; overflow-wrap:anywhere; }
+.rate-editor-name > span { display:block; margin-top:4px; color:#5c645f; }
+.rate-editor-table input { width:100%; min-width:0; min-height:44px; height:46px; border:1px solid #bdc7bc; border-radius:6px; padding:10px 8px; color:#18221d; background:#faf8f4; font-variant-numeric:tabular-nums; font-size:14px; }
+.rate-editor-table input:focus-visible,.rate-editor-search input:focus-visible { outline:2px solid #9d7b48; outline-offset:2px; }
+.rate-editor-table input:disabled { opacity:.65; }
+.rate-editor-pvc input { background:#edf4ef; border-color:#abc0ad; }
+.rate-editor-pvc small { display:block; margin-top:6px; color:#345340; line-height:1.5; }
+.rate-editor-mobile-label { display:none; }
+.owner-rate-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.owner-rate-actions > p { flex:1 1 220px; font-size:12px; line-height:1.5; }
+.owner-rate-actions [role="status"] { color:#245a35; }
+.owner-rate-actions [role="alert"] { color:#96372e; }
+@media(pointer:coarse) { .owner-studio .owner-rates :is(input,select,textarea) { font-size:16px; } }
+@media(max-width:767px) {
+  .rate-editor-table-wrap { overflow:visible; border:0; background:transparent; }
+  .rate-editor-table,.rate-editor-table tbody { display:block; width:100%; min-width:0; }
+  .rate-editor-table thead { display:none; }
+  .rate-editor-table tr { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:16px 0; border-bottom:1px solid #c5d6c9; }
+  .rate-editor-table tr:first-child { padding-top:0; }
+  .rate-editor-table tr:last-child { border-bottom:0; padding-bottom:0; }
+  .rate-editor-table td { display:block; min-width:0; padding:0; border:0; }
+  .rate-editor-table .rate-editor-name { grid-column:1 / -1; display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .rate-editor-name strong { font-size:14px; }
+  .rate-editor-name > span { flex-shrink:0; font-size:11px; }
+  .rate-editor-mobile-label { display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:#345340; }
+  .rate-editor-table input { font-size:16px; }
+  .owner-rates { padding:14px; }
+  .owner-rates > summary { min-height:44px; line-height:1.5; }
+  .owner-rate-actions { align-items:stretch; }
+  .owner-rate-actions > button { width:100%; }
+}

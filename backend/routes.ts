@@ -321,7 +321,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (drawers) for (const grade of ['Base','Normal','Premium'] as const) updated.grades[grade].allowances = {...packageAllowances(updated.grades[grade]),extraDrawerRupees:drawers.rates[grade].Standard};
     // Business/payment details have their own validated endpoint; stale rate-card
     // tabs must not restore an old payment recipient or business address.
-    activeCatalogue = { ...updated, company: activeCatalogue.company };
+    activeCatalogue = { ...updated, version: activeCatalogue.version, company: activeCatalogue.company };
     saveDbToDisk();
     res.json({ catalogue: activeCatalogue });
   });
@@ -809,6 +809,8 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (supersedePublicId && !latest(supersedePublicId)) { res.status(404).json({error:'The quotation to update no longer exists.'}); return; }
     // Automatically extract and persist any rate_card_updates or new work types from the draft into activeCatalogue
     const autoMerged = extractAndMergeRateCardFromDraft(activeCatalogue, normalizedDraft);
+    const missingWorkTypes=[...new Set(normalizedDraft.rooms.flatMap(room=>room.items.map(item=>item.work_type||'')).filter(key=>!autoMerged.catalogue.workTypes[key]))];
+    if(missingWorkTypes.length){res.status(422).json({error:`Confirm and save rates for these work types before publishing: ${missingWorkTypes.join(', ')}.`});return;}
     activeCatalogue = syncDrawerAllowances(autoMerged.catalogue);
 
     const now = new Date();
