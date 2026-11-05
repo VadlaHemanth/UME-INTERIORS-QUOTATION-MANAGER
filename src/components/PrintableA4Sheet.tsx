@@ -79,6 +79,16 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
       let sectionHeading: HTMLElement | undefined;
       let sectionLabel = 'Quotation';
       const newPage = (continued = false) => {
+        // A whole table can move after the first-row preflight. Move its
+        // section heading as well, instead of leaving a title with no content.
+        const trailingHeading=body?.lastElementChild;
+        if(trailingHeading?.classList.contains('pdf-section-heading')) {
+          trailingHeading.remove();
+          const previousPage=body.parentElement!;
+          const labels=(previousPage.dataset.section || '').split(' / ');
+          if(labels.length>1&&labels.at(-1)===sectionLabel)previousPage.dataset.section=labels.slice(0,-1).join(' / ');
+          if(body.children.length===(letterhead?1:0)&&created.length>1)created.pop()!.remove();
+        }
         const page = document.createElement('section');
         page.className = 'pdf-page';
         page.dataset.section = sectionLabel;

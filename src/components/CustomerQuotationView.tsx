@@ -275,7 +275,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const [paymentAmount, setPaymentAmount] = useState<number>(50000);
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
   const [paymentFeedback, setPaymentFeedback] = useState<{
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
   const [copiedBankField, setCopiedBankField] = useState<string | null>(null);
@@ -594,7 +594,10 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     try {
       // Start file sharing directly from the tap, before any save/network await.
       const result = await sharePaymentImage(paymentImage, draft.quote.number || 'quotation', navigator, window.isSecureContext);
-      if (result === 'cancelled') return;
+      if (result === 'cancelled') {
+        setPaymentFeedback({type:'info',message:'Sharing cancelled. Your screenshot is still attached. Tap “I’ve made the payment” when you’re ready to try again.'});
+        return;
+      }
       if (result !== 'shared') {
         setShowManualPaymentShare(true);
         setPaymentFeedback({ type: 'error', message: result === 'insecure'
@@ -2204,6 +2207,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     className={`p-3 rounded-lg border font-medium ${
                       paymentFeedback.type === 'success'
                         ? 'bg-[#E4EFE7] border-[#15803D] text-[#1C3A2F]'
+                        : paymentFeedback.type === 'info'
+                        ? 'bg-[#FAF8F4] border-[#D8D0C2] text-[#1C3A2F]'
                         : 'bg-[#FEF2F2] border-[#B91C1C] text-[#991B1B]'
                     }`}
                   >
