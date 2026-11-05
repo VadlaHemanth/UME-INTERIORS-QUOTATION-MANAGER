@@ -19,7 +19,8 @@ import {
   ResolvedPackageSelection,
 } from '../lib/schema';
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
-import { documentTerms, materialLines, materialWording, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { PackageWarrantyLabel } from './PackageWarrantyLabel';
 import {
   DeterministicQrCode,
   UmeLogoMark,
@@ -475,7 +476,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                     }`}
               </p>
               <p className="text-[11px] text-[#1C3A2F] font-semibold mt-0.5">
-                {mixByRoom ? 'Grades and PVC options vary by room. Manufacturer warranties follow the selected product’s certificate and terms.' : `${activeGradeInfo.termiteProofBadge} · ${activeGradeInfo.warrantyBanner}`}
+                {mixByRoom ? 'Grades and PVC options vary by room. Manufacturer warranties follow the selected product’s certificate and terms.' : `${activeGradeInfo.termiteProofBadge} · ${packageWarrantyLabel(activeGradeInfo) || activeGradeInfo.warrantyBanner}`}
               </p>
               {ownerRecommendedGrade && (
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#76541C] mt-2">
@@ -544,6 +545,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       )}
                     </span>
                   </div>
+                  <PackageWarrantyLabel grade={gInfo}/>
                   <p className="text-[10px] font-semibold text-[#1C3A2F] mt-0.5">
                     {gInfo.termiteProofBadge}
                   </p>
@@ -564,6 +566,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               );
             })}
           </div>
+          <p className="text-[9.5px] leading-relaxed text-[#4A524D]">{PLYWOOD_WARRANTY_CONDITIONS}</p>
         </div>
 
         {/* Room-by-Room Side-by-Side 3-Package Summary Table */}

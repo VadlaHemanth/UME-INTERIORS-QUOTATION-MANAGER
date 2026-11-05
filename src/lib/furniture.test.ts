@@ -2,8 +2,37 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canonicalFurnitureName } from './furniture';
 import { DEFAULT_UME_CATALOGUE, formatCleanItemDescription, getPackageDisplayName } from './catalogue';
-import { DEFAULT_MATERIAL_WORDING, materialLines, packageAllowances, scopeNotes, upgradeCatalogue } from './commercial-spec';
+import { DEFAULT_MATERIAL_WORDING, documentTerms, materialLines, packageAllowances, packageWarrantyLabel, scopeNotes, upgradeCatalogue } from './commercial-spec';
 import { indiaDate, nextQuoteNumber } from './quote-workflow';
+
+test('package warranty labels and document terms follow saved product coverage without inventing a warranty',()=>{
+  const catalogue=structuredClone(DEFAULT_UME_CATALOGUE);
+  assert.equal(packageWarrantyLabel(catalogue.grades.Base),null);
+  assert.equal(packageWarrantyLabel(catalogue.grades.Normal),'Up to 15 years plywood warranty');
+  assert.equal(packageWarrantyLabel(catalogue.grades.Premium),'Up to 30 years plywood warranty');
+  catalogue.grades.Normal.approvedBrands[0].warrantyYears=12;
+  catalogue.grades.Normal.approvedBrands[1].warrantyYears=8;
+  assert.equal(packageWarrantyLabel(catalogue.grades.Normal),'Up to 12 years plywood warranty');
+  assert.match(documentTerms(catalogue,['Normal']).find(term=>term.id===10)!.clause,/Standard plywood: up to 12 years/);
+  catalogue.grades.Normal.approvedBrands=[];
+  assert.equal(packageWarrantyLabel(catalogue.grades.Normal),null);
+});
+
+test('display-name update preserves legal identity, custom names, saved materials and prices',()=>{
+  for(const brandName of ['UMAMAHESHWARA INTERIORS','Owner Custom Interiors']) {
+    const catalogue=structuredClone(DEFAULT_UME_CATALOGUE);
+    catalogue.version='ume-catalogue-2026.11.v8';
+    catalogue.company.brandName=brandName;
+    const before=structuredClone(catalogue);
+    const updated=upgradeCatalogue(catalogue);
+    const expected=structuredClone(before);
+    expected.version=DEFAULT_UME_CATALOGUE.version;
+    if(brandName==='UMAMAHESHWARA INTERIORS') expected.company.brandName='UME Interiors';
+    assert.deepEqual(updated,expected);
+    assert.deepEqual(catalogue,before);
+    assert.equal(upgradeCatalogue(updated),updated);
+  }
+});
 
 test('canonical furniture names keep aliases consistent without confusing pull-outs and wall cabinets',()=>{
   for(const alias of ['wall cabinet','wall cabinet unit','Kitchen Overhead Wall Cabinet']) assert.equal(canonicalFurnitureName(alias,'Box type','Kitchen'),'Kitchen Overhead Wall Cabinet');

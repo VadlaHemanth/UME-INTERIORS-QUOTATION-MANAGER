@@ -14,6 +14,14 @@ export const DEFAULT_PACKAGE_ALLOWANCES: PackageAllowances = {
   includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4, additionalAllowances: [],
 };
 export const DEFAULT_DRAWER_PRICES: Record<PlywoodGrade, number> = {Base:4000, Normal:5000, Premium:6000};
+export const PLYWOOD_WARRANTY_CONDITIONS = 'Manufacturer warranty applies to plywood. Coverage depends on the selected product, brand certificate, invoice and manufacturer terms.';
+export function packageWarrantyYears(grade: GradeInfo): number {
+  return Math.max(0, ...grade.approvedBrands.map(brand => Number.isFinite(brand.warrantyYears) && brand.warrantyYears > 0 ? brand.warrantyYears : 0));
+}
+export function packageWarrantyLabel(grade: GradeInfo): string | null {
+  const years = packageWarrantyYears(grade);
+  return years > 0 ? `Up to ${years} years plywood warranty` : null;
+}
 export const packageAllowances = (grade: GradeInfo): PackageAllowances => ({ ...DEFAULT_PACKAGE_ALLOWANCES, extraDrawerRupees:DEFAULT_DRAWER_PRICES[grade.grade], ...grade.allowances });
 export function syncDrawerAllowances(catalogue: StudioCatalogue): StudioCatalogue {
   const drawers = catalogue.workTypes['Additional internal drawer'];
@@ -74,7 +82,7 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
   const labels = {Base:'Basic',Normal:'Standard',Premium:'Premium'};
   return catalogue.termsAndConditions.map(term => {
     if (term.id === 9) { const wording = materialWording(catalogue); return {...term,clause:`${wording.internalLaminate} ${wording.externalLaminate}`}; }
-    if (term.id === 10) return {...term,clause:`Materials follow the approved product list for the selected package. ${[...new Set(grades)].map(grade=>{const years=Math.max(0,...catalogue.grades[grade].approvedBrands.map(brand=>brand.warrantyYears));return `${labels[grade]} plywood: ${years ? `up to ${years} years manufacturer warranty` : 'warranty under the selected manufacturer’s terms; no fixed period is promised'}.`;}).join(' ')} Actual coverage follows the selected product, brand warranty certificate, invoice and manufacturer terms. Alternatives require written customer approval. This is not a blanket warranty on the entire furniture installation.`};
+    if (term.id === 10) return {...term,clause:`Materials follow the approved product list for the selected package. ${[...new Set(grades)].map(grade=>{const years=packageWarrantyYears(catalogue.grades[grade]);return `${labels[grade]} plywood: ${years ? `up to ${years} years manufacturer warranty` : 'warranty under the selected manufacturer’s terms; no fixed period is promised'}.`;}).join(' ')} Actual coverage follows the selected product, brand warranty certificate, invoice and manufacturer terms. Alternatives require written customer approval. This is not a blanket warranty on the entire furniture installation.`};
     if (workOrder && term.id === 8) return {...term,title:'Confirmed scope and recorded changes',clause:'This work order records the agreed package, measurements, quantities and specifications. Changes to the confirmed scope, materials, requirements or prices must be documented in an updated work order and approved by the customer before the affected work proceeds.'};
     return workOrder ? {...term,clause:term.clause.replace(/a revised quotation/g, 'an updated work order')} : term;
   });
@@ -82,8 +90,13 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
 
 /** Upgrade the old shipped defaults once; retain owner-entered brands and rates. */
 export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
-  if (catalogue.version === 'ume-catalogue-2026.11.v8') return catalogue;
+  if (catalogue.version === 'ume-catalogue-2026.11.v9') return catalogue;
   const next = structuredClone(catalogue);
+  if (catalogue.version === 'ume-catalogue-2026.11.v8') {
+    if (next.company.brandName === 'UMAMAHESHWARA INTERIORS') next.company.brandName = 'UME Interiors';
+    next.version = 'ume-catalogue-2026.11.v9';
+    return next;
+  }
   // This release changes the shipped defaults without resetting custom amounts.
   if (catalogue.version === 'ume-catalogue-2026.11.v7') {
     for (const g of ['Base','Normal','Premium'] as const) {
@@ -97,7 +110,7 @@ export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
     next.commonMaterials = next.commonMaterials.map(line => /^Woodworking Adhesive \(Fevicol Marine \/ SH \/ Jivanjor\)$/i.test(line) ? 'Woodworking adhesive: Fevicol and Jeevanjor.' : line);
     next.materialWording = materialWording(next);
     next.version = 'ume-catalogue-2026.11.v8';
-    return next;
+    return upgradeCatalogue(next);
   }
   const labels = { Base: 'Basic', Normal: 'Standard', Premium: 'Premium' } as const;
   for (const g of ['Base', 'Normal', 'Premium'] as const) {

@@ -1,6 +1,6 @@
 import { FinishOption, PlywoodGrade, ProtectionOption } from './schema';
 import { canonicalFurnitureName, FURNITURE_VOCABULARY } from './furniture';
-import { documentTerms, materialLines, packageAllowances, scopeNotes, type MaterialWording, type PackageAllowances } from './commercial-spec';
+import { documentTerms, materialLines, packageAllowances, packageWarrantyLabel, scopeNotes, type MaterialWording, type PackageAllowances } from './commercial-spec';
 
 export interface WorkTypeDefinition {
   id: string;
@@ -309,9 +309,9 @@ export interface StudioCatalogue {
 }
 
 export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
-  version: 'ume-catalogue-2026.11.v8',
+  version: 'ume-catalogue-2026.11.v9',
   company: {
-    brandName: 'UMAMAHESHWARA INTERIORS',
+    brandName: 'UME Interiors',
     legalName: 'Umamaheshwara Enterprises',
     subtitle: 'Residential and Commercial Interior Designers',
     domain: 'umeinteriors.com',
@@ -1296,7 +1296,7 @@ export function buildDynamicGemInstructions(catalogue: StudioCatalogue = DEFAULT
       source_text_en: 'Fold-away wall desk with laminate finish and folding brackets; final specification to be confirmed.',
     }}],
   };
-  return `You are Quotation Studio, the private quotation and rate-card assistant for UMAMAHESHWARA INTERIORS (Umamaheshwara Enterprises, Chengicherla, Hyderabad; Proprietor V. SUBHASH).
+  return `You are Quotation Studio, the private quotation and rate-card assistant for ${catalogue.company.brandName} (${catalogue.company.legalName}; Proprietor ${catalogue.company.proprietor}).
 
 PURPOSE AND APP HANDOFF
 Help the owner turn Telugu, Hindi, English, Roman Telugu/Hindi, or mixed site notes into the exact English JSON accepted by UME Interiors. The owner signs in at /owner. Customer quotations are private /q/<token> links. You have no live connection to the app, cannot publish a link or alter its database, cannot log in for the owner, and cannot verify or credit a payment.
@@ -1365,7 +1365,7 @@ Current saved standard terms — reference only, already rendered automatically:
 ${documentTerms(catalogue, ['Base','Normal','Premium']).map(term => `- ${term.title}: ${term.clause}`).join('\n')}
 Current saved settings (these are included allowances, not extra charges added to every unit):
 ${Object.entries(catalogue.grades).map(([key, grade]) => { const a = packageAllowances(grade); const drawerPrice = catalogue.workTypes['Additional internal drawer']?.rates[key as PlywoodGrade].Standard ?? a.extraDrawerRupees; return `- ${getPackageDisplayName(key as PlywoodGrade)}: handles up to ₹${a.handleRupees} each; laminate up to ₹${a.laminateSheetRupees} per sheet; additional internal drawers ₹${drawerPrice} each; ${a.includedBedroomDrawersMin}–${a.includedBedroomDrawersMax} drawers in box-type bedroom wardrobes, subject to size and approved layout.`; }).join('\n')}
-The owner can edit allowances, brands, plywood grades and warranty years under Settings → Packages & materials. Read the brand pools below exactly: BWR must remain BWR, never silently change it to BWP. Standard has up to 15 years and Premium up to 30 years in the current default catalogue; actual coverage depends on the selected product and its brand warranty certificate, invoice and terms. Never promise whole-furniture immunity from dampness or termites. For a new allowance use only an owner-confirmed amount; the owner can save it as a reusable default in settings. Do not invent a hinge price.
+The owner can edit allowances, brands, plywood grades and warranty years under Settings → Packages & materials. Read the brand pools below exactly: BWR must remain BWR, never silently change it to BWP. Package-selection warranty labels are generated automatically in the online quote and PDF from the maximum warranty in each package's saved plywood products: ${(['Normal','Premium'] as const).map(grade => `${getPackageDisplayName(grade)}: ${packageWarrantyLabel(catalogue.grades[grade]) || 'no fixed warranty period promised'}`).join('; ')}. Do not generate these labels in JSON, quote.notes or owner_requests. Actual coverage depends on the selected product and its brand warranty certificate, invoice and terms. Never promise whole-furniture immunity from dampness or termites. For a new allowance use only an owner-confirmed amount; the owner can save it as a reusable default in settings. Do not invent a hinge price.
 Conversation memory helps only within the current chat. To change future Gem/Custom GPT chats, the owner must copy the current app instructions again into that assistant’s saved configuration. Do not claim you rewrote its configuration or app database.
 
 4. TAILORED OPTIONAL RECOMMENDATIONS

@@ -50,10 +50,11 @@ import { DeterministicQrCode } from './BrandMark';
 import { printQuotation } from '../lib/print-quotation';
 import { PrintableA4Sheet } from './PrintableA4Sheet';
 import './customer-quotation.css';
-import { documentTerms, materialLines, materialWording, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
 import { WorkOrderView } from './WorkOrderView';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
+import { PackageWarrantyLabel } from './PackageWarrantyLabel';
 
 interface CustomerQuotationViewProps {
   isPreview?: boolean;
@@ -958,6 +959,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                           </span>
                         </div>
 
+                        <PackageWarrantyLabel grade={gInfo}/>
+
                         <p
                           className={`package-choice-price text-lg font-sans font-bold tabular-nums mt-1 ${
                             isActive ? 'text-white' : 'text-[#1C3A2F]'
@@ -974,18 +977,19 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                           {gInfo.termiteProofBadge}
                         </p>
 
-                        <p
+                        {!packageWarrantyLabel(gInfo) && <p
                           className={`text-[11px] mt-0.5 leading-snug ${
                             isActive ? 'text-white/85' : 'text-[#5C645F]'
                           }`}
                         >
                           {gInfo.warrantyBanner}
-                        </p>
+                        </p>}
                       </div>
                     </button>
                   );
                 })}
               </div>
+              <p className="text-[11px] leading-relaxed text-[#4A524D]">{PLYWOOD_WARRANTY_CONDITIONS}</p>
             </div>
             <PlywoodSpecifications catalogue={catalogue} grades={ALL_GRADES}/>
           </section>

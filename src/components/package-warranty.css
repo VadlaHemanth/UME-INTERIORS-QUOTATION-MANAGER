@@ -1,0 +1,20 @@
+.package-warranty-label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 100%;
+  margin-top: 7px;
+  padding: 5px 7px;
+  border: 1px solid #d4dfd6;
+  border-radius: 5px;
+  background: #f0f5f0;
+  color: #244735;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+}
+.package-warranty-label svg { flex: 0 0 14px; margin-top: 1px; }
+.package-choice[aria-pressed="true"] .package-warranty-label { background: #294c3c; border-color: #65816a; color: #f2dfbe; }
+.quote-document .package-warranty-label { margin-top: 6px; padding: 4px 5px; font-size: 9.5px; gap: 4px; }
+.quote-document .package-warranty-label svg { width: 12px; height: 12px; flex-basis: 12px; }

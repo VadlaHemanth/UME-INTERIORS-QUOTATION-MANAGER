@@ -14,10 +14,13 @@ test('downloaded assistant instructions match the app copy button', () => {
 test('assistant instructions use current edited rates and keep the example behind review gates', () => {
   const catalogue = structuredClone(DEFAULT_UME_CATALOGUE);
   catalogue.workTypes['Box type'].rates.Base.Standard = 987;
+  catalogue.grades.Normal.approvedBrands[0].warrantyYears = 20;
   const instructions = buildDynamicGemInstructions(catalogue);
   assert.match(instructions, /work_type "Box type"; unit "sq_ft"; Basic \(Base\) 987,/);
   assert.match(instructions, /signs in at \/owner/);
   assert.match(instructions, /not a live sync/);
+  assert.match(instructions, /Standard: Up to 20 years plywood warranty/);
+  assert.match(instructions, /Do not generate these labels in JSON, quote.notes or owner_requests/);
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
   const validation = validateQuotationDraftV2(example);
   assert.equal(validation.validForDraft, true);

@@ -1,4 +1,12 @@
-# Release verification — 4 November 2026
+# Release verification — 5 November 2026
+
+## Package warranty labels and display name
+
+Standard and Premium package choices now show a shared shield label in the online quotation and PDF. The label uses the maximum warranty among that quotation's saved plywood products: up to 15 years for Standard and 30 years for Premium in the current catalogue. The owner confirmed 15 years after the saved products were checked. A nearby sentence explains manufacturer/product conditions; the full brand details remain available. Empty or zero-year lists do not invent a warranty. Instructions explain that the app generates these labels automatically and must not receive duplicate JSON notes.
+
+The shipped display name is UME Interiors, retaining Umamaheshwara Enterprises as the legal name. The one-time v8-to-v9 update changes only the exact previous shipped display name and version, preserving custom names, product coverage, prices and bank details. The PDF signature reads “For UME Interiors (Umamaheshwara Enterprises)”.
+
+All 76 tests pass, including edited warranty values in labels, terms and assistant instructions, actual PDF markup, and preservation of custom settings during the display-name update. Production-bundle Chromium checks at 320, 390, 768 and 1440 pixels found no page overflow or clipped labels. Selected Standard styling was checked on mobile and desktop. Unpublished and published Online/PDF styles match; both printed fixtures have eight A4 pages with no body overflow. Rendered first and signature pages were visually checked, and the browser reported no runtime errors.
 
 ## Assistant content-ownership follow-up
 
