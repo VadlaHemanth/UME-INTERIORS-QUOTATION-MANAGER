@@ -1025,7 +1025,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         <div className="pt-8 border-t border-[#E5DFD3] grid grid-cols-2 gap-8 text-xs print-avoid-break">
           <div>
             <p className="font-bold text-[#18221D]">
-              For {catalogue.company.brandName} ({catalogue.company.legalName})
+              For {catalogue.company.brandName.toUpperCase()} ({catalogue.company.legalName})
             </p>
             <p className="text-[#5C645F] mt-6">
               <strong>{catalogue.company.proprietor}</strong> · Proprietor ({catalogue.company.phone})

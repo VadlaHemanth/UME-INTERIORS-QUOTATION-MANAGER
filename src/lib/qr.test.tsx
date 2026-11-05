@@ -87,7 +87,7 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
     assert.match(html,/Fevicol and Jeevanjor/);
     assert.match(html,/Up to 15 years plywood warranty/);
     assert.match(html,/Up to 30 years plywood warranty/);
-    assert.match(html,/For UME Interiors \(Umamaheshwara Enterprises\)/);
+    assert.match(html,/For UME INTERIORS \(Umamaheshwara Enterprises\)/);
     assert.doesNotMatch(html,/Fevicol Marine|Jivanjor|\bSH\b/);
     assert.ok(svg, 'the real PDF source markup must contain its booking QR');
     const decoded = scanRenderedSvgQr(svg);
