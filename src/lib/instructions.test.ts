@@ -20,6 +20,9 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions, /signs in at \/owner/);
   assert.match(instructions, /not a live sync/);
   assert.match(instructions,/ONE CONSOLIDATED REVIEW BEFORE FINAL JSON/);
+  assert.match(instructions,/DIMENSION ORDER — HEIGHT × WIDTH/);
+  assert.match(instructions,/never swap or guess an unlabelled pair/);
+  assert.match(instructions,/Preserve confirmed length, depth, diameter, piece counts/);
   assert.match(instructions,/do not interview rate by rate/);
   assert.match(instructions,/The AI CAN generate a reusable rate-card addition\/change in JSON/);
   assert.match(instructions,/For ordinary quotations, reuse the saved rates/);

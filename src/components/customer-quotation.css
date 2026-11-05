@@ -58,7 +58,7 @@
   .customer-quotation .room-comparison-table tr:last-child td:nth-child(n+3) span { display: inline-block; padding: 5px 2px; font-size: 13px; white-space: nowrap; }
   .customer-quotation .detail-price-table td:first-child { grid-column: 1 / -1; }
   .customer-quotation .detail-price-table td:nth-child(2) { grid-column: span 2; }
-  .customer-quotation .detail-price-table td:nth-child(2)::before { content: 'Dimensions'; }
+  .customer-quotation .detail-price-table td:nth-child(2)::before { content: 'Dimensions (Height × Width)'; }
   .customer-quotation .detail-price-table td:nth-child(3)::before { content: 'Area / Qty'; }
   .customer-quotation .detail-price-table td:nth-child(n+4) { font-size: 13px; padding: 8px 4px; border-radius: 6px; }
   .customer-quotation .detail-price-table td[colspan] { grid-column: 1 / -1; }

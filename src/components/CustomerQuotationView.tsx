@@ -1459,6 +1459,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 </th>
                                 <th className="py-3 px-2.5 font-bold whitespace-nowrap">
                                   Dimensions
+                                  <span className="block font-normal">Height × Width</span>
                                 </th>
                                 <th className="py-3 px-2.5 text-right font-bold whitespace-nowrap">
                                   Area / Qty

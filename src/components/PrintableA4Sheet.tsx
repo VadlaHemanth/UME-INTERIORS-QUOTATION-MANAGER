@@ -737,7 +737,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       <th className="py-2 px-3 font-semibold">
                         Furniture and specification
                       </th>
-                      <th className="py-2 px-2 font-semibold">Dimensions</th>
+                      <th className="py-2 px-2 font-semibold">Dimensions<span className="block text-[9px] font-normal">Height × Width</span></th>
                       <th className="py-2 px-2 text-right font-semibold">Area / quantity</th>
                       {(isWorkOrder ? [rSel.grade] : ALL_GRADES).map(grade => <th key={grade} className={`py-2 px-2 text-right font-semibold ${rSel.grade === grade ? 'pdf-selected-heading' : ''}`}>{isWorkOrder ? 'Agreed amount' : getPackageDisplayName(grade)}</th>)}
                     </tr>

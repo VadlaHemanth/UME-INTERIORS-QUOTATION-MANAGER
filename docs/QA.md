@@ -1,5 +1,9 @@
 # Release verification — 5 November 2026
 
+## Height and width labels
+
+Online quotation tables and PDFs now show “Height × Width” beneath Dimensions; the mobile item layout names both dimensions in its visible label. Assistant instructions require confirmed rectangular front-area measurements in that order, preserve other measurement types and ask about ambiguous orientation once during consolidated review. Existing numbers and prices are unchanged. All 80 tests pass, including the instruction/download match and actual PDF markup. Chromium checks at 320, 390 and 1440 pixels confirm the labels without page overflow. Normal/native quotation, work-order and long-content PDFs retain their tested page counts, with no overflowing page bodies or trailing section headings.
+
 ## Mobile workflow follow-up after the rate-card release
 
 After publishing the rate editor/defaults/instructions, the broader mobile pass checked customer package changes, room mixing, optional-work selection, saved preferences, support requests, payment-image attachment and sharing, cancellation, UPI recipient links, owner login, quotation listing/editing/publication, returning to the studio, settings and assistant instructions. Synthesized touch and native keyboard checks cover 320px and 390px portrait plus 844×390 landscape; the initial pass also covers 768px tablet and 1440px desktop. Checked screens have no horizontal page overflow or browser runtime errors. The file-share test checks the actual file type, byte count and quotation-based filename with a mocked native share target; no WhatsApp recipient or bank transaction was used.
