@@ -118,7 +118,7 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
     const workHtml=work(advance-5000);
     const workSvg=/<svg\b[^>]*\baria-label="Next scheduled payment"[^>]*>[\s\S]*?<\/svg>/.exec(workHtml)?.[0];assert.ok(workSvg);
     const workUrl=new URL(scanRenderedSvgQr(workSvg)!);assert.equal(workUrl.searchParams.get('am'),'5000');assert.equal(workUrl.searchParams.get('pa'),'edited.payments@bank');assert.equal(workUrl.searchParams.get('tn'),'Work order UME-TEST-EDITED-BANK');
-    assert.match(workHtml,/Agreed furniture scope/);assert.match(workHtml,/Confirmation date/);assert.match(workHtml,/2026-11-06/);assert.match(workHtml,/Verified payments/);assert.match(workHtml,/Online work order/);assert.doesNotMatch(workHtml,/quotation total|UPI booking|Online quotation/);
+    assert.match(workHtml,/Agreed furniture scope/);assert.match(workHtml,/Confirmation date/);assert.match(workHtml,/06-11-2026/);assert.match(workHtml,/Verified payments/);assert.match(workHtml,/Online work order/);assert.doesNotMatch(workHtml,/quotation total|UPI booking|Online quotation/);
     const overLimit=work(50000);const genericSvg=/<svg\b[^>]*\baria-label="UPI · enter amount"[^>]*>[\s\S]*?<\/svg>/.exec(overLimit)?.[0];assert.ok(genericSvg);assert.equal(new URL(scanRenderedSvgQr(genericSvg)!).searchParams.has('am'),false);
     assert.doesNotMatch(work(total),/aria-label="Next scheduled payment"|aria-label="UPI · enter amount"/);
     assert.doesNotMatch(work(advance-5000,true),/aria-label="Next scheduled payment"|aria-label="Online work order"/);

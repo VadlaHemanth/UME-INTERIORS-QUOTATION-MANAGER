@@ -15,7 +15,7 @@ test('walkthrough order starts Hall, Pooja and Kitchen without inventing rooms o
 
 test('hall units start with TV, crockery and vanity; kitchen and bedroom units follow construction order',()=>{
   const items=['Vanity Cabinet','TV Wall Panelling','Crockery Cabinet','TV Console Cabinet','Additional Internal Drawer'].map((name,itemIndex)=>({name,itemIndex}));
-  assert.deepEqual(orderQuotationFurniture(items,'Hall').map(i=>i.itemIndex),[3,2,0,1,4]);
+  assert.deepEqual(orderQuotationFurniture(items,'Hall').map(i=>i.itemIndex),[3,1,2,0,4]);
   assert.deepEqual(items.map(i=>i.itemIndex),[0,1,2,3,4]);
   assert.deepEqual(orderQuotationFurniture([{name:'Kitchen Loft'},{name:'Kitchen Overhead Wall Cabinet'},{name:'Kitchen Base Cabinet'},{name:'Tandem Drawer System'}],'Kitchen').map(i=>i.name),['Kitchen Base Cabinet','Tandem Drawer System','Kitchen Overhead Wall Cabinet','Kitchen Loft']);
   assert.deepEqual(orderQuotationFurniture([{name:'Kitchen Loft'},{name:'Opposite-side kitchen cabinet unit'},{name:'Kitchen Overhead Wall Cabinet'}],'Kitchen').map(i=>i.name),['Kitchen Overhead Wall Cabinet','Opposite-side kitchen cabinet unit','Kitchen Loft']);

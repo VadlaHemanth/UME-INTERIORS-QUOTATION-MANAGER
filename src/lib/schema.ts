@@ -4,6 +4,7 @@
  */
 
 import { validateAddonSuggestions } from './addon-suggestions';
+import { expiryFromIssue } from './quotation-dates';
 
 export type InputLanguageCode = 'te' | 'hi' | 'en';
 export type PlywoodGrade = 'Base' | 'Normal' | 'Premium';
@@ -37,6 +38,8 @@ export interface QuoteMeta {
   number: string | null;
   date: string | null;
   valid_until: string | null;
+  /** Calendar days after the issue date. Dates remain ISO in JSON and storage. */
+  validity_days?: number;
   /** Approved quotation-specific notes shown in the online document and PDF. */
   notes?: string[];
   /** Owner-controlled customer-facing badge for the selected default package. */
@@ -71,6 +74,8 @@ export interface DraftItem {
   size_text: string | null;
   measure: ItemMeasure;
   quantity: number | null;
+  /** Zero-based index of the main unit in this same room, e.g. a loft's wardrobe. */
+  parent_item_index?: number | null;
   /**
    * Legacy import metadata only. New assistant JSON and published quotations
    * omit this field: the applicable contact-area protection is determined by
@@ -108,6 +113,8 @@ export interface QuotationDraftV2 {
   schema_version: 'quotation-studio.draft.v2';
   output_language: 'en';
   is_demo: boolean;
+  /** Reusable, owner-approved process corrections; never customer or payment data. */
+  assistant_memory_updates?: string[];
   languages: InputLanguageCode[];
   customer: CustomerInfo;
   quote: QuoteMeta;
@@ -276,6 +283,7 @@ export function validateQuotationDraftV2(
       message: 'output_language must always be "en".',
     });
   }
+  if(d.assistant_memory_updates!==undefined&&(!Array.isArray(d.assistant_memory_updates)||d.assistant_memory_updates.length>20||d.assistant_memory_updates.some(line=>typeof line!=='string'||!line.trim()||line.length>500)))issues.push({path:'/assistant_memory_updates',severity:'error',code:'SCHEMA_MISMATCH',message:'Reusable assistant corrections must be up to 20 short text rules, at most 500 characters each.'});
 
   if (d.is_demo === true) {
     issues.push({
@@ -434,6 +442,11 @@ export function validateQuotationDraftV2(
         message: `Invalid date "${d.quote.valid_until}" at /quote/valid_until. Use YYYY-MM-DD.`,
       });
     }
+    if(d.quote.validity_days!==undefined&&(!Number.isSafeInteger(d.quote.validity_days)||d.quote.validity_days<1||d.quote.validity_days>3650))issues.push({path:'/quote/validity_days',severity:'error',code:'INVALID_DATE',message:'Validity must be a whole number of days from 1 to 3,650.'});
+    if(d.quote.date&&d.quote.valid_until&&isValidCalendarDate(d.quote.date)&&isValidCalendarDate(d.quote.valid_until)){
+      if(d.quote.valid_until<=d.quote.date)issues.push({path:'/quote/valid_until',severity:'error',code:'INVALID_DATE',message:'Valid until must be after the issue date.'});
+      else if(d.quote.validity_days!==undefined&&expiryFromIssue(d.quote.date,d.quote.validity_days)!==d.quote.valid_until)issues.push({path:'/quote/valid_until',severity:'error',code:'INVALID_DATE',message:'The expiry date must match the issue date plus the selected validity days.'});
+    }
   }
 
   // Recommended package checks
@@ -476,6 +489,14 @@ export function validateQuotationDraftV2(
       } else {
         room.items.forEach((item, iIdx) => {
           const iPath = `${rPath}/items/${iIdx}`;
+          const parent=item.parent_item_index;
+          if(parent==null&&/loft|low roof/i.test(`${item.name} ${item.work_type}`)&&!/panelling|under loft/i.test(item.name||'')&&room.items.filter(other=>/loft|low roof/i.test(`${other.name} ${other.work_type}`)&&!/panelling|under loft/i.test(other.name||'')).length>1&&room.items.filter(other=>!/loft/i.test(`${other.name} ${other.work_type}`)&&/wardrobe|dressing|crockery|vanity/i.test(other.name||'')).length>1)issues.push({path:`${iPath}/parent_item_index`,severity:'publish_blocker',code:'MISSING_REQUIRED_FIELD',message:`Choose the main unit for "${item.name}" in ${room.name}. Each loft must stay with the wardrobe, dressing table or cabinet it belongs above.`});
+          if(parent!=null){
+            let invalid=!Number.isSafeInteger(parent)||parent<0||parent>=room.items.length||parent===iIdx;
+            let cursor:number|null|undefined=parent;const seen=new Set([iIdx]);
+            while(!invalid&&cursor!=null){if(seen.has(cursor)){invalid=true;break;}seen.add(cursor);cursor=room.items[cursor]?.parent_item_index;}
+            if(invalid)issues.push({path:`${iPath}/parent_item_index`,severity:'error',code:'SCHEMA_MISMATCH',message:'Choose another furniture item in this room as the main unit. Links cannot refer to themselves or form a loop.'});
+          }
           checkStringField(item.name, `${iPath}/name`, true);
           checkStringField(item.work_type, `${iPath}/work_type`, true);
           checkStringField(item.size_text, `${iPath}/size_text`, true);

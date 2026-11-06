@@ -15,6 +15,7 @@ function publicDraft(draft: QuotationDraftV2): QuotationDraftV2 {
     customer: { name: draft.customer.name, phone: draft.customer.phone, site: draft.customer.site },
     quote: {
       number: draft.quote.number, date: draft.quote.date, valid_until: draft.quote.valid_until,
+      ...(draft.quote.validity_days!==undefined?{validity_days:draft.quote.validity_days}:{}),
       ...(draft.quote.notes ? { notes: [...draft.quote.notes] } : {}),
       ...(typeof draft.quote.show_recommended_package === 'boolean'
         ? { show_recommended_package: draft.quote.show_recommended_package }
@@ -33,6 +34,7 @@ function publicDraft(draft: QuotationDraftV2): QuotationDraftV2 {
         size_text: item.size_text,
         measure: { unit: item.measure.unit, per_item: item.measure.per_item },
         quantity: item.quantity,
+        ...(item.parent_item_index!=null?{parent_item_index:item.parent_item_index}:{}),
         optional: item.optional,
         source_text_en: item.source_text_en,
       })),
@@ -83,6 +85,7 @@ export function publicCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
     pvcSpec: structuredClone(catalogue.pvcSpec),
     commonMaterials: [...catalogue.commonMaterials],
     materialWording: catalogue.materialWording ? {...catalogue.materialWording} : undefined,
+    hardwareScope:catalogue.hardwareScope,
     notesAndExclusions: [...catalogue.notesAndExclusions],
     termsAndConditions: structuredClone(catalogue.termsAndConditions),
     highGlossSheetUpgradeDelta: catalogue.highGlossSheetUpgradeDelta,

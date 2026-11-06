@@ -58,12 +58,15 @@ import {
 import { getQuotationBasisLabel, getQuotationEstimateNote, isFloorPlanEstimate } from '../lib/quotation-notes';
 import { indiaDate, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../lib/quote-workflow';
 import { CustomerQuotationView } from './CustomerQuotationView';
-import { canonicalFurnitureName, FURNITURE_VOCABULARY } from '../lib/furniture';
+import { FURNITURE_VOCABULARY } from '../lib/furniture';
 import { packageAllowances } from '../lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../lib/quotation-presentation';
 import { RoomScopeEditor } from './RoomScopeEditor';
 import { RateCardEditor } from './RateCardEditor';
 import { workOrderPreview } from '../lib/work-order-document';
+import { beginQuotationEdit,completeQuoteDates,expiryFromIssue,validityBetween,validIsoDate } from '../lib/quotation-dates';
+import { normalizeFurnitureLayout } from '../lib/furniture-layout';
+import { QuotationDateField } from './QuotationDateField';
 
 export interface PublishedQuoteSummary {
   publicId: string;
@@ -162,7 +165,7 @@ function createEmptyOwnerDraft(quotes: PublishedQuoteSummary[] = []): QuotationD
   return {
     schema_version: 'quotation-studio.draft.v2', output_language: 'en', is_demo: false,
     languages: ['en'], customer: { name: null, site: null, phone: null },
-    quote: { number: nextQuoteNumber(quotes), date: indiaDate(), valid_until: quoteExpiry(), show_recommended_package: false, notes: [] },
+    quote: { number: nextQuoteNumber(quotes), date: indiaDate(), valid_until: quoteExpiry(),validity_days:30, show_recommended_package: false, notes: [] },
     recommended: { grade: 'Base', protection: 'Standard', finish: 'SF', brand_preference: null },
     rooms: [{ name: 'Master Bedroom', recommended: null, items: [] }],
     owner_requests: [], needs_clarification: [],
@@ -292,6 +295,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
   // Tab 3: Master Gem Instructions & Image Prompts
   const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
+  const [assistantMemoryFeedback,setAssistantMemoryFeedback]=useState('');
+  const [savingAssistantMemory,setSavingAssistantMemory]=useState(false);
   const [copiedImagePromptId, setCopiedImagePromptId] = useState<string | null>(null);
 
   const previousCatalogue = useRef(catalogue);
@@ -352,13 +357,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     const draft=prepareQuotationDraft(workingDraft,editableCatalogue);
     for (const room of draft.rooms) for (const item of room.items) if (item.work_type && JSON.stringify(editableCatalogue.workTypes[item.work_type]?.rates)!==JSON.stringify(catalogue.workTypes[item.work_type]?.rates)) item.custom_rates=null;
     draft.quote.notes=reviewedQuotationNotes(draft,reviewedOwnerRequests);
-    const previous=quotes.find(quote=>quote.publicId===supersedeId && quote.status!=='Draft');
-    if (previous) {
-      draft.quote.date=indiaDate();
-      if (draft.quote.valid_until===previous.draft.quote.valid_until) draft.quote.valid_until=quoteExpiry(draft.quote.date);
-    }
-    draft.quote.date ||= indiaDate();
-    draft.quote.valid_until ||= quoteExpiry(draft.quote.date);
+    draft.quote=completeQuoteDates(draft.quote,indiaDate());
     return draft;
   },[workingDraft,editableCatalogue,catalogue,reviewedOwnerRequests,quotes,supersedeId]);
   const previewSnapshot=useMemo(()=>calculateQuotationPricing(previewDraft,editableCatalogue),[previewDraft,editableCatalogue]);
@@ -408,7 +407,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       if (!addonValidation.valid) throw new Error(addonValidation.errors.join(' '));
       validateQuotationDraftV2(v2, { reviewedOwnerRequests: false });
       const autoRateMerge = extractAndMergeRateCardFromDraft(editableCatalogue, v2);
-      if (autoRateMerge.addedOrUpdatedKeys.length > 0) {
+      if (autoRateMerge.addedOrUpdatedKeys.length > 0||autoRateMerge.assistantMemoryChanged) {
         await onUpdateCatalogue(autoRateMerge.catalogue);
         setEditableCatalogue(autoRateMerge.catalogue);
       }
@@ -417,11 +416,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       const existing = currentQuotes.find(q => q.draft.quote.number && q.draft.quote.number === v2.quote.number);
       setSupersedeId(existing?.publicId || '');
       v2.quote.number ||= nextQuoteNumber(quotes);
-      v2.quote.date ||= indiaDate();
-      v2.quote.valid_until ||= quoteExpiry(v2.quote.date);
-      for (const room of v2.rooms) for (const item of room.items) item.name = canonicalFurnitureName(item.name || '',item.work_type || '',room.name || '');
+      v2.quote=existing?beginQuotationEdit(v2.quote,indiaDate()):completeQuoteDates(v2.quote,indiaDate());
       setReviewedOwnerRequests(false);
-      syncDraft(v2);
+      syncDraft(prepareQuotationDraft(v2,autoRateMerge.catalogue));
       setPublishResult({
         ok: true,
         message:
@@ -896,7 +893,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           <span>Field: {issue.path || '/'}</span>
                           <span>{issue.code}</span>
                         </div>
-                        <p className="text-[#18221D] font-medium">{issue.message}</p>
+                        <p className="text-[#18221D] font-medium">{issue.path==='/quote/date'&&!validIsoDate(workingDraft.quote.date)?'Enter a valid issue date as DD-MM-YYYY, or choose it from the calendar.':issue.path==='/quote/valid_until'&&!validIsoDate(workingDraft.quote.valid_until)?'Enter a valid expiry as DD-MM-YYYY, or choose it from the calendar.':issue.message}</p>
                       </div>
                     ))}
                     </div>}
@@ -1097,8 +1094,9 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="owner-field">Issue date<input type="date" value={workingDraft.quote.date || ''} onChange={e => syncDraft({...workingDraft,quote:{...workingDraft.quote,date:e.target.value || null}})}/></label>
-                  <label className="owner-field">Valid until<input type="date" value={workingDraft.quote.valid_until || ''} onChange={e => syncDraft({...workingDraft,quote:{...workingDraft.quote,valid_until:e.target.value || null}})}/><span>Defaults to 30 days from publication.</span></label>
+                  <QuotationDateField label="Issue date" value={workingDraft.quote.date} onChange={date=>syncDraft({...workingDraft,quote:{...workingDraft.quote,date,...(validIsoDate(date)?{valid_until:expiryFromIssue(date,workingDraft.quote.validity_days??30)}:{})}})}/>
+                  <QuotationDateField label="Valid until" value={workingDraft.quote.valid_until} onChange={expiry=>{const days=validityBetween(workingDraft.quote.date,expiry);syncDraft({...workingDraft,quote:{...workingDraft.quote,valid_until:expiry,...(days?{validity_days:days}:{})}});}}/>
+                  <label className="owner-field">Quotation validity (days)<input type="number" inputMode="numeric" aria-label="Quotation validity in days" min="1" max="3650" step="1" value={workingDraft.quote.validity_days||''} onChange={event=>{const days=Number(event.target.value);const expiry=expiryFromIssue(workingDraft.quote.date||'',days);syncDraft({...workingDraft,quote:{...workingDraft.quote,validity_days:days,...(expiry?{valid_until:expiry}:{})}});}}/><span>Defaults to 30 when you open a quotation for editing. Changing the issue date or days adjusts the expiry.</span></label>
                 </div>
                 <label className="owner-field">Additional quotation notes<textarea rows={3} value={(workingDraft.quote.notes || []).join('\n')} placeholder="One approved note per line. These notes appear in the online quotation and PDF." onChange={e => syncDraft({...workingDraft,quote:{...workingDraft.quote,notes:e.target.value.split('\n')}})}/></label>
                 <fieldset className="space-y-3 border-t border-[#E5DFD3] pt-4">
@@ -1657,7 +1655,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            const draftCopy = structuredClone(q.draft);
+                            const draftCopy = normalizeFurnitureLayout(q.draft);
+                            draftCopy.quote=beginQuotationEdit(draftCopy.quote,indiaDate());
                             if (q.defaultSentPackage) {
                               draftCopy.recommended = {
                                 grade: q.defaultSentPackage.grade,
@@ -1861,6 +1860,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
               <pre className="owner-instructions p-4 bg-[#18221D] text-[#FAF8F4] rounded-xl text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[460px] overflow-y-auto">
                 {dynamicGemInstructions}
               </pre>
+              <div className="space-y-3 border-t border-[#E5DFD3] pt-4"><label className="owner-field">Saved corrections for future assistant setups<textarea aria-label="Saved assistant corrections" rows={4} maxLength={25500} value={(editableCatalogue.assistantLessons||[]).join('\n')} placeholder="One reusable rule per line, e.g. Keep each loft immediately after its confirmed main unit." onChange={event=>{setEditableCatalogue(previous=>({...previous,assistantLessons:event.target.value.split('\n')}));setAssistantMemoryFeedback('Unsaved corrections');}}/><span>Save reusable process rules only. Do not store customer details, passwords or payment references. These rules and the latest saved rates are included in the copy button above; paste the refreshed setup into your Gem/Custom GPT before a new chat.</span></label><button className="owner-action-primary" type="button" disabled={savingAssistantMemory} onClick={async()=>{setSavingAssistantMemory(true);try{const next={...editableCatalogue,assistantLessons:[...new Set((editableCatalogue.assistantLessons||[]).map(line=>line.trim()).filter(Boolean))]};await onUpdateCatalogue(next);setEditableCatalogue(next);setAssistantMemoryFeedback('Corrections saved. Copy the updated assistant instructions above for future chats.');}catch(error){setAssistantMemoryFeedback(error instanceof Error?error.message:'Could not save corrections.');}finally{setSavingAssistantMemory(false);}}}>{savingAssistantMemory?'Saving…':'Save assistant corrections'}</button>{assistantMemoryFeedback&&<p className="text-xs" role="status">{assistantMemoryFeedback}</p>}</div>
             </div>
 
             {/* Luxury AI Image Prompts Library */}

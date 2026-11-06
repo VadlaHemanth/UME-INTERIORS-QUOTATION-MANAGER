@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { getPackageDisplayName, type StudioCatalogue } from '../lib/catalogue';
-import { additionalMaterialLines, materialWording, packageAllowances, type MaterialWording } from '../lib/commercial-spec';
+import { additionalMaterialLines,DEFAULT_HARDWARE_SCOPE,hardwareBrands, materialWording, packageAllowances, type MaterialWording } from '../lib/commercial-spec';
 import { ALL_GRADES } from '../lib/pricing';
 import type { PlywoodGrade } from '../lib/schema';
 
@@ -34,6 +34,7 @@ export function MaterialSettings({ catalogue, onSave, onDirtyChange, onBusyChang
     event.preventDefault(); setBusy(true); setMessage('');
     try {
       const saved = structuredClone(draft);
+      for(const grade of ALL_GRADES)saved.grades[grade].hardwareBrands=[...new Set(hardwareBrands(saved,grade).map(brand=>brand.trim()).filter(Boolean))];
       const drawers = saved.workTypes['Additional internal drawer'];
       if (drawers) for (const grade of ALL_GRADES) drawers.rates[grade] = {Standard:packageAllowances(saved.grades[grade]).extraDrawerRupees,'With PVC':packageAllowances(saved.grades[grade]).extraDrawerRupees};
       await onSave(saved); setDraft(saved);setSavedState(JSON.stringify(saved));
@@ -51,6 +52,7 @@ export function MaterialSettings({ catalogue, onSave, onDirtyChange, onBusyChang
         {(['tagline', 'termiteProofBadge', 'warrantyBanner', 'plainEnglishSummary'] as const).map(key => <div className="business-field business-field-wide" key={key}><label htmlFor={`${grade}-${key}`}>{({tagline:'Package description',termiteProofBadge:'Plywood grade',warrantyBanner:'Warranty summary',plainEnglishSummary:'Material specification'})[key]}</label><textarea id={`${grade}-${key}`} rows={2} value={info[key]} required onChange={e => update(grade, value => { value[key] = e.target.value; })}/></div>)}
       </div>
       <h3>Plywood brands, grades and warranty</h3>
+      <div className="business-field"><label htmlFor={`${grade}-hardware-brands`}>Hardware brands · preferred order</label><textarea id={`${grade}-hardware-brands`} rows={3} value={hardwareBrands(draft,grade).join('\n')} onChange={event=>update(grade,value=>{value.hardwareBrands=event.target.value.split('\n');})}/><p className="business-field-hint">One brand per line. First is preferred. Applies to the hardware scope below; handles have their own allowance.</p></div>
       {info.approvedBrands.map((brand, index) => <div className="material-brand" key={index}>
         <div className="business-fields">
           <div className="business-field"><label htmlFor={`${grade}-brand-${index}`}>Brand / product {index + 1}</label><textarea rows={2} id={`${grade}-brand-${index}`} value={brand.name} required onChange={e => update(grade, value => { value.approvedBrands[index].name = e.target.value; })}/></div>
@@ -78,6 +80,7 @@ export function MaterialSettings({ catalogue, onSave, onDirtyChange, onBusyChang
           {([['materialsAndLabour','Materials and labour statement'],['externalLaminate','External laminate specification'],['internalLaminate','Internal laminate specification'],['handles','Handle allowance label']] as [keyof MaterialWording,string][]).map(([key,label]) => <div className="business-field business-field-wide" key={key}><label htmlFor={`material-wording-${key}`}>{label}</label><textarea id={`material-wording-${key}`} rows={key === 'handles' ? 2 : 3} required maxLength={2000} value={draft.materialWording[key]} onChange={event=>{setDraft(previous=>({...previous,materialWording:{...previous.materialWording,[key]:event.target.value}}));setMessage('');}}/></div>)}
         </div>
         <h3>Other materials and hardware</h3>
+        <div className="business-field"><label htmlFor="hardware-scope">Included hardware scope</label><textarea id="hardware-scope" rows={4} maxLength={2000} required value={draft.hardwareScope||DEFAULT_HARDWARE_SCOPE} onChange={event=>setDraft(previous=>({...previous,hardwareScope:event.target.value}))}/><p className="business-field-hint">Use bedroom wardrobe sliding-door fittings, tandem systems, soft-close mechanisms and telescopic channels. Do not imply that sliding room-entry doors or handles are included.</p></div>
         {draft.commonMaterials.map((line,index)=><div className="material-brand" key={index}><div className="business-field"><label htmlFor={`material-line-${index}`}>Material specification {index + 1}</label><textarea id={`material-line-${index}`} required rows={3} maxLength={2000} value={line} onChange={event=>{setDraft(previous=>({...previous,commonMaterials:previous.commonMaterials.map((value,i)=>i===index?event.target.value:value)}));setMessage('');}}/></div><button type="button" className="settings-cancel" onClick={()=>setDraft(previous=>({...previous,commonMaterials:previous.commonMaterials.filter((_,i)=>i!==index)}))}>Remove material</button></div>)}
         <button type="button" className="settings-cancel" onClick={()=>setDraft(previous=>({...previous,commonMaterials:[...previous.commonMaterials,'']}))}>Add material specification</button>
       </div>

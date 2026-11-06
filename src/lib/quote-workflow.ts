@@ -1,4 +1,6 @@
 import type { QuotationDraftV2, ResolvedPackageSelection } from './schema';
+import { expiryFromIssue } from './quotation-dates';
+import { canonicalFurnitureName } from './furniture';
 
 export interface AgreedSelection {
   wholeHomeSelection: ResolvedPackageSelection;
@@ -21,8 +23,8 @@ export function agreedSelectionIdentity(selection:AgreedSelection):string {
 export function indiaDate(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
-export function quoteExpiry(issueDate = indiaDate()): string {
-  return new Date(new Date(`${issueDate}T00:00:00Z`).getTime()+30*86400000).toISOString().slice(0,10);
+export function quoteExpiry(issueDate = indiaDate(),days=30): string {
+  return expiryFromIssue(issueDate,days);
 }
 export function nextQuoteNumber(drafts: { draft: QuotationDraftV2 }[], now = new Date()): string {
   const prefix = `UME-${indiaDate(now).slice(2, 4)}-`;
@@ -60,13 +62,21 @@ export function carryAgreedSelection(previous: QuotationDraftV2, next: Quotation
   const result = structuredClone(selection);
   result.roomSelections = {};
   result.selectedOptionalPointers = [];
+  const consumed=new Set<string>();
   for (const [ri, room] of next.rooms.entries()) {
     const oldIndex = previous.rooms.findIndex(old => old.name?.toLowerCase() === room.name?.toLowerCase());
-    if (oldIndex < 0) continue;
     if (selection.roomSelections[oldIndex]) result.roomSelections[ri] = structuredClone(selection.roomSelections[oldIndex]);
     for (const [ii,item] of room.items.entries()) {
-      const oldItem = previous.rooms[oldIndex].items.findIndex(old => old.name?.toLowerCase() === item.name?.toLowerCase() && old.work_type === item.work_type);
-      if (oldItem >= 0 && selection.selectedOptionalPointers.includes(`/rooms/${oldIndex}/items/${oldItem}`)) result.selectedOptionalPointers.push(`/rooms/${ri}/items/${ii}`);
+      const parentName=item.parent_item_index==null?null:canonicalFurnitureName(room.items[item.parent_item_index]?.name||'');
+      const candidates=previous.rooms.flatMap((oldRoom,oldRi)=>oldRoom.items.map((old,oldIi)=>({old,oldRi,oldIi,key:`${oldRi}/${oldIi}`}))).filter(candidate=>!consumed.has(candidate.key)&&candidate.old.work_type===item.work_type&&canonicalFurnitureName(candidate.old.name||'',item.work_type||'').toLowerCase()===canonicalFurnitureName(item.name||'',item.work_type||'').toLowerCase());
+      const parentMatches=(candidate:typeof candidates[number])=>parentName!=null&&candidate.old.parent_item_index!=null&&canonicalFurnitureName(previous.rooms[candidate.oldRi].items[candidate.old.parent_item_index]?.name||'')===parentName;
+      candidates.sort((a,b)=>Number(b.oldRi===oldIndex)-Number(a.oldRi===oldIndex)||Number(parentMatches(b))-Number(parentMatches(a))||Number(b.old.size_text===item.size_text)-Number(a.old.size_text===item.size_text)||Number(b.old.optional===item.optional)-Number(a.old.optional===item.optional));
+      const match=candidates[0];
+      if(match){
+        consumed.add(match.key);
+        if(oldIndex<0&&ii===0&&selection.mixByRoom)result.roomSelections[ri]=structuredClone(selection.roomSelections[match.oldRi]||selection.wholeHomeSelection);
+        if(selection.selectedOptionalPointers.includes(`/rooms/${match.oldRi}/items/${match.oldIi}`))result.selectedOptionalPointers.push(`/rooms/${ri}/items/${ii}`);
+      }
     }
   }
   return result;

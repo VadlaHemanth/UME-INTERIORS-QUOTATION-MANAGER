@@ -21,9 +21,12 @@ import {
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
 import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import { PackageWarrantyLabel } from './PackageWarrantyLabel';
-import { quotationDisplayRooms, roomDisplayNumber } from '../lib/quotation-order';
+import { furnitureRelationshipLabel,quotationDisplayRooms, roomDisplayNumber } from '../lib/quotation-order';
 import { workOrderPaymentSummary } from '../lib/work-order-document';
 import { indiaDate } from '../lib/quote-workflow';
+import { formatQuotationDate } from '../lib/quotation-dates';
+import { PlywoodSpecifications } from './PlywoodSpecifications';
+import {selectedRoomItems,selectedRoomPackageAmount} from '../lib/pricing';
 import {
   DeterministicQrCode,
   UmeLogoMark,
@@ -365,7 +368,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   approvedDiscountRupees,
   verifiedPaidRupees,
 }) => {
-  const displayRooms=quotationDisplayRooms(snapshot.rooms);
+  const displayRooms=quotationDisplayRooms(snapshot.rooms,isWorkOrder?selectedOptionalPointers:undefined);
   const calc = computeCustomerSelectionTotal(snapshot, {
     wholeHomeSelection,
     mixByRoom,
@@ -394,7 +397,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   const paymentQrParameters=new URLSearchParams({pa:catalogue.company.bank.upiId,pn:catalogue.company.bank.accountName,cu:'INR',tn:`${isWorkOrder?'Work order':'Booking'} ${quoteRef}`});
   if(!qrNeedsEnteredAmount)paymentQrParameters.set('am',String(qrRequestedAmount));
   const showPaymentQr=qrRequestedAmount>0&&!needsBookingConfirmation;
-  const documentGrades = isWorkOrder ? snapshot.rooms.map(room => (mixByRoom ? roomSelections[room.roomIndex] || wholeHomeSelection : wholeHomeSelection).grade) : ALL_GRADES;
+  const documentGrades = isWorkOrder ? displayRooms.map(room => (mixByRoom ? roomSelections[room.roomIndex] || wholeHomeSelection : wholeHomeSelection).grade) : ALL_GRADES;
   const origin = typeof window !== 'undefined' ? window.location.origin : `https://${catalogue.company.domain}`;
   const shareUrl = `${origin}/q/${publicId}`;
 
@@ -455,7 +458,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               {isWorkOrder?'Confirmation date':'Issue date'}
             </p>
             <p className="font-mono font-bold text-[#18221D] mt-0.5">
-              {issueDate || 'Not set'}
+              {formatQuotationDate(issueDate) || 'Not set'}
             </p>
           </div>
           <div className="min-w-0">
@@ -463,7 +466,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               {isWorkOrder ? 'Scope status' : 'Valid until'}
             </p>
             <p className="font-mono font-bold text-[#1C3A2F] mt-0.5">
-              {isWorkOrder ? isPreview?'Proposed revision':'Confirmed' : draft.quote.valid_until || 'Not set'}
+              {isWorkOrder ? isPreview?'Proposed revision':'Confirmed' : formatQuotationDate(draft.quote.valid_until) || 'Not set'}
             </p>
           </div>
         </div>
@@ -624,16 +627,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       : wholeHomeSelection;
                   const rSub = calc.roomBreakdownTotals[r.roomIndex]?.total ?? 0;
                   const stdRoom =
-                    r.roomTotals[makeComboKey('Base', rSel.protection, rSel.finish)] || 0;
+                    selectedRoomPackageAmount(r,{...rSel,grade:'Base'},selectedOptionalPointers);
                   const normRoom =
-                    r.roomTotals[makeComboKey('Normal', rSel.protection, rSel.finish)] || 0;
+                    selectedRoomPackageAmount(r,{...rSel,grade:'Normal'},selectedOptionalPointers);
                   const premRoom =
-                    r.roomTotals[makeComboKey('Premium', rSel.protection, rSel.finish)] || 0;
+                    selectedRoomPackageAmount(r,{...rSel,grade:'Premium'},selectedOptionalPointers);
 
                   return (
                     <tr key={r.roomIndex}>
                       <td className="py-2.5 px-3 font-bold text-[#18221D]">
-                        {roomDisplayNumber(displayIndex)}. {r.name} ({r.items.filter((i) => !i.optional).length} units)
+                        {roomDisplayNumber(displayIndex)}. {r.name} ({selectedRoomItems(r,selectedOptionalPointers).length} units)
                       </td>
                       <td className={`py-2.5 px-2.5 text-right font-mono tabular-nums ${rSel.grade === 'Base' ? 'pdf-selected-cell' : 'text-[#4A524D]'}`}>
                         {formatINR(stdRoom)}
@@ -689,6 +692,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </div>
 
         {/* Material & Laminate Specifications */}
+        <PlywoodSpecifications catalogue={catalogue} grades={documentGrades} selectedGrade={mixByRoom?null:wholeHomeSelection.grade} print/>
         <div className="bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-4 text-[11px] space-y-1.5 print-avoid-break">
           <p className="font-bold uppercase tracking-wider text-[#1C3A2F] text-[10px]">
             Included materials, laminate and hardware
@@ -799,6 +803,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                           <tr key={`${room.roomIndex}-${item.itemIndex}`}>
                             <td className="py-2 px-3">
                               <p className="font-bold text-[#18221D]">{cleanTitle}{item.optional ? " · Selected optional work" : ""}</p>
+                              {furnitureRelationshipLabel(item,room.items)&&<p className="text-[9px] text-[#31513D] mt-0.5">{furnitureRelationshipLabel(item,room.items)}</p>}
                               <p className="text-[10px] text-[#5C645F] leading-snug mt-0.5">
                                 {cleanDesc}
                               </p>
@@ -1034,7 +1039,6 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         {showPaymentQr&&qrNeedsEnteredAmount&&<p className="text-[10px] text-[#4A524D] print-avoid-break">The next scheduled amount is {formatINR(qrRequestedAmount)}. The saved UPI limit is {formatINR(upiLimit)} per payment, so the QR leaves the amount for you to enter. Use bank transfer for larger payments.</p>}
 
         <section className="space-y-3 text-[11px]" data-pdf-flow-group>
-          {[...new Set(documentGrades)].map(grade => <div className="pdf-plywood-spec print-avoid-break" key={grade}><h3 className="font-bold">{getPackageDisplayName(grade)} · Plywood options and manufacturer warranty</h3><ul>{catalogue.grades[grade].approvedBrands.map((brand,index) => <li key={index}><strong>{brand.name}</strong> · {brand.spec} · {brand.warrantyYears > 0 ? `${brand.warrantyYears} years, subject to brand certificate and invoice` : 'Warranty under the selected manufacturer’s terms'}</li>)}</ul></div>)}
           <div className="pdf-scope-notes print-avoid-break"><h3 className="font-bold">Scope, inclusions and additional charges</h3><ul>{[...scopeNotes(catalogue,documentGrades),...quotationCustomerNotes(draft)].map((note,index) => <li key={index}>{note}</li>)}</ul></div>
         </section>
         <div className="space-y-5 pdf-acceptance-group">

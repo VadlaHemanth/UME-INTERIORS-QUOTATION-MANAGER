@@ -8,13 +8,15 @@ import type { QuotationDraftV2 } from '../lib/schema';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
 import { documentTerms, materialLines, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import { sharePaymentImage } from '../lib/payment-image-share';
-import { quotationDisplayRooms } from '../lib/quotation-order';
+import { furnitureRelationshipLabel,quotationDisplayRooms } from '../lib/quotation-order';
 import { workOrderPaymentSummary } from '../lib/work-order-document';
+import { formatQuotationDate } from '../lib/quotation-dates';
+import { indiaDate } from '../lib/quote-workflow';
 
 type Props={publicId:string;revision:number;draft:QuotationDraftV2;snapshot:PricedQuotationSnapshot;catalogue:StudioCatalogue;approvedDiscountRupees:number;verifiedPaidRupees:number;workOrder:FinalizedWorkOrder;isPreview?:boolean;initialPrintPreview?:boolean};
 
 export function WorkOrderView({publicId,revision,draft,snapshot,catalogue,approvedDiscountRupees,verifiedPaidRupees,workOrder,isPreview=false,initialPrintPreview=false}:Props) {
-  const displayRooms=quotationDisplayRooms(snapshot.rooms);
+  const displayRooms=quotationDisplayRooms(snapshot.rooms,workOrder.selection.selectedOptionalPointers);
   const [pdf,setPdf]=useState(initialPrintPreview);
   const [paymentImage,setPaymentImage]=useState<File|null>(null);
   const [shareMessage,setShareMessage]=useState('');
@@ -24,7 +26,7 @@ export function WorkOrderView({publicId,revision,draft,snapshot,catalogue,approv
   const selection=workOrder.selection;
   const calc=computeCustomerSelectionTotal(snapshot,{...selection,approvedDiscountRupees});
   const payment=workOrderPaymentSummary(calc.grandTotal,verifiedPaidRupees);
-  const grades=snapshot.rooms.map(room=>(selection.mixByRoom?selection.roomSelections[room.roomIndex]||selection.wholeHomeSelection:selection.wholeHomeSelection).grade);
+  const grades=displayRooms.map(room=>(selection.mixByRoom?selection.roomSelections[room.roomIndex]||selection.wholeHomeSelection:selection.wholeHomeSelection).grade);
   const upi=new URLSearchParams({pa:catalogue.company.bank.upiId,pn:catalogue.company.bank.accountName,cu:'INR',tn:`Work order ${draft.quote.number}`});
   if(payment.nextAmount>0&&payment.nextAmount<=catalogue.company.bank.upiLimitRupees)upi.set('am',String(payment.nextAmount));
   const share=async()=>{
@@ -43,7 +45,7 @@ export function WorkOrderView({publicId,revision,draft,snapshot,catalogue,approv
     {pdf&&<div className="quotation-print-shell block py-8 px-4"><PrintableA4Sheet publicId={publicId} revision={revision} draft={draft} snapshot={snapshot} catalogue={catalogue} {...selection} approvedDiscountRupees={approvedDiscountRupees} verifiedPaidRupees={verifiedPaidRupees} isWorkOrder isPreview={isPreview} workOrderConfirmedAt={workOrder.confirmedAt}/></div>}
     {!pdf&&<div className="work-order-content no-print">
       <section className="work-order-summary" id="work-order-scope">
-        <div><h2>{isPreview?'Proposed work-order scope':'Your agreed scope'}</h2><p>{draft.customer.site}</p><p>{selection.mixByRoom?'Packages confirmed by room':`${getPackageDisplayName(selection.wholeHomeSelection.grade)} package`}</p><p>{isPreview?'Existing confirmation':'Confirmed after bank verification'}: {new Date(workOrder.confirmedAt).toLocaleDateString('en-IN')}.</p></div>
+        <div><h2>{isPreview?'Proposed work-order scope':'Your agreed scope'}</h2><p>{draft.customer.site}</p><p>{selection.mixByRoom?'Packages confirmed by room':`${getPackageDisplayName(selection.wholeHomeSelection.grade)} package`}</p><p>{isPreview?'Existing confirmation':'Confirmed after bank verification'}: {formatQuotationDate(indiaDate(new Date(workOrder.confirmedAt)))}.</p></div>
         <dl><div><dt>Work order total</dt><dd>{formatINR(calc.grandTotal)}</dd></div><div><dt>Verified payments</dt><dd>{formatINR(verifiedPaidRupees)}</dd></div><div><dt>Balance</dt><dd>{formatINR(payment.balance)}</dd></div></dl>
       </section>
       <p className="work-order-notice">{isPreview?'This is an unpublished work-order revision. Review the proposed changes before publishing. Payment and sharing actions are available after publication.':'Your package and scope are confirmed. To change measurements, materials or work, contact UME; approved changes will be recorded in an updated work order.'}</p>
@@ -53,7 +55,7 @@ export function WorkOrderView({publicId,revision,draft,snapshot,catalogue,approv
         return <section className="work-order-room" key={room.roomIndex}>
           <header><h2>{room.name}</h2><span>{getPackageDisplayName(chosen.grade)} · {chosen.finish==='SF'?'SF matte':'High-gloss'}{chosen.protection==='With PVC'?' · with 6 mm PVC':''}</span><strong>{formatINR(calc.roomBreakdownTotals[room.roomIndex]?.total||0)}</strong></header>
           {chosen.brand_preference&&<p className="work-order-brand">Preferred plywood: {chosen.brand_preference}</p>}
-          {room.items.filter(item=>!item.optional||selection.selectedOptionalPointers.includes(`/rooms/${room.roomIndex}/items/${item.itemIndex}`)).map(item=><article key={item.itemIndex}><div><h3>{standardizeCompetitorItemName(item.name,item.workType,room.name)}</h3><p>{formatCleanItemDescription(item.sourceTextEn,item.name,item.workType,room.name)}</p><p>{item.unit==='sq_ft'?'Height × Width: ':''}{item.sizeText} · {item.totalMeasure.toFixed(2)} {item.unit==='sq_ft'?'sq ft':item.unit==='each'?'items':item.unit==='running_ft'?'running ft':item.unit==='lumpsum'?'lump sum':item.unit}</p></div><strong>{formatINR(item.exactAmounts[combo])}</strong></article>)}
+          {room.items.filter(item=>!item.optional||selection.selectedOptionalPointers.includes(`/rooms/${room.roomIndex}/items/${item.itemIndex}`)).map(item=><article key={item.itemIndex}><div><h3>{standardizeCompetitorItemName(item.name,item.workType,room.name)}</h3>{furnitureRelationshipLabel(item,room.items)&&<p className="work-order-relation">{furnitureRelationshipLabel(item,room.items)}</p>}<p>{formatCleanItemDescription(item.sourceTextEn,item.name,item.workType,room.name)}</p><p>{item.unit==='sq_ft'?'Height × Width: ':''}{item.sizeText} · {item.totalMeasure.toFixed(2)} {item.unit==='sq_ft'?'sq ft':item.unit==='each'?'items':item.unit==='running_ft'?'running ft':item.unit==='lumpsum'?'lump sum':item.unit}</p></div><strong>{formatINR(item.exactAmounts[combo])}</strong></article>)}
         </section>;
       })}
       <PlywoodSpecifications catalogue={catalogue} grades={grades} selectedGrade={selection.mixByRoom?null:selection.wholeHomeSelection.grade}/>

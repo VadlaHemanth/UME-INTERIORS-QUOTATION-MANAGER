@@ -16,6 +16,9 @@ export const DEFAULT_PACKAGE_ALLOWANCES: PackageAllowances = {
 };
 export const DEFAULT_DRAWER_PRICES: Record<PlywoodGrade, number> = {Base:4000, Normal:5000, Premium:6000};
 export const PLYWOOD_WARRANTY_CONDITIONS = 'Manufacturer warranty applies to plywood. Coverage depends on the selected product, brand certificate, invoice and manufacturer terms.';
+export const DEFAULT_HARDWARE_BRANDS:Record<PlywoodGrade,string[]>={Base:['Berlin','Ebco','Nimmi'],Normal:['Godrej','Berlin','Ebco','Nimmi'],Premium:['Hettich','Sleek','Godrej','Berlin','Ebco','Nimmi']};
+export const DEFAULT_HARDWARE_SCOPE='Bedroom wardrobe sliding-door fittings, tandem systems, soft-close hinges/mechanisms and telescopic channels, where itemised. Brands are in preferred order. Handles use their separate allowance.';
+export const hardwareBrands=(catalogue:StudioCatalogue,grade:PlywoodGrade)=>catalogue.grades[grade].hardwareBrands||(/Soft-Close Hinges & Telescopic Channels \(Berlin \/ Ebco \/ Nimmi\)/.test(catalogue.commonMaterials.join(' '))?DEFAULT_HARDWARE_BRANDS.Base:DEFAULT_HARDWARE_BRANDS[grade]);
 export function packageWarrantyYears(grade: GradeInfo): number {
   return Math.max(0, ...grade.approvedBrands.map(brand => Number.isFinite(brand.warrantyYears) && brand.warrantyYears > 0 ? brand.warrantyYears : 0));
 }
@@ -38,7 +41,7 @@ export const DEFAULT_MATERIAL_WORDING = {
 };
 export type MaterialWording = typeof DEFAULT_MATERIAL_WORDING;
 export const materialWording = (catalogue: StudioCatalogue): MaterialWording => ({...DEFAULT_MATERIAL_WORDING,...catalogue.materialWording});
-export const additionalMaterialLines = (catalogue: StudioCatalogue) => catalogue.commonMaterials.filter(line => !/^(1\.0 mm Outside Decorative Laminate Finish|0\.8 mm White \/ Fabric Inside Liner Laminate|Handles \(worth up to)/i.test(line));
+export const additionalMaterialLines = (catalogue: StudioCatalogue) => catalogue.commonMaterials.filter(line => !/^(1\.0 mm Outside Decorative Laminate Finish|0\.8 mm White \/ Fabric Inside Liner Laminate|Handles \(worth up to|Soft-Close Hinges & Telescopic Channels \(Berlin \/ Ebco \/ Nimmi\))/i.test(line));
 
 export function materialLines(catalogue: StudioCatalogue, grades: PlywoodGrade[]): string[] {
   const unique = [...new Set(grades)];
@@ -91,12 +94,20 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
 
 /** Upgrade the old shipped defaults once; retain owner-entered brands and rates. */
 export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
-  if (catalogue.version === 'ume-catalogue-2026.11.v10') return catalogue;
+  if (catalogue.version === 'ume-catalogue-2026.11.v11') return catalogue;
   const next = structuredClone(catalogue);
+  if(catalogue.version==='ume-catalogue-2026.11.v10'){
+    for(const grade of ['Base','Normal','Premium'] as const)next.grades[grade].hardwareBrands||=[...DEFAULT_HARDWARE_BRANDS[grade]];
+    next.hardwareScope||=DEFAULT_HARDWARE_SCOPE;
+    next.assistantLessons||=[];
+    next.commonMaterials=next.commonMaterials.filter(line=>line!=='Soft-Close Hinges & Telescopic Channels (Berlin / Ebco / Nimmi)');
+    next.version='ume-catalogue-2026.11.v11';
+    return next;
+  }
   if(catalogue.version==='ume-catalogue-2026.11.v9') {
     applyApprovedCoreRates(next);
     next.version='ume-catalogue-2026.11.v10';
-    return next;
+    return upgradeCatalogue(next);
   }
   if (catalogue.version === 'ume-catalogue-2026.11.v8') {
     if (next.company.brandName === 'UMAMAHESHWARA INTERIORS') next.company.brandName = 'UME Interiors';

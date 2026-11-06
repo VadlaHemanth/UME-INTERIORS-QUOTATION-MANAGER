@@ -55,6 +55,9 @@ import { quotationDisplayRooms } from '../lib/quotation-order';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
 import { WorkOrderView } from './WorkOrderView';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
+import { formatQuotationDate } from '../lib/quotation-dates';
+import {selectedRoomItems,selectedRoomPackageAmount} from '../lib/pricing';
+import { furnitureRelationshipLabel } from '../lib/quotation-order';
 import { PackageWarrantyLabel } from './PackageWarrantyLabel';
 
 interface CustomerQuotationViewProps {
@@ -370,10 +373,10 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const totalUnitsCount = useMemo(
     () =>
       snapshot.rooms.reduce(
-        (sum, r) => sum + r.items.filter((i) => !i.optional).length,
+        (sum, r) => sum + selectedRoomItems(r,selectedOptionalPointers).length,
         0
       ),
-    [snapshot]
+    [snapshot,selectedOptionalPointers]
   );
 
   const milestones = useMemo(
@@ -833,8 +836,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       Mobile: <strong>{draft.customer.phone}</strong>
                     </span>
                   )}
-                  {draft.quote.date && <span className="font-sans tabular-nums">Issued: <strong>{draft.quote.date}</strong></span>}
-                  {draft.quote.valid_until && <span className="font-sans tabular-nums">Valid until: <strong>{draft.quote.valid_until}</strong></span>}
+                  {draft.quote.date && <span className="font-sans tabular-nums">Issued: <strong>{formatQuotationDate(draft.quote.date)}</strong></span>}
+                  {draft.quote.valid_until && <span className="font-sans tabular-nums">Valid until: <strong>{formatQuotationDate(draft.quote.valid_until)}</strong></span>}
                 </div>
               </div>
 
@@ -1080,14 +1083,15 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     <tbody className="divide-y divide-[#EAE4D8]">
                       {displayRooms.map((room) => {
                         const rSel = roomSelections[room.roomIndex] || wholeHomeSelection;
-                        const baseItemCount = room.items.filter((i) => !i.optional).length;
+                        const baseItemCount = selectedRoomItems(room,selectedOptionalPointers).length;
+                        const unselectedOptional=room.items.length-baseItemCount;
 
                         const stdRoomAmt =
-                          room.roomTotals[makeComboKey('Base', rSel.protection, rSel.finish)] || 0;
+                          selectedRoomPackageAmount(room,{...rSel,grade:'Base'},selectedOptionalPointers);
                         const normRoomAmt =
-                          room.roomTotals[makeComboKey('Normal', rSel.protection, rSel.finish)] || 0;
+                          selectedRoomPackageAmount(room,{...rSel,grade:'Normal'},selectedOptionalPointers);
                         const premRoomAmt =
-                          room.roomTotals[makeComboKey('Premium', rSel.protection, rSel.finish)] || 0;
+                          selectedRoomPackageAmount(room,{...rSel,grade:'Premium'},selectedOptionalPointers);
 
                         const isPvcAdded = rSel.protection === 'With PVC';
 
@@ -1111,7 +1115,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                   {room.name}
                                 </p>
                                 <p className="text-[11px] text-[#5C645F] mt-0.5">
-                                  {baseItemCount} {baseItemCount === 1 ? 'Unit' : 'Units'} · View Items →
+                                  {baseItemCount} {baseItemCount === 1 ? 'Unit' : 'Units'}{unselectedOptional?` · ${unselectedOptional} optional`:''} · View Items →
                                 </p>
                               </button>
                             </td>
@@ -1565,6 +1569,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                             <p className="font-bold text-[#18221D] text-sm">
                                               {cleanTitle}
                                             </p>
+                                            {furnitureRelationshipLabel(item,room.items)&&<p className="text-xs text-[#31513D] mt-0.5">{furnitureRelationshipLabel(item,room.items)}</p>}
                                             <p className="text-[13px] text-[#5C645F] mt-0.5 leading-relaxed">
                                               {cleanDescription}
                                             </p>

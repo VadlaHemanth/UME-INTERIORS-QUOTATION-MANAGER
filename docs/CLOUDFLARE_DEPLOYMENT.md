@@ -74,6 +74,8 @@ The current release includes private drafts, automatic owner-only revisions, quo
 
 Work-order creation is an explicit owner action in **Quotations → Create work order / Payments & work orders**. Existing bank-verified bookings can be confirmed without recording another payment. Deployment does not automatically convert legacy quotations or add financial records. Work-order revision previews are read-only; current bank settings, verified credits and the original booking confirmation date are retained in the confirmed document.
 
+The v11 catalogue adds editable hardware priorities/scope and saved assistant corrections while retaining owner rates, business details and existing brand edits. Additive quotation fields support linked furniture and validity days; no SQL migration is required. Historical quotation/material snapshots are preserved. Publish an update to apply new layout/material settings to an existing customer job. Refresh the saved external assistant instructions after deployment and after later reusable rate/correction changes.
+
 Local source changes are not live until this deployment procedure completes. The QA notes distinguish local checks from previously deployed behavior.
 
 ```powershell

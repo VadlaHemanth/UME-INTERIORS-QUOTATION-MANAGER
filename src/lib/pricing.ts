@@ -36,6 +36,7 @@ export function makeComboKey(
 
 export interface PricedLineMatrix {
   itemIndex: number;
+  parentItemIndex?:number|null;
   roomIndex: number;
   name: string;
   workType: string;
@@ -59,6 +60,13 @@ export interface PricedRoom {
   recommended: ResolvedPackageSelection | null;
   items: PricedLineMatrix[];
   roomTotals: Record<PackageComboKey, number>;
+}
+export function selectedRoomItems(room:PricedRoom,pointers:readonly string[]){
+  return room.items.filter(item=>!item.optional||pointers.includes(`/rooms/${room.roomIndex}/items/${item.itemIndex}`));
+}
+export function selectedRoomPackageAmount(room:PricedRoom,selection:ResolvedPackageSelection,pointers:readonly string[]){
+  const combo=makeComboKey(selection.grade,selection.protection,selection.finish);
+  return selectedRoomItems(room,pointers).reduce((sum,item)=>sum+item.exactAmounts[combo],0);
 }
 
 export interface PricedQuotationSnapshot {
@@ -283,6 +291,7 @@ export function calculateQuotationPricing(
 
       return {
         itemIndex: iIdx,
+        ...(item.parent_item_index!=null?{parentItemIndex:item.parent_item_index}:{}),
         roomIndex: rIdx,
         name: item.name || 'Unnamed item',
         workType: item.work_type || 'Box type',

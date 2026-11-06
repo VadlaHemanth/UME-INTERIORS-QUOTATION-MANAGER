@@ -4,9 +4,10 @@ import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, getPackageDisp
 import { calculateMilestoneSchedule, calculateQuotationPricing, computeCustomerSelectionTotal, type PricedQuotationSnapshot } from '../src/lib/pricing';
 import { type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
 import { randomHex, type OwnerAccount } from './auth';
-import { agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
+import { agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
 import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
+import { beginQuotationEdit,completeQuoteDates } from '../src/lib/quotation-dates';
 
 export interface PaymentLedgerEntry {
   id: string;
@@ -274,7 +275,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (req.body.publicId && (!existing || existing.deletedAt)) { res.status(404).json({error:'Draft not found.'}); return; }
     if (existing && existing.status !== 'Draft') { res.status(409).json({error:'Publish an update to save changes to an already published quotation.'}); return; }
     const defaultPackage: ResolvedPackageSelection = {grade:draft.recommended?.grade || 'Base',protection:draft.recommended?.protection || 'Standard',finish:draft.recommended?.finish || 'SF',brand_preference:draft.recommended?.brand_preference || null};
-    draft.quote.number ||= nextQuoteNumber(allRecords()); draft.quote.date ||= indiaDate();
+    draft.quote.number ||= nextQuoteNumber(allRecords()); draft.quote=completeQuoteDates(draft.quote,indiaDate());
     const record: PublishedQuotationRecord = {publicId:existing?.publicId || `ume${randomHex(16)}`,revision:0,status:'Draft',publishedAt:new Date().toISOString(),viewsCount:0,lastViewedAt:null,draft,snapshot:calculateQuotationPricing(draft,activeCatalogue),approvedDiscountRupees:Math.max(0,Number(req.body.approvedDiscountRupees)||0),defaultSentPackage:defaultPackage,lastCustomerSelection:{wholeHomeSelection:defaultPackage,mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],acceptedTermsAt:null},catalogueSnapshot:structuredClone(activeCatalogue)};
     quotesStore.set(record.publicId,record); saveDbToDisk();
     res.json({record,quotes:visibleRecords()});
@@ -308,7 +309,9 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (!Array.isArray(updated.commonMaterials) || updated.commonMaterials.length > 40 || updated.commonMaterials.some(line => typeof line !== 'string' || !line.trim() || line.length > 2000) || (updated.materialWording && Object.keys(DEFAULT_MATERIAL_WORDING).some(key => { const value = updated.materialWording![key as keyof typeof DEFAULT_MATERIAL_WORDING]; return typeof value !== 'string' || !value.trim() || value.length > 2000; }))) {
       res.status(400).json({error:'Enter a material specification in each field (up to 2,000 characters), or remove an unused material.'}); return;
     }
+    if((updated.hardwareScope!==undefined&&(typeof updated.hardwareScope!=='string'||!updated.hardwareScope.trim()||updated.hardwareScope.length>2000))||(updated.assistantLessons!==undefined&&(!Array.isArray(updated.assistantLessons)||updated.assistantLessons.length>50||updated.assistantLessons.some(line=>typeof line!=='string'||!line.trim()||line.length>500)))){res.status(400).json({error:'Check the hardware scope and saved assistant corrections.'});return;}
     for (const grade of Object.values(updated.grades)) {
+      if(grade.hardwareBrands!==undefined&&(!Array.isArray(grade.hardwareBrands)||!grade.hardwareBrands.length||grade.hardwareBrands.length>15||grade.hardwareBrands.some(brand=>typeof brand!=='string'||!brand.trim()||brand.length>80))){res.status(400).json({error:'Enter hardware brand names in preferred order (one to fifteen per package).'});return;}
       const allowance = packageAllowances(grade);
       if (Object.entries(allowance).some(([key, value]) => key !== 'additionalAllowances' && (!Number.isSafeInteger(value) || Number(value) < 0)) || allowance.includedBedroomDrawersMax < allowance.includedBedroomDrawersMin || !grade.approvedBrands?.length || grade.approvedBrands.some(b => !b.name?.trim() || !b.spec?.trim() || !Number.isInteger(b.warrantyYears) || b.warrantyYears < 0) || allowance.additionalAllowances?.some(a => !a.name?.trim() || !a.unit?.trim() || !Number.isSafeInteger(a.amountRupees) || a.amountRupees < 0)) {
         res.status(400).json({ error: 'Check package allowances, drawer limits, plywood names, grades and warranty years.' }); return;
@@ -321,7 +324,8 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (drawers) for (const grade of ['Base','Normal','Premium'] as const) updated.grades[grade].allowances = {...packageAllowances(updated.grades[grade]),extraDrawerRupees:drawers.rates[grade].Standard};
     // Business/payment details have their own validated endpoint; stale rate-card
     // tabs must not restore an old payment recipient or business address.
-    activeCatalogue = { ...updated, version: activeCatalogue.version, company: activeCatalogue.company };
+    for(const grade of ['Base','Normal','Premium'] as const)updated.grades[grade].hardwareBrands??=activeCatalogue.grades[grade].hardwareBrands;
+    activeCatalogue = { ...updated,hardwareScope:updated.hardwareScope??activeCatalogue.hardwareScope,assistantLessons:updated.assistantLessons??activeCatalogue.assistantLessons, version: activeCatalogue.version, company: activeCatalogue.company };
     saveDbToDisk();
     res.json({ catalogue: activeCatalogue });
   });
@@ -445,8 +449,8 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       rec.draft = structuredClone(normalizedDraft);
       delete rec.draft.rate_card_updates;
       rec.draft.quote.number = previous.draft.quote.number;
-      rec.draft.quote.date = indiaDate();
-      if (rec.draft.quote.valid_until === previous.draft.quote.valid_until) rec.draft.quote.valid_until = quoteExpiry(rec.draft.quote.date);
+      rec.draft.quote = beginQuotationEdit(rec.draft.quote,indiaDate());
+      delete rec.draft.assistant_memory_updates;
       (rec as any).linesCustomizedByOwner = true;
       const isKarthik = rec.publicId === 'ume3b71e904a52c88d1f603e219c4a7b810';
       rec.snapshot = calculateQuotationPricing(
@@ -454,6 +458,8 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
         activeCatalogue,
         isKarthik ? { lineRateOverrides: KARTHIK_HISTORICAL_RATE_OVERRIDES } : undefined
       );
+      const carried=carryAgreedSelection(previous.draft,rec.draft,previous.workOrder?.selection||previous.lastCustomerSelection);
+      rec.lastCustomerSelection={...rec.lastCustomerSelection,...carried};
     }
 
     if (typeof approvedDiscountRupees === 'number') {
@@ -494,7 +500,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     );
 
     rec.catalogueSnapshot = structuredClone(activeCatalogue);
-    if (previous.workOrder) { rec.lastCustomerSelection = {...previous.lastCustomerSelection,...carryAgreedSelection(previous.draft,rec.draft,previous.workOrder.selection)}; finalize(rec); }
+    if (previous.workOrder) { const carried=carryAgreedSelection(previous.draft,rec.draft,previous.workOrder.selection);rec.lastCustomerSelection = {...previous.lastCustomerSelection,...carried};rec.workOrder={...structuredClone(previous.workOrder),selection:carried,totalRupees:calc.grandTotal}; finalize(rec); }
 
     saveDbToDisk();
     res.json({
@@ -830,7 +836,6 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
 
     const now = new Date();
     const todayStr = indiaDate(now);
-    const validUntilDate = new Date(now.getTime() + 30 * 86400000).toISOString().slice(0, 10);
 
     const finalizedDraft: QuotationDraftV2 = structuredClone(normalizedDraft);
     const previous = supersedePublicId ? latest(supersedePublicId) : undefined;
@@ -842,14 +847,11 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (!previous && allRecords().some(q => q.draft.quote.number === finalizedDraft.quote.number)) finalizedDraft.quote.number = nextQuoteNumber(allRecords(), now);
     delete finalizedDraft.rate_card_updates;
     finalizedDraft.quote.notes = reviewedQuotationNotes(finalizedDraft,Boolean(reviewedOwnerRequests));
-    if (previous) finalizedDraft.quote.date = todayStr;
-    if (previous && finalizedDraft.quote.valid_until === previous.draft.quote.valid_until) finalizedDraft.quote.valid_until = quoteExpiry(todayStr);
-    if (!finalizedDraft.quote.date) {
-      finalizedDraft.quote.date = todayStr;
-    }
-    if (!finalizedDraft.quote.valid_until) {
-      finalizedDraft.quote.valid_until = quoteExpiry(finalizedDraft.quote.date || todayStr);
-    }
+    if(previous&&finalizedDraft.quote.validity_days===undefined&&finalizedDraft.quote.date===previous.draft.quote.date&&finalizedDraft.quote.valid_until===previous.draft.quote.valid_until)finalizedDraft.quote=beginQuotationEdit(finalizedDraft.quote,todayStr);
+    finalizedDraft.quote=completeQuoteDates(finalizedDraft.quote,todayStr);
+    delete finalizedDraft.assistant_memory_updates;
+    const datedValidation=validateQuotationDraftV2(finalizedDraft,{reviewedOwnerRequests:Boolean(reviewedOwnerRequests)});
+    if(!datedValidation.readyForPublish){res.status(422).json({error:'Review the resolved issue date, validity and quotation details before publishing.',validation:datedValidation});return;}
 
     const snapshot = calculateQuotationPricing(finalizedDraft, activeCatalogue);
     const publicId = `ume${randomHex(16)}`;
