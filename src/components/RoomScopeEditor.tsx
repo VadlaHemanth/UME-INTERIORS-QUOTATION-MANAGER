@@ -1,23 +1,26 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import type { StudioCatalogue } from '../lib/catalogue';
 import { formatCleanItemDescription, getPackageDisplayName } from '../lib/catalogue';
 import { canonicalFurnitureName } from '../lib/furniture';
 import type { DraftItem, QuotationDraftV2 } from '../lib/schema';
 import { formatINR, getUnitRateForItem } from '../lib/pricing';
+import { orderQuotationRooms, orderQuotationFurniture } from '../lib/quotation-order';
 
 export function RoomScopeEditor({ draft, catalogue, onChange }: { draft:QuotationDraftV2; catalogue:StudioCatalogue; onChange:(value:QuotationDraftV2)=>void }) {
-  const [openRooms,setOpenRooms] = useState(new Set([0]));
+  const initialOpenRooms=()=>{const first=orderQuotationRooms(draft.rooms)[0];return new Set(first?[draft.rooms.indexOf(first)]:[]);};
+  const [openRooms,setOpenRooms] = useState(initialOpenRooms);
+  useEffect(()=>{setOpenRooms(initialOpenRooms());},[draft.quote.number]);
   const update = (roomIndex:number,itemIndex:number,patch:Partial<DraftItem>) => {
     const next=structuredClone(draft); Object.assign(next.rooms[roomIndex].items[itemIndex],patch); onChange(next);
   };
   return <section className="scope-editor" aria-labelledby="scope-editor-title">
     <header><div><h3 id="scope-editor-title">Rooms and furniture</h3><p>Add the scope, then check measurements and billing units.</p></div><button type="button" onClick={() => { const next=structuredClone(draft); next.rooms.push({name:`Room ${next.rooms.length+1}`,recommended:null,items:[]}); setOpenRooms(previous=>new Set([...previous,next.rooms.length-1])); onChange(next); }}><Plus size={16}/> Add room</button></header>
-    {draft.rooms.map((room,ri) => <details className="scope-room" key={ri} open={openRooms.has(ri)} onToggle={e=>{const opened=e.currentTarget.open; setOpenRooms(previous=>{if(previous.has(ri)===opened)return previous; const next=new Set(previous); opened?next.add(ri):next.delete(ri); return next;});}}>
+    {orderQuotationRooms(draft.rooms).map((room) => {const ri=draft.rooms.indexOf(room);return <details className="scope-room" key={ri} open={openRooms.has(ri)} onToggle={e=>{const opened=e.currentTarget.open; setOpenRooms(previous=>{if(previous.has(ri)===opened)return previous; const next=new Set(previous); opened?next.add(ri):next.delete(ri); return next;});}}>
       <summary><strong>{room.name || `Room ${ri+1}`}</strong><span>{room.items.length} item{room.items.length===1?'':'s'}</span></summary>
       <div className="scope-room-content">
         <div className="scope-room-heading"><label className="owner-field">Room name<input value={room.name || ''} onChange={e=>{const next=structuredClone(draft);next.rooms[ri].name=e.target.value;onChange(next);}}/></label><button type="button" className="scope-delete" onClick={()=>{const next=structuredClone(draft);next.rooms.splice(ri,1);onChange(next);}}><Trash2 size={16}/> Remove room</button></div>
-        {room.items.map((item,ii)=>{
+        {orderQuotationFurniture(room.items,room.name).map((item)=>{const ii=room.items.indexOf(item);
           const grade=draft.recommended?.grade || 'Base';
           const amount=getUnitRateForItem(item,grade,draft.recommended?.protection || 'Standard','SF',catalogue)*(item.measure.per_item || 0)*(item.quantity || 0);
           return <article className="scope-item" key={ii}>
@@ -38,6 +41,6 @@ export function RoomScopeEditor({ draft, catalogue, onChange }: { draft:Quotatio
         {!room.items.length && <p className="scope-empty">No furniture added to this room yet.</p>}
         <button type="button" className="scope-add-item" onClick={()=>{const next=structuredClone(draft);next.rooms[ri].items.push({name:null,work_type:'Box type',size_text:null,measure:{unit:'sq_ft',per_item:null},quantity:1,optional:false,source_text_en:''});onChange(next);}}><Plus size={16}/> Add furniture</button>
       </div>
-    </details>)}
+    </details>;})}
   </section>;
 }

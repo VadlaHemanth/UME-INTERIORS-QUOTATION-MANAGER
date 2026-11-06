@@ -10,6 +10,8 @@ Retain the UME mark on a white header. Forest (#1c3a2f), ivory (#f4f1ea), white 
 
 A framed-sheet report is the refinement direction. The first question is: what is selected, what does it cost, and what happens next? The product's signature is the real room/package comparison plus the booking credit breakdown. Details are real data; never add ornamental charts, fake proof or invented figures.
 
+Arrange quoted rooms as a home walkthrough, beginning Hall/Living/Dining, Pooja and Kitchen. Hall furniture begins TV unit, crockery cabinet and vanity when present. Preserve the saved identities behind displayed rooms and items. Plywood options use visible package comparison cards, pairing each product with its listed manufacturer-warranty period; essential package/material information is never hidden behind an accordion.
+
 ## Mobile behavior
 
 Use compact room cards, reliable native checkboxes, 44px minimum practical tap targets, 16px form input text, visible field labels and safe-area spacing. Save selection and Review & pay remain reachable at the end and in a compact bottom action bar. The bar must not cover the final content, keyboard or payment form. Full payment terms remain available without accidental truncation.

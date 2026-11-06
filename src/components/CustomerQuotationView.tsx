@@ -50,7 +50,8 @@ import { DeterministicQrCode } from './BrandMark';
 import { printQuotation } from '../lib/print-quotation';
 import { PrintableA4Sheet } from './PrintableA4Sheet';
 import './customer-quotation.css';
-import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { documentTerms, materialLines, materialWording, packageWarrantyLabel, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
+import { quotationDisplayRooms } from '../lib/quotation-order';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
 import { WorkOrderView } from './WorkOrderView';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
@@ -166,6 +167,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   onSubmitPayment,
   onSwitchQuote,
 }) => {
+  const displayRooms=useMemo(()=>quotationDisplayRooms(snapshot.rooms),[snapshot.rooms]);
   useEffect(() => {
     const previousTitle = document.title;
     document.title = `${workOrder ? 'Work order' : 'Quotation'} - ${draft.quote.number || 'Unpublished preview'}`;
@@ -237,8 +239,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     setEditableDraft(structuredClone(draft));
   }, [draft]);
 
-  // Room filter tab for Detailed Breakdown — defaults to Room 0 (Master Bedroom)
-  const [activeBreakdownRoomIdx, setActiveBreakdownRoomIdx] = useState<number | 'ALL'>(0);
+  const [activeBreakdownRoomIdx, setActiveBreakdownRoomIdx] = useState<number | 'ALL'>(displayRooms[0]?.roomIndex??0);
+  useEffect(()=>{setActiveBreakdownRoomIdx(quotationDisplayRooms(snapshot.rooms)[0]?.roomIndex??0);},[publicId,revision]);
 
   // View mode: Interactive vs Printable A4 PDF Sheet
   const [showPrintSheet, setShowPrintSheet] = useState<boolean>(initialPrintPreview);
@@ -350,7 +352,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
       roomIndex: number;
       item: (typeof snapshot.rooms)[0]['items'][0];
     }[] = [];
-    snapshot.rooms.forEach((r) => {
+    displayRooms.forEach((r) => {
       r.items.forEach((it) => {
         if (it.optional) {
           list.push({
@@ -363,7 +365,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
       });
     });
     return list;
-  }, [snapshot]);
+  }, [displayRooms]);
 
   const totalUnitsCount = useMemo(
     () =>
@@ -678,11 +680,11 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
   const displayedBreakdownRooms = useMemo(() => {
     if (activeBreakdownRoomIdx === 'ALL') {
-      return snapshot.rooms;
+      return displayRooms;
     }
-    const found = snapshot.rooms.find((r) => r.roomIndex === activeBreakdownRoomIdx);
-    return found ? [found] : snapshot.rooms.slice(0, 1);
-  }, [snapshot.rooms, activeBreakdownRoomIdx]);
+    const found = displayRooms.find((r) => r.roomIndex === activeBreakdownRoomIdx);
+    return found ? [found] : displayRooms.slice(0, 1);
+  }, [displayRooms, activeBreakdownRoomIdx]);
 
   // Pre-compute whole-home totals for Standard, Normal, Premium side-by-side under active PVC setting
   const sideBySideWholeHomeTotals = useMemo(() => {
@@ -992,9 +994,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   );
                 })}
               </div>
-              <p className="text-[11px] leading-relaxed text-[#4A524D]">{PLYWOOD_WARRANTY_CONDITIONS}</p>
             </div>
-            <PlywoodSpecifications catalogue={catalogue} grades={ALL_GRADES}/>
+            <PlywoodSpecifications catalogue={catalogue} grades={ALL_GRADES} selectedGrade={mixByRoom?null:wholeHomeSelection.grade}/>
           </section>
 
           {selectionSaveError && (
@@ -1077,7 +1078,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#EAE4D8]">
-                      {snapshot.rooms.map((room) => {
+                      {displayRooms.map((room) => {
                         const rSel = roomSelections[room.roomIndex] || wholeHomeSelection;
                         const baseItemCount = room.items.filter((i) => !i.optional).length;
 
@@ -1346,7 +1347,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
 
                   {/* Room Filter Pill Tabs */}
                   <div className="breakdown-room-tabs flex flex-wrap items-center gap-1.5" role="group" aria-label="Show room specifications">
-                    {snapshot.rooms.map((r) => {
+                    {displayRooms.map((r) => {
                       const isActive = activeBreakdownRoomIdx === r.roomIndex;
                       return (
                         <button

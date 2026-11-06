@@ -1,4 +1,12 @@
-# Release verification — 5 November 2026
+# Release verification — 6 November 2026
+
+## Walkthrough order and visible plywood comparison
+
+Online quotations, owner room editing/previews, work orders and PDFs display rooms in a consistent walkthrough order: Hall/Living/Dining, Pooja, Kitchen, Master Bedroom, Children’s Bedroom, Guest Bedroom, other bedrooms and remaining spaces. Hall furniture starts TV unit, crockery cabinet and vanity, followed by related panelling/other work. Kitchen and bedroom furniture use construction-based sequences. Equal-priority/unknown names remain stable, and absent rooms/items are not invented. Sorting is view-only: original roomIndex/itemIndex values, source JSON arrays, mixed-package selections, optional pointers, rates and saved snapshots remain unchanged. PDF room numbers follow the visible sequence.
+
+The plywood section uses visible Basic/Standard/Premium comparison cards. Each saved brand/product appears beside its manufacturer-warranty period; Basic explicitly says when no fixed period is listed. Conditions explain that listed brands are alternatives and coverage follows the selected product/certificate/invoice. No accordion interaction is required. Package data comes from the quotation's saved catalogue; the selected package can be identified without promising coverage for the entire furniture installation. The AI instructions specify the same ordering and require remapping room/item references if rearranging newly generated JSON, while leaving app-generated plywood/warranty content out of notes.
+
+All 84 tests pass, with coverage for stable ordering, source-index and pricing preservation, warranty-card contents, edited settings, zero-year coverage, and current downloadable instructions. Production-bundle Chromium checks at 320/390/768/1440 pixels show all thirteen fixture products without hidden rows, horizontal page overflow or runtime errors. A deliberately unsorted fixture confirms Hall/Pooja/Kitchen order in customer and PDF comparisons, TV/Crockery/Vanity row order, preserved mixed packages and optional selection, owner editing of the correct original TV item, and matching unpublished preview order. The nine-page mixed-package fixture has no overflowing print bodies or orphan headings; rendered comparison/furniture pages were reviewed. A separate confirmed-work-order fixture starts with Hall/TV online and in native print, shows its six Premium plywood options openly, and retains four agreed-scope columns across seven pages without print overflow.
 
 ## Height and width labels
 

@@ -21,6 +21,10 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions, /not a live sync/);
   assert.match(instructions,/ONE CONSOLIDATED REVIEW BEFORE FINAL JSON/);
   assert.match(instructions,/DIMENSION ORDER — HEIGHT × WIDTH/);
+  assert.match(instructions,/ROOM AND FURNITURE WALKTHROUGH ORDER/);
+  assert.match(instructions,/Crockery Cabinet second, Vanity \/ Wash-Basin Cabinet third/);
+  assert.match(instructions,/recompute suggested_addons\[\]\.room_index/);
+  assert.match(instructions,/visible package comparison cards/);
   assert.match(instructions,/never swap or guess an unlabelled pair/);
   assert.match(instructions,/Preserve confirmed length, depth, diameter, piece counts/);
   assert.match(instructions,/do not interview rate by rate/);
@@ -28,7 +32,7 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions,/For ordinary quotations, reuse the saved rates/);
   assert.ok(instructions.includes('| Box type | sq_ft | 987 | 1150 | 1350 |'));
   assert.match(instructions, /Standard: Up to 20 years plywood warranty/);
-  assert.match(instructions, /Do not generate these labels in JSON, quote.notes or owner_requests/);
+  assert.match(instructions, /Do not generate these labels or comparisons in JSON, quote.notes or owner_requests/);
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
   const validation = validateQuotationDraftV2(example);
   assert.equal(validation.validForDraft, true);

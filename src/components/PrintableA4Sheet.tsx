@@ -21,6 +21,7 @@ import {
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
 import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import { PackageWarrantyLabel } from './PackageWarrantyLabel';
+import { quotationDisplayRooms, roomDisplayNumber } from '../lib/quotation-order';
 import {
   DeterministicQrCode,
   UmeLogoMark,
@@ -360,6 +361,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   approvedDiscountRupees,
   verifiedPaidRupees,
 }) => {
+  const displayRooms=quotationDisplayRooms(snapshot.rooms);
   const calc = computeCustomerSelectionTotal(snapshot, {
     wholeHomeSelection,
     mixByRoom,
@@ -600,7 +602,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5DFD3]">
-                {snapshot.rooms.map((r) => {
+                {displayRooms.map((r,displayIndex) => {
                   const rSel =
                     mixByRoom && roomSelections[r.roomIndex]
                       ? roomSelections[r.roomIndex]
@@ -616,7 +618,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   return (
                     <tr key={r.roomIndex}>
                       <td className="py-2.5 px-3 font-bold text-[#18221D]">
-                        0{r.roomIndex + 1}. {r.name} ({r.items.filter((i) => !i.optional).length} units)
+                        {roomDisplayNumber(displayIndex)}. {r.name} ({r.items.filter((i) => !i.optional).length} units)
                       </td>
                       <td className={`py-2.5 px-2.5 text-right font-mono tabular-nums ${rSel.grade === 'Base' ? 'pdf-selected-cell' : 'text-[#4A524D]'}`}>
                         {formatINR(stdRoom)}
@@ -703,7 +705,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </div>
 
         <div className="space-y-5" data-pdf-flow-group>
-          {snapshot.rooms.map((room) => {
+          {displayRooms.map((room,displayIndex) => {
             const rSel =
               mixByRoom && roomSelections[room.roomIndex]
                 ? roomSelections[room.roomIndex]
@@ -718,7 +720,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 <div className="bg-[#FAF8F4] px-4 py-2.5 border-b border-[#E5DFD3] flex items-center justify-between text-xs">
                   <div>
                     <span className="font-bold text-[#18221D]">
-                      0{room.roomIndex + 1}. {room.name}
+                      {roomDisplayNumber(displayIndex)}. {room.name}
                     </span>
                     <span className="ml-2 text-[#1C3A2F] font-semibold">
                       (Chosen: {getPackageDisplayName(rSel.grade)}

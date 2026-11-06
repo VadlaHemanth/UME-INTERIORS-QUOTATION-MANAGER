@@ -295,12 +295,6 @@
 @media print {
   .selection-mobile-bar, .selection-end-actions { display: none !important; }
 }
-.plywood-specifications { display: grid; gap: 10px; }
-.plywood-specifications details { padding: 12px 0; border-top: 1px solid #d8d0c2; }
-.plywood-specifications summary { font-size: 13px; font-weight: 600; cursor: pointer; min-height: 28px; }
-.plywood-specifications ul { display: grid; gap: 12px; padding-top: 16px; }
-.plywood-specifications li { display: grid; gap: 4px; font-size: 13px; line-height: 1.55; }
-.plywood-specifications li span { color: #4a524d; }
 .quotation-notes-list { list-style: disc; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; line-height: 1.65; }
 .work-order-content { max-width:1120px; margin:0 auto; padding:24px; display:grid; gap:24px; }
 .work-order-toolbar { padding:20px clamp(16px,3vw,40px); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; background:white; }
