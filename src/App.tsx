@@ -327,10 +327,19 @@ export default function App() {
   };
 
   const handleRecordVerifiedPayment = async (publicId: string, amountRupees: number, reference: string) => {
-    const response = await fetch(`/api/studio/quotes/${publicId}/verified-payment`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountRupees, reference})});
+    const record=quotes.find(quote=>quote.publicId===publicId);
+    const response = await fetch(`/api/studio/quotes/${publicId}/verified-payment`, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amountRupees, reference,expectedRevision:record?.revision,expectedSelection:record?.lastCustomerSelection})});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Could not record payment.');
+    if (!response.ok) {if(response.status===409)await loadOwnerStudioData();throw new Error(data.error || 'Could not record payment.');}
     setQuotes(data.quotes); setLedger(data.ledger);
+  };
+
+  const handleCreateWorkOrder=async(publicId:string)=>{
+    const record=quotes.find(quote=>quote.publicId===publicId);
+    const response=await fetch(`/api/studio/quotes/${publicId}/work-order`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmAgreedScope:true,expectedRevision:record?.revision,expectedSelection:record?.lastCustomerSelection})});
+    const data=await response.json();
+    if(!response.ok){if(response.status===409)await loadOwnerStudioData();throw new Error(data.error||'Could not create the work order.');}
+    setQuotes(data.quotes);
   };
 
   const handleDeleteQuote = async (publicId: string) => {
@@ -542,7 +551,7 @@ export default function App() {
                 className="px-3.5 py-2 rounded-lg text-xs font-semibold text-[#1B241E] bg-white hover:bg-[#FAF8F3] border border-[#D4CEC2] inline-flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-[#1C3A2F]" />
-                <span>Download PDF</span>
+                <span>{customerQuoteRecord?.workOrder?'Download work order PDF':'Download PDF'}</span>
               </button>
               <button
                 type="button"
@@ -690,6 +699,7 @@ export default function App() {
             onUpdateCatalogue={handleUpdateCatalogue}
             onVerifyOrRejectPayment={handleVerifyOrRejectPayment}
             onRecordVerifiedPayment={handleRecordVerifiedPayment}
+            onCreateWorkOrder={handleCreateWorkOrder}
             onDeleteQuote={handleDeleteQuote}
           /></Suspense></div>
         )}

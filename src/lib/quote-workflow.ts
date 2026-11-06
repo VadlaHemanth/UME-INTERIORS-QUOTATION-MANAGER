@@ -13,6 +13,11 @@ export interface FinalizedWorkOrder {
   selection: AgreedSelection;
   totalRupees: number;
 }
+/** Only agreement-changing fields participate; presentation and save timestamps do not. */
+export function agreedSelectionIdentity(selection:AgreedSelection):string {
+  const packageKey=(value:ResolvedPackageSelection)=>[value.grade,value.protection,value.finish,value.brand_preference||null];
+  return JSON.stringify([packageKey(selection.wholeHomeSelection),selection.mixByRoom,Object.entries(selection.roomSelections||{}).sort(([a],[b])=>Number(a)-Number(b)).map(([key,value])=>[key,packageKey(value)]),[...(selection.selectedOptionalPointers||[])].sort()]);
+}
 export function indiaDate(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }

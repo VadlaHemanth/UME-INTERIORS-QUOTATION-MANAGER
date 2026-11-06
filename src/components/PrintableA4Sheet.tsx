@@ -22,6 +22,8 @@ import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotati
 import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import { PackageWarrantyLabel } from './PackageWarrantyLabel';
 import { quotationDisplayRooms, roomDisplayNumber } from '../lib/quotation-order';
+import { workOrderPaymentSummary } from '../lib/work-order-document';
+import { indiaDate } from '../lib/quote-workflow';
 import {
   DeterministicQrCode,
   UmeLogoMark,
@@ -30,6 +32,7 @@ import {
 interface PrintableA4SheetProps {
   isPreview?: boolean;
   isWorkOrder?: boolean;
+  workOrderConfirmedAt?:string;
   publicId: string;
   revision: number;
   draft: QuotationDraftV2;
@@ -317,7 +320,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
         number.textContent = `Page ${index + 1} of ${created.length}`;
         footer.append(label, number);
         page.append(footer);
-        page.setAttribute('aria-label', `Quotation page ${index + 1} of ${created.length}`);
+        page.setAttribute('aria-label', `${reference} · page ${index + 1} of ${created.length}`);
       });
       pages.replaceChildren(...created);
       measurementHost.remove();
@@ -349,6 +352,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
 export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   isPreview = false,
   isWorkOrder = false,
+  workOrderConfirmedAt,
   publicId,
   revision,
   draft,
@@ -380,6 +384,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   const estimateBasisLabel = getQuotationBasisLabel(draft.quote);
   const estimateNote = getQuotationEstimateNote(draft.quote, isWorkOrder ? 'work_order' : 'quotation');
   const documentLabel = isWorkOrder ? 'Work order' : 'Quotation';
+  const issueDate=isWorkOrder&&workOrderConfirmedAt&&!Number.isNaN(Date.parse(workOrderConfirmedAt))?indiaDate(new Date(workOrderConfirmedAt)):draft.quote.date;
+  const needsBookingConfirmation=!isWorkOrder&&milestones.requiresOwnerSmallOrderRule;
+  const payment=workOrderPaymentSummary(calc.grandTotal,verifiedPaidRupees);
+  const qrRequestedAmount=isWorkOrder?payment.nextAmount:milestones.bookingRequired;
+  const upiLimit=catalogue.company.bank.upiLimitRupees;
+  const qrNeedsEnteredAmount=qrRequestedAmount>upiLimit;
+  const paymentQrLabel=qrNeedsEnteredAmount?'UPI · enter amount':isWorkOrder?'Next scheduled payment':'UPI booking';
+  const paymentQrParameters=new URLSearchParams({pa:catalogue.company.bank.upiId,pn:catalogue.company.bank.accountName,cu:'INR',tn:`${isWorkOrder?'Work order':'Booking'} ${quoteRef}`});
+  if(!qrNeedsEnteredAmount)paymentQrParameters.set('am',String(qrRequestedAmount));
+  const showPaymentQr=qrRequestedAmount>0&&!needsBookingConfirmation;
   const documentGrades = isWorkOrder ? snapshot.rooms.map(room => (mixByRoom ? roomSelections[room.roomIndex] || wholeHomeSelection : wholeHomeSelection).grade) : ALL_GRADES;
   const origin = typeof window !== 'undefined' ? window.location.origin : `https://${catalogue.company.domain}`;
   const shareUrl = `${origin}/q/${publicId}`;
@@ -410,7 +424,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   return (
     <A4Document reference={`${documentLabel} ${quoteRef}`}>
       {/* PAGE 1: LETTERHEAD, CLIENT DETAILS & SIDE-BY-SIDE 3-PACKAGE SUMMARY */}
-      <div className="pdf-flow-section" data-page-label="Quotation overview">
+      <div className="pdf-flow-section" data-page-label={isWorkOrder?'Work order overview':'Quotation overview'}>
         <header className="pdf-letterhead">
           <UmeLogoMark size="pdf" />
           <div className="pdf-company">
@@ -438,10 +452,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
-              Issue Date
+              {isWorkOrder?'Confirmation date':'Issue date'}
             </p>
             <p className="font-mono font-bold text-[#18221D] mt-0.5">
-              {draft.quote.date || 'Not set'}
+              {issueDate || 'Not set'}
             </p>
           </div>
           <div className="min-w-0">
@@ -449,7 +463,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               {isWorkOrder ? 'Scope status' : 'Valid until'}
             </p>
             <p className="font-mono font-bold text-[#1C3A2F] mt-0.5">
-              {isWorkOrder ? 'Confirmed' : draft.quote.valid_until || 'Not set'}
+              {isWorkOrder ? isPreview?'Proposed revision':'Confirmed' : draft.quote.valid_until || 'Not set'}
             </p>
           </div>
         </div>
@@ -490,6 +504,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <p className="text-[11px] text-[#1C3A2F] font-semibold mt-0.5">
                 {mixByRoom ? 'Grades and PVC options vary by room. Manufacturer warranties follow the selected product’s certificate and terms.' : `${activeGradeInfo.termiteProofBadge} · ${packageWarrantyLabel(activeGradeInfo) || activeGradeInfo.warrantyBanner}`}
               </p>
+              {isWorkOrder&&!mixByRoom&&<p className="text-[10px] text-[#4A524D] mt-1">Finish: {wholeHomeSelection.finish==='SF'?'SF matte':'High-gloss'}{wholeHomeSelection.brand_preference?` · Preferred plywood: ${wholeHomeSelection.brand_preference}`:''}</p>}
               {ownerRecommendedGrade && (
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#76541C] mt-2">
                   Recommended by UME: {getPackageDisplayName(ownerRecommendedGrade)} Package
@@ -689,13 +704,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       </div>
 
       {/* PAGE 2: ITEMISED ROOM-BY-ROOM BREAKDOWN WITH ALL 3 PACKAGE RATES SIDE-BY-SIDE */}
-      <div className="pdf-flow-section" data-page-label="Furniture scope & rates">
+      <div className="pdf-flow-section" data-page-label={isWorkOrder?'Agreed furniture scope':'Furniture scope & rates'}>
         <div className="pdf-section-heading flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
 
             <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
               <h2 className="text-[15px] font-bold leading-none text-[#18221D]">
-                Furniture scope and package rates
+                {isWorkOrder?'Agreed furniture scope':'Furniture scope and package rates'}
               </h2>
             </div>
           </div>
@@ -718,7 +733,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 className="pdf-table-scroll border border-[#E5DFD3] rounded-lg overflow-hidden print-avoid-break"
               >
                 <div className="bg-[#FAF8F4] px-4 py-2.5 border-b border-[#E5DFD3] flex items-center justify-between text-xs">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <span className="font-bold text-[#18221D]">
                       {roomDisplayNumber(displayIndex)}. {room.name}
                     </span>
@@ -726,6 +741,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       (Chosen: {getPackageDisplayName(rSel.grade)}
                       {rSel.protection === 'With PVC' ? ' · +6mm PVC' : ''})
                     </span>
+                    {isWorkOrder&&<span className="block text-[10px] text-[#4A524D] mt-1 break-words">Finish: {rSel.finish==='SF'?'SF matte':'High-gloss'}{rSel.brand_preference?` · Preferred plywood: ${rSel.brand_preference}`:''}</span>}
                   </div>
                   <span className="font-bold text-[#18221D] font-mono tabular-nums">
                     Selected room total: {formatINR(rSub)}
@@ -808,13 +824,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       </div>
 
       {/* PAGE 3: EASY-TO-UNDERSTAND MILESTONE PAYMENT SCHEDULE, BANK DETAILS & TERMS */}
-      <div className="pdf-flow-section" data-page-label="Payment schedule & terms">
+      <div className="pdf-flow-section" data-page-label={isWorkOrder?'Payments & verified credits':'Payment schedule & terms'}>
         <div className="pdf-section-heading flex items-center justify-between gap-4 border-b-2 border-[#1C3A2F] pb-3 pt-1">
           <div className="flex items-center gap-3.5 min-w-0">
 
             <div className="flex flex-col justify-center gap-1 py-0.5 min-w-0">
               <h2 className="text-[15px] font-bold leading-none text-[#18221D]">
-                Payment schedule and terms
+                {isWorkOrder?'Payment schedule and verified credits':'Payment schedule and terms'}
               </h2>
             </div>
           </div>
@@ -823,19 +839,24 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </p>
         </div>
 
-        {/* Crystal-Clear Milestone Explanation Banner */}
+        <div className="space-y-4 pdf-payment-overview">
+        {/* Keep the explanation, verified credit and milestone table together when they fit one page. */}
         <div className="p-3.5 bg-[#E4EFE7] border border-[#1C3A2F]/30 rounded-lg text-xs text-[#18221D] space-y-1 print-avoid-break">
           <p className="font-bold text-[#1C3A2F]">
             How the payment schedule works
           </p>
           <p className="text-[11px] text-[#3D4741] leading-relaxed">
-            {milestones.requiresOwnerSmallOrderRule ? (
+            {isWorkOrder ? (
+              <>Verified payments of <strong>{formatINR(verifiedPaidRupees,true)}</strong> are credited against this work order. The balances below deduct that credit. Pay the next scheduled amount only when its corresponding work stage is reached.</>
+            ) : needsBookingConfirmation ? (
               <>This order requires proprietor confirmation of booking and work-start terms. The milestone amounts below are indicative. Contact {catalogue.company.proprietor} before making a payment.</>
             ) : (
               <>The <strong>{formatINR(milestones.bookingRequired, true)} order booking payment</strong> is <strong>part of your first 50% advance</strong>. It counts toward your project price ({formatINR(calc.grandTotal, true)}). The balances below deduct verified payments and show the amount needed to reach each stage.</>
             )}
           </p>
         </div>
+
+        {isWorkOrder&&<div className="pdf-total-summary print-avoid-break"><span>Verified payments <strong>{formatINR(verifiedPaidRupees)}</strong></span><span>Remaining balance <strong>{formatINR(payment.balance)}</strong></span><span>{payment.nextAmount?`Next scheduled · ${payment.nextLabel}`:'Payment status'} <strong>{payment.nextAmount?formatINR(payment.nextAmount):'Paid in full'}</strong></span></div>}
 
         {/* 4-Column Easy-to-Understand Milestone Schedule Table */}
         <div className="pdf-table-scroll border border-[#E5DFD3] rounded-lg overflow-hidden print-avoid-break">
@@ -859,7 +880,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </thead>
             <tbody className="divide-y divide-[#E5DFD3]">
               {/* Stage 1 */}
-              {milestones.requiresOwnerSmallOrderRule ? (
+              {needsBookingConfirmation ? (
                 <tr className="bg-[#FAF8F4]">
                   <td className="py-2.5 px-3.5 font-bold">Step 1 · Booking terms</td>
                   <td colSpan={3} className="py-2.5 px-3.5 text-xs text-[#5C645F]">Confirm the booking amount with the proprietor before payment.</td>
@@ -868,10 +889,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <tr className="bg-[#FAF8F4]">
                 <td className="py-2.5 px-3.5">
                   <p className="font-bold text-[#18221D]">
-                    Step 1 · Booking payment
+                    {isWorkOrder?'Step 1 · Booking credit':'Step 1 · Booking payment'}
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    Confirms the work order for the agreed scope. Counts toward the 50% advance.
+                    {isWorkOrder?'Booking credit for the confirmed scope. Included in the first 50% advance.':'Confirms the work order for the agreed scope. Counts toward the 50% advance.'}
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -897,7 +918,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                     Step 2 · Balance of the 50% advance
                   </p>
                   <p className="text-[10.5px] text-[#5C645F]">
-                    {milestones.requiresOwnerSmallOrderRule ? 'Work-start terms and booking credit require proprietor confirmation.' : `50% advance (${formatINR(milestones.advance50PercentTotal)}) less the ${formatINR(milestones.bookingRequired)} booking. Due before plywood dispatch to site.`}
+                    {needsBookingConfirmation ? 'Work-start terms and booking credit require proprietor confirmation.' : `50% advance (${formatINR(milestones.advance50PercentTotal)}) less the ${formatINR(milestones.bookingRequired)} booking. Due before plywood dispatch to site.`}
                   </p>
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#18221D]">
@@ -905,7 +926,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(milestones.advance50PercentTotal, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">50% of quotation total</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">50% of {documentLabel.toLowerCase()} total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#18221D]">
                   {formatINR(milestones.advanceRemainingToStartWork, true)}
@@ -927,7 +948,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(stage3Cumulative, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">85% of quotation total</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">85% of {documentLabel.toLowerCase()} total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#18221D]">
                   {formatINR(
@@ -952,7 +973,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#4A524D]">
                   {formatINR(stage4Cumulative, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">95% of quotation total</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">95% of {documentLabel.toLowerCase()} total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#18221D]">
                   {formatINR(
@@ -977,7 +998,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                 </td>
                 <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-[#1C3A2F]">
                   {formatINR(calc.grandTotal, true)}
-                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">100% of quotation total</div>
+                  <div className="text-[9.5px] font-semibold text-[#1C3A2F]">100% of {documentLabel.toLowerCase()} total</div>
                 </td>
                 <td className="py-2.5 px-3.5 text-right font-mono font-bold tabular-nums text-[#1C3A2F]">
                   {formatINR(Math.max(0, calc.grandTotal - verifiedPaidRupees), true)}
@@ -987,6 +1008,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </table>
         </div>
 
+        </div>
         <section className="pdf-bank print-avoid-break" aria-label="Bank account and payment QR codes">
           <div className="pdf-bank-info">
             <p className="pdf-eyebrow">Bank account for payments</p>
@@ -1000,34 +1022,34 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
             </dl>
           </div>
           <div className="pdf-bank-qrs">
-            {!milestones.requiresOwnerSmallOrderRule && (isPreview ? <PreviewQrSpace label="UPI booking"/> : (
+            {showPaymentQr && (isPreview ? <PreviewQrSpace label={paymentQrLabel}/> : (
               <DeterministicQrCode
-                value={`upi://pay?${new URLSearchParams({ pa: catalogue.company.bank.upiId, pn: catalogue.company.bank.accountName, am: String(milestones.bookingRequired), cu: 'INR', tn: `Booking ${quoteRef}` }).toString()}`}
-                size={94} label="UPI booking" />
+                value={`upi://pay?${paymentQrParameters.toString()}`}
+                size={94} label={paymentQrLabel} />
             ))}
-            {!isPreview ? <DeterministicQrCode value={shareUrl} size={94} label="Online quotation" /> : <PreviewQrSpace label="Online quotation"/>}
+            {!isPreview ? <DeterministicQrCode value={shareUrl} size={94} label={isWorkOrder?'Online work order':'Online quotation'} /> : <PreviewQrSpace label={isWorkOrder?'Online work order':'Online quotation'}/>}
           </div>
         </section>
+
+        {showPaymentQr&&qrNeedsEnteredAmount&&<p className="text-[10px] text-[#4A524D] print-avoid-break">The next scheduled amount is {formatINR(qrRequestedAmount)}. The saved UPI limit is {formatINR(upiLimit)} per payment, so the QR leaves the amount for you to enter. Use bank transfer for larger payments.</p>}
 
         <section className="space-y-3 text-[11px]" data-pdf-flow-group>
           {[...new Set(documentGrades)].map(grade => <div className="pdf-plywood-spec print-avoid-break" key={grade}><h3 className="font-bold">{getPackageDisplayName(grade)} · Plywood options and manufacturer warranty</h3><ul>{catalogue.grades[grade].approvedBrands.map((brand,index) => <li key={index}><strong>{brand.name}</strong> · {brand.spec} · {brand.warrantyYears > 0 ? `${brand.warrantyYears} years, subject to brand certificate and invoice` : 'Warranty under the selected manufacturer’s terms'}</li>)}</ul></div>)}
           <div className="pdf-scope-notes print-avoid-break"><h3 className="font-bold">Scope, inclusions and additional charges</h3><ul>{[...scopeNotes(catalogue,documentGrades),...quotationCustomerNotes(draft)].map((note,index) => <li key={index}>{note}</li>)}</ul></div>
         </section>
-        {/* Notes & Terms and Conditions (Includes 0.8mm / 0.72mm Laminate Gauge Note) */}
+        <div className="space-y-5 pdf-acceptance-group">
+        {/* Keep the terms with their acceptance block. Laminate wording is included in term 9. */}
         <div className="space-y-2.5 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
             Specifications and terms
           </p>
-          <div className="p-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[10.5px] text-[#18221D] leading-snug">
-            <strong>Laminate thickness and finish:</strong> {materialWording(catalogue).internalLaminate} {materialWording(catalogue).externalLaminate}
-          </div>
           <div className="pdf-terms grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] text-[#4A524D] leading-relaxed">
             {documentTerms(catalogue,documentGrades,isWorkOrder).map((t) => (
               <div key={t.id}>
                 <strong className="text-[#18221D]">
-                  {t.id}. {milestones.requiresOwnerSmallOrderRule && t.id === 1 ? 'Booking confirmation' : milestones.requiresOwnerSmallOrderRule && t.id === 2 ? 'Work-start confirmation' : t.title}:
+                  {t.id}. {needsBookingConfirmation && t.id === 1 ? 'Booking confirmation' : needsBookingConfirmation && t.id === 2 ? 'Work-start confirmation' : t.title}:
                 </strong>{' '}
-                {milestones.requiresOwnerSmallOrderRule && [1, 2].includes(t.id) ? 'Booking amount, credit and work-start timing require written proprietor confirmation for this order before payment.' : t.clause}
+                {needsBookingConfirmation && [1, 2].includes(t.id) ? 'Booking amount, credit and work-start timing require written proprietor confirmation for this order before payment.' : t.clause}
               </div>
             ))}
           </div>
@@ -1049,6 +1071,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <strong>{draft.customer.name || 'Customer signature'}</strong> · Date: ________________
             </p>
           </div>
+        </div>
         </div>
       </div>
     </A4Document>

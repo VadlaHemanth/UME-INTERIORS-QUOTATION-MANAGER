@@ -41,6 +41,8 @@ import {
   ALL_GRADES,
   ALL_PROTECTIONS,
   calculateQuotationPricing,
+  calculateMilestoneSchedule,
+  computeCustomerSelectionTotal,
   formatINR,
   makeComboKey,
 } from '../lib/pricing';
@@ -61,6 +63,7 @@ import { packageAllowances } from '../lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../lib/quotation-presentation';
 import { RoomScopeEditor } from './RoomScopeEditor';
 import { RateCardEditor } from './RateCardEditor';
+import { workOrderPreview } from '../lib/work-order-document';
 
 export interface PublishedQuoteSummary {
   publicId: string;
@@ -152,6 +155,7 @@ interface OwnerStudioViewProps {
     rejectionReason?: string
   ) => Promise<void>;
   onRecordVerifiedPayment: (publicId: string, amountRupees: number, reference: string) => Promise<void>;
+  onCreateWorkOrder:(publicId:string)=>Promise<void>;
 }
 
 function createEmptyOwnerDraft(quotes: PublishedQuoteSummary[] = []): QuotationDraftV2 {
@@ -207,6 +211,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   onUpdateCatalogue,
   onVerifyOrRejectPayment,
   onRecordVerifiedPayment,
+  onCreateWorkOrder,
   onDeleteQuote,
 }) => {
   const [activeTab, setActiveTab] = useState<
@@ -270,9 +275,20 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const [verifiedAmount, setVerifiedAmount] = useState(50000);
   const [verifiedReference, setVerifiedReference] = useState('');
   const [recordingPayment, setRecordingPayment] = useState(false);
+  const [creatingWorkOrder,setCreatingWorkOrder]=useState(false);
+  const [workOrderFeedback,setWorkOrderFeedback]=useState<{ok:boolean;message:string}|null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
   const [updateWorkOrderSelection,setUpdateWorkOrderSelection] = useState(false);
   const currentQuotes = useMemo(() => quotes.filter(q => !q.supersededByPublicId || !quotes.some(next => next.publicId === q.supersededByPublicId)).sort((a,b) => b.publishedAt.localeCompare(a.publishedAt)), [quotes]);
+  const paymentRecord=currentQuotes.find(quote=>quote.publicId===paymentQuote&&quote.status!=='Draft');
+  const verifiedForQuote=(publicId:string)=>{const ids=seriesIds(quotes,publicId);return ledger.filter(entry=>ids.has(entry.publicId)&&entry.status==='Verified Paid').reduce((sum,entry)=>sum+entry.amountRupees,0);};
+  const paymentTotal=paymentRecord?computeCustomerSelectionTotal(paymentRecord.snapshot,{...paymentRecord.lastCustomerSelection,approvedDiscountRupees:paymentRecord.approvedDiscountRupees}).grandTotal:0;
+  const paymentVerified=paymentRecord?verifiedForQuote(paymentRecord.publicId):0;
+  const paymentBooking=calculateMilestoneSchedule(paymentTotal).bookingRequired;
+  const bookingRemaining=Math.max(0,paymentBooking-paymentVerified);
+  const choosePaymentQuote=(publicId:string)=>{const record=currentQuotes.find(quote=>quote.publicId===publicId);setPaymentQuote(publicId);setWorkOrderFeedback(null);setVerifiedReference('');if(record){const total=computeCustomerSelectionTotal(record.snapshot,{...record.lastCustomerSelection,approvedDiscountRupees:record.approvedDiscountRupees}).grandTotal;setVerifiedAmount(Math.max(0,calculateMilestoneSchedule(total).bookingRequired-verifiedForQuote(publicId)));}};
+  const openWorkOrderSetup=(publicId:string)=>{choosePaymentQuote(publicId);setActiveTab('ledger');};
+  useEffect(()=>{if(activeTab==='ledger'&&paymentQuote)requestAnimationFrame(()=>document.getElementById('work-order-setup')?.scrollIntoView({block:'start',behavior:'instant'}));},[activeTab,paymentQuote]);
 
   // Tab 3: Master Gem Instructions & Image Prompts
   const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
@@ -346,6 +362,10 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     return draft;
   },[workingDraft,editableCatalogue,catalogue,reviewedOwnerRequests,quotes,supersedeId]);
   const previewSnapshot=useMemo(()=>calculateQuotationPricing(previewDraft,editableCatalogue),[previewDraft,editableCatalogue]);
+  const editingRecord=quotes.find(quote=>quote.publicId===supersedeId);
+  const previewDefaultPackage:ResolvedPackageSelection={grade:previewDraft.recommended?.grade||'Base',protection:previewDraft.recommended?.protection||'Standard',finish:previewDraft.recommended?.finish||'SF',brand_preference:previewDraft.recommended?.brand_preference||null};
+  const previewWorkOrder=editingRecord?.workOrder?workOrderPreview(editingRecord.draft,previewDraft,editingRecord.workOrder,previewSnapshot,approvedDiscount,updateWorkOrderSelection?previewDefaultPackage:undefined):undefined;
+  const previewVerifiedPaid=editingRecord?.workOrder?verifiedForQuote(editingRecord.publicId):0;
 
   const syncDraft = (next: QuotationDraftV2) => {
     const withAutomaticProtection = applyStandardPvcScopes(next, editableCatalogue);
@@ -719,7 +739,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   : 'text-[#4A524D] hover:text-[#18221D]'
               }`}
             >
-              Payments ({ledger.length})
+              Payments & work orders
             </button>
             <button
               type="button"
@@ -738,7 +758,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
       {previewMode && <section className="owner-preview">
         <div className="owner-preview-toolbar no-print"><div><strong>Unpublished preview</strong><p>Check the customer experience before publishing. Changes here are temporary.</p></div><div><button type="button" onClick={() => openPreview('online')} aria-pressed={previewMode === 'online'}>Online</button><button type="button" onClick={() => openPreview('pdf')} aria-pressed={previewMode === 'pdf'}>PDF</button><button type="button" onClick={closePreview}>Back to editor</button></div></div>
-        <CustomerQuotationView key={previewMode} publicId="preview" revision={1} status="Draft" isPreview initialPrintPreview={previewMode === 'pdf'} draft={previewDraft} snapshot={previewSnapshot} catalogue={editableCatalogue} approvedDiscountRupees={Math.max(0,Math.round(approvedDiscount))} verifiedPaidRupees={0} pendingPaymentsCount={0} defaultSentPackage={{grade:workingDraft.recommended?.grade || 'Base', protection:workingDraft.recommended?.protection || 'Standard', finish:workingDraft.recommended?.finish || 'SF',brand_preference:workingDraft.recommended?.brand_preference || null}} initialSelection={{wholeHomeSelection:{grade:workingDraft.recommended?.grade || 'Base',protection:workingDraft.recommended?.protection || 'Standard',finish:workingDraft.recommended?.finish || 'SF',brand_preference:workingDraft.recommended?.brand_preference || null},mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],acceptedTermsAt:null}} onSaveSelection={async()=>{}} onSubmitPayment={async()=>({ok:false,error:'Publish the quotation before requesting payment.'})}/>
+        <CustomerQuotationView key={previewMode} publicId="preview" revision={1} status="Draft" workOrder={previewWorkOrder} isPreview initialPrintPreview={previewMode === 'pdf'} draft={previewDraft} snapshot={previewSnapshot} catalogue={editableCatalogue} approvedDiscountRupees={Math.max(0,Math.round(approvedDiscount))} verifiedPaidRupees={previewVerifiedPaid} pendingPaymentsCount={0} defaultSentPackage={{grade:workingDraft.recommended?.grade || 'Base', protection:workingDraft.recommended?.protection || 'Standard', finish:workingDraft.recommended?.finish || 'SF',brand_preference:workingDraft.recommended?.brand_preference || null}} initialSelection={{wholeHomeSelection:{grade:workingDraft.recommended?.grade || 'Base',protection:workingDraft.recommended?.protection || 'Standard',finish:workingDraft.recommended?.finish || 'SF',brand_preference:workingDraft.recommended?.brand_preference || null},mixByRoom:false,roomSelections:{},selectedOptionalPointers:[],acceptedTermsAt:null}} onSaveSelection={async()=>{}} onSubmitPayment={async()=>({ok:false,error:'Publish the quotation before requesting payment.'})}/>
       </section>}
       <div hidden={previewMode !== null} className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 no-print">
         {activeTab !== 'unified_studio' && publishResult && !publishResult.ok && (
@@ -1570,7 +1590,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                               await onUpdateDefaultPackage(q.publicId, {
                                 grade: g,
                                 protection: p,
-                                finish: 'SF',
+                                finish: q.defaultSentPackage?.finish||q.lastCustomerSelection.wholeHomeSelection.finish,
                                 brand_preference: catalogue.grades[g].approvedBrands[0]?.name || null,
                               });
                               setSavedDefaultToastId(q.publicId);
@@ -1633,6 +1653,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
                       {/* Right: Actions */}
                       <div className="flex flex-wrap items-center gap-2">
+                        {q.status!=='Draft'&&!q.workOrder&&<button type="button" className="owner-create-work-order" onClick={()=>openWorkOrderSetup(q.publicId)}>Create work order</button>}
                         <button
                           type="button"
                           onClick={() => {
@@ -1641,7 +1662,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                               draftCopy.recommended = {
                                 grade: q.defaultSentPackage.grade,
                                 protection: q.defaultSentPackage.protection,
-                                finish: 'SF',
+                                finish: q.defaultSentPackage.finish,
                                 brand_preference: q.defaultSentPackage.brand_preference,
                               };
                             }
@@ -1901,28 +1922,34 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         {/* TAB 4: BANK VERIFICATION LEDGER */}
         {activeTab === 'ledger' && (
           <div className="bg-white border border-[#E5DFD3] rounded-2xl p-6 shadow-xs space-y-5">
-            <div className="border-b border-[#EAE4D8] pb-4">
-              <h2 className="text-lg font-bold text-[#18221D]">
-                Private Bank Verification Ledger (SBI Chengicherla Acc: 35976768268)
-              </h2>
-              <p className="text-xs text-[#5C645F]">
-                Check screenshots received in WhatsApp against your bank statement, then record the verified credit. The booking is part of the 50% advance. A confirmed booking creates a work order with the agreed package and scope.
-              </p>
+            <div id="work-order-setup" className="owner-work-order-setup">
+              <h2>Payments & work orders</h2>
+              <p>Review the agreed scope, then verify the booking in your bank statement. Recording enough verified booking creates the work order on the customer's existing link.</p>
+              <p className="owner-bank-reference">{catalogue.company.bank.bankName} · account ending {catalogue.company.bank.accountNumber.slice(-4)}</p>
+              {paymentRecord && <section className="owner-work-order-summary" aria-label="Work order setup summary">
+                <h3>{paymentRecord.draft.customer.name} · {paymentRecord.draft.quote.number}</h3>
+                <dl><div><dt>Agreed scope total</dt><dd>{formatINR(paymentTotal)}</dd></div><div><dt>Verified payments</dt><dd>{formatINR(paymentVerified)}</dd></div><div><dt>Booking required</dt><dd>{formatINR(paymentBooking)}</dd></div><div><dt>Booking still to verify</dt><dd>{formatINR(bookingRemaining)}</dd></div></dl>
+                <p>Package: <strong>{paymentRecord.lastCustomerSelection.mixByRoom?'Room-by-room selection':getPackageDisplayName(paymentRecord.lastCustomerSelection.wholeHomeSelection.grade)}</strong> · {paymentRecord.draft.rooms.length} rooms · {paymentRecord.lastCustomerSelection.selectedOptionalPointers.length} selected optional items.</p>
+                {!paymentRecord.lastCustomerSelection.savedByCustomer && !paymentRecord.workOrder && <p>Confirm this package and scope with the customer before creating the work order.</p>}
+                <div className="owner-work-order-actions">
+                  <button type="button" onClick={()=>onOpenCustomerQuote(paymentRecord.publicId)}>Review selected scope</button>
+                  {paymentRecord.workOrder?<button type="button" className="owner-action-primary" onClick={()=>onOpenCustomerQuote(paymentRecord.publicId)}>Open work order</button>:bookingRemaining===0?<button type="button" className="owner-action-primary" disabled={creatingWorkOrder||recordingPayment} onClick={async()=>{setCreatingWorkOrder(true);setWorkOrderFeedback(null);try{await onCreateWorkOrder(paymentRecord.publicId);setWorkOrderFeedback({ok:true,message:'Work order created from the existing verified booking. No new payment was added.'});}catch(error){setWorkOrderFeedback({ok:false,message:error instanceof Error?error.message:'Could not create the work order.'});}finally{setCreatingWorkOrder(false);}}}>{creatingWorkOrder?'Creating…':'Confirm scope & create work order'}</button>:<p>Record or verify the remaining {formatINR(bookingRemaining)} booking below to create this work order.</p>}
+                </div>
+              </section>}
+              <form className="owner-payment-record grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={async e=>{
+                e.preventDefault();if(recordingPayment||creatingWorkOrder)return;setRecordingPayment(true);setWorkOrderFeedback(null);
+                try{await onRecordVerifiedPayment(paymentQuote,verifiedAmount,verifiedReference.trim());setVerifiedReference('');setWorkOrderFeedback({ok:true,message:paymentRecord?.workOrder||verifiedAmount>=bookingRemaining?'Verified payment recorded. Open the agreed work order above.':'Verified payment recorded. Complete the remaining booking verification to create the work order.'});}
+                catch(error){setWorkOrderFeedback({ok:false,message:error instanceof Error?error.message:'Could not record payment. Your entries are preserved; try again.'});}finally{setRecordingPayment(false);}
+              }}>
+                <h3 className="sm:col-span-2">Record a bank-verified payment</h3>
+                <label className="owner-field">Quotation<select required aria-label="Quotation for work order or payment" value={paymentQuote} disabled={recordingPayment||creatingWorkOrder} onChange={e=>choosePaymentQuote(e.target.value)}><option value="">Choose a published quotation</option>{currentQuotes.filter(q=>q.status!=='Draft').map(q=><option key={q.publicId} value={q.publicId}>{q.draft.customer.name} · {q.draft.quote.number}{q.workOrder?' · Work order created':''}</option>)}</select></label>
+                <label className="owner-field">Bank-verified amount (₹)<input type="number" inputMode="numeric" aria-label="Bank-verified payment amount" min="1" step="1" required disabled={recordingPayment||creatingWorkOrder} value={verifiedAmount||''} onChange={e=>setVerifiedAmount(Number(e.target.value))}/></label>
+                <label className="owner-field">Bank transaction reference<input required aria-label="Bank transaction reference" maxLength={120} disabled={recordingPayment||creatingWorkOrder} value={verifiedReference} onChange={e=>setVerifiedReference(e.target.value)}/></label>
+                <button type="submit" className="owner-action-primary self-end" disabled={!paymentRecord||recordingPayment||creatingWorkOrder}>{recordingPayment?'Recording…':paymentRecord&&!paymentRecord.workOrder&&verifiedAmount>=bookingRemaining&&bookingRemaining>0?'Record booking & create work order':'Record verified payment'}</button>
+                <p className="text-xs sm:col-span-2">Record only money you have already checked in the bank. A shared screenshot alone does not verify a payment. The booking is credited toward the first 50% advance.</p>
+              </form>
+              {workOrderFeedback&&<p role={workOrderFeedback.ok?'status':'alert'} className={workOrderFeedback.ok?'owner-work-order-success':'owner-work-order-error'}>{workOrderFeedback.message}</p>}
             </div>
-
-            <form className="owner-payment-record grid grid-cols-1 sm:grid-cols-2 gap-4" onSubmit={async e => {
-              e.preventDefault(); setRecordingPayment(true); setPublishResult(null);
-              try { await onRecordVerifiedPayment(paymentQuote,verifiedAmount,verifiedReference.trim()); setVerifiedReference(''); setPublishResult({ok:true,message:'Verified payment recorded. The agreed work order is available on the customer’s existing link.'}); }
-              catch(error) { setPublishResult({ok:false,message:error instanceof Error ? error.message : 'Could not record payment.'}); }
-              finally { setRecordingPayment(false); }
-            }}>
-              <label className="owner-field">Quotation<select required value={paymentQuote} onChange={e => setPaymentQuote(e.target.value)}><option value="">Choose customer</option>{currentQuotes.map(q => <option key={q.publicId} value={q.publicId}>{q.draft.customer.name} · {q.draft.quote.number}</option>)}</select></label>
-              <label className="owner-field">Bank-verified amount (₹)<input type="number" min="1" step="1" required value={verifiedAmount} onChange={e => setVerifiedAmount(Number(e.target.value))}/></label>
-              <label className="owner-field">Bank transaction reference<input required maxLength={120} value={verifiedReference} onChange={e => setVerifiedReference(e.target.value)}/></label>
-              <button type="submit" className="owner-action-primary self-end" disabled={recordingPayment}>{recordingPayment ? 'Recording…' : 'Record verified payment'}</button>
-              <p className="text-xs sm:col-span-2">Confirm the customer’s saved package and optional items before recording the credit. This records a bank payment you have already checked.</p>
-            </form>
-            {publishResult?.ok && <p role="status" className="p-3 bg-[#E4EFE7] text-sm rounded-lg">{publishResult.message}</p>}
             <div className="overflow-x-auto border border-[#E5DFD3] rounded-xl">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>

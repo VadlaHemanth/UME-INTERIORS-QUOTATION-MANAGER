@@ -4,7 +4,7 @@ import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, getPackageDisp
 import { calculateMilestoneSchedule, calculateQuotationPricing, computeCustomerSelectionTotal, type PricedQuotationSnapshot } from '../src/lib/pricing';
 import { type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
 import { randomHex, type OwnerAccount } from './auth';
-import { carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
+import { agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
 import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
 
@@ -159,9 +159,9 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     quotesStore.set(record.publicId, record);
     return record;
   };
-  const finalize = (record: PublishedQuotationRecord) => {
+  const finalize = (record: PublishedQuotationRecord, confirmedAt=new Date().toISOString()) => {
     const calc = computeCustomerSelectionTotal(record.snapshot, { ...record.lastCustomerSelection, approvedDiscountRupees: record.approvedDiscountRupees });
-    record.workOrder = { confirmedAt: new Date().toISOString(), sourceRevision: record.revision, selection: structuredClone(record.lastCustomerSelection), totalRupees: calc.grandTotal };
+    record.workOrder ||= { confirmedAt, sourceRevision: record.revision, selection: structuredClone(record.lastCustomerSelection), totalRupees: calc.grandTotal };
     record.lastCustomerSelection.savedByCustomer = true;
     const advance = calculateMilestoneSchedule(calc.grandTotal, paid(record.publicId)).advance50PercentTotal;
     record.status = paid(record.publicId) >= advance ? 'Advance paid' : 'Booking paid';
@@ -767,6 +767,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (!record || record.status === 'Draft' || !Number.isSafeInteger(amount) || amount <= 0 || amount > 100000000 || !reference || reference.length > 120) {
       res.status(400).json({error:'Choose a quotation, enter the verified amount and bank reference.'}); return;
     }
+    if((req.body.expectedRevision!==undefined&&req.body.expectedRevision!==record.revision)||(req.body.expectedSelection&&agreedSelectionIdentity(req.body.expectedSelection)!==agreedSelectionIdentity(record.lastCustomerSelection))){res.status(409).json({error:'The quotation or customer selection changed. Review the latest scope before recording this payment.'});return;}
     if (paymentLedger.some(p => p.utrReference.toLowerCase() === reference.toLowerCase() && p.status !== 'Rejected')) {
       res.status(409).json({error:'This bank reference is already recorded.'}); return;
     }
@@ -776,6 +777,20 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (paid(record.publicId) >= Math.min(50000, calc.grandTotal * .5)) finalize(record);
     saveDbToDisk();
     res.status(201).json({entry, quote:record, ledger:paymentLedger, quotes:visibleRecords()});
+  });
+
+  // Explicit owner action for a booking already verified in the ledger. No payment is invented.
+  app.post('/api/studio/quotes/:publicId/work-order',(req,res)=>{
+    const record=latest(req.params.publicId);
+    if(!record||record.status==='Draft'){res.status(404).json({error:'Choose a published quotation before creating a work order.'});return;}
+    if(req.body.confirmAgreedScope!==true){res.status(400).json({error:'Review and confirm the agreed package and scope before creating the work order.'});return;}
+    if(record.workOrder){res.json({quote:record,quotes:visibleRecords()});return;}
+    if((req.body.expectedRevision!==undefined&&req.body.expectedRevision!==record.revision)||(req.body.expectedSelection&&agreedSelectionIdentity(req.body.expectedSelection)!==agreedSelectionIdentity(record.lastCustomerSelection))){res.status(409).json({error:'The quotation or customer selection changed. Review the latest scope before creating the work order.'});return;}
+    const calc=computeCustomerSelectionTotal(record.snapshot,{...record.lastCustomerSelection,approvedDiscountRupees:record.approvedDiscountRupees});
+    const required=calculateMilestoneSchedule(calc.grandTotal).bookingRequired;
+    const verified=paid(record.publicId);
+    if(verified<required){res.status(422).json({error:'Record or verify the remaining booking payment before creating this work order.',requiredBookingRupees:required,verifiedPaidRupees:verified});return;}
+    finalize(record);saveDbToDisk();res.status(201).json({quote:record,quotes:visibleRecords()});
   });
 
   // Publish or Revise a Validated v2 Draft directly from JSON (Creates cryptographic 128-bit publicId & immutable snapshot)
@@ -897,7 +912,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
         record.lastCustomerSelection = {...structuredClone(previous.lastCustomerSelection),...carryAgreedSelection(previous.draft,record.draft,previous.workOrder.selection)};
         if (confirmWorkOrderSelection === true) { record.lastCustomerSelection.wholeHomeSelection=structuredClone(defaultSentPkg);record.lastCustomerSelection.mixByRoom=false;record.lastCustomerSelection.roomSelections={}; }
         // Keep agreed room choices; newly added rooms use the agreed whole-home grade.
-        finalize(record);
+        finalize(record,previous.workOrder.confirmedAt);
       }
     }
 

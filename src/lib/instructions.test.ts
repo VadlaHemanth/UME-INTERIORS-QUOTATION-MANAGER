@@ -25,6 +25,10 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions,/Crockery Cabinet second, Vanity \/ Wash-Basin Cabinet third/);
   assert.match(instructions,/recompute suggested_addons\[\]\.room_index/);
   assert.match(instructions,/visible package comparison cards/);
+  assert.match(instructions,/WORK ORDER CREATION AND PDF/);
+  assert.match(instructions,/retain the original booking confirmation date/);
+  assert.match(instructions,/Confirm scope & create work order without adding another payment/);
+  assert.match(instructions,/work-order confirmation date, verified credits, remaining balance/);
   assert.match(instructions,/never swap or guess an unlabelled pair/);
   assert.match(instructions,/Preserve confirmed length, depth, diameter, piece counts/);
   assert.match(instructions,/do not interview rate by rate/);

@@ -18,6 +18,8 @@ Use compact room cards, reliable native checkboxes, 44px minimum practical tap t
 
 ## Payment states
 
+Work-order creation is visible on published quotation rows and in Payments & work orders. Show agreed scope, verified credits and the booking still to verify before the owner acts. An existing verified booking creates the document without adding money to the ledger. Keep payment explanations with their table and acceptance with terms in the PDF; use confirmed-scope wording throughout.
+
 A mobile Pay with UPI action opens the device's payment app with the current recipient and amount. The customer completes any transaction. The separate I have made the payment action shares the selected screenshot using the native file share sheet. No duplicate underlined text-only WhatsApp control. A cancelled share or unsuccessful save must not report completion. Owner bank verification is the source of payment confirmation.
 
 ## Motion and accessibility

@@ -724,7 +724,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     feedbackMessage,
   ]);
 
-  if (workOrder) return <WorkOrderView publicId={publicId} revision={revision} draft={draft} snapshot={snapshot} catalogue={catalogue} approvedDiscountRupees={approvedDiscountRupees} verifiedPaidRupees={verifiedPaidRupees} workOrder={workOrder}/>;
+  if (workOrder) return <WorkOrderView publicId={publicId} revision={revision} draft={draft} snapshot={snapshot} catalogue={catalogue} approvedDiscountRupees={approvedDiscountRupees} verifiedPaidRupees={verifiedPaidRupees} workOrder={workOrder} isPreview={isPreview} initialPrintPreview={initialPrintPreview}/>;
 
   return (
     <div className="customer-quotation min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16">

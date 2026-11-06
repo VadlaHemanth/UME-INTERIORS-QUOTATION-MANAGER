@@ -85,7 +85,7 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
     if (term.id === 9) { const wording = materialWording(catalogue); return {...term,clause:`${wording.internalLaminate} ${wording.externalLaminate}`}; }
     if (term.id === 10) return {...term,clause:`Materials follow the approved product list for the selected package. ${[...new Set(grades)].map(grade=>{const years=packageWarrantyYears(catalogue.grades[grade]);return `${labels[grade]} plywood: ${years ? `up to ${years} years manufacturer warranty` : 'warranty under the selected manufacturer’s terms; no fixed period is promised'}.`;}).join(' ')} Actual coverage follows the selected product, brand warranty certificate, invoice and manufacturer terms. Alternatives require written customer approval. This is not a blanket warranty on the entire furniture installation.`};
     if (workOrder && term.id === 8) return {...term,title:'Confirmed scope and recorded changes',clause:'This work order records the agreed package, measurements, quantities and specifications. Changes to the confirmed scope, materials, requirements or prices must be documented in an updated work order and approved by the customer before the affected work proceeds.'};
-    return workOrder ? {...term,clause:term.clause.replace(/a revised quotation/g, 'an updated work order')} : term;
+    return workOrder ? {...term,clause:term.clause.replace(/a revised quotation/g, 'an updated work order').replace(/quotation total/g,'work order total')} : term;
   });
 }
 

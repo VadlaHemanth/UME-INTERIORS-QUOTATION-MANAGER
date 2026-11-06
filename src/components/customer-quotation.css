@@ -297,6 +297,8 @@
 }
 .quotation-notes-list { list-style: disc; padding-left: 20px; display: grid; gap: 10px; font-size: 13px; line-height: 1.65; }
 .work-order-content { max-width:1120px; margin:0 auto; padding:24px; display:grid; gap:24px; }
+.work-order-brand { padding:12px 20px 0; font-size:12px; color:#4a524d; }
+.work-order-payment-actions { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .work-order-toolbar { padding:20px clamp(16px,3vw,40px); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; background:white; }
 .work-order-toolbar h1 { font-size:24px; font-weight:700; }
 .work-order-toolbar p { margin-top:5px; font-size:13px; }

@@ -22,6 +22,31 @@ function request(path: string, method = 'GET', body?: unknown, cookie?: string, 
 }
 function cookieFrom(response: Response): string { return response.headers.get('set-cookie')!.split(';')[0]; }
 
+test('explicit work-order creation uses existing verified booking without inventing or duplicating a payment',async()=>{
+  const state=paymentFixture();const quote=state.quotes[0];quote.lastCustomerSelection.mixByRoom=true;quote.lastCustomerSelection.roomSelections={4:{grade:'Normal',protection:'With PVC',finish:'SF',brand_preference:null}};quote.lastCustomerSelection.selectedOptionalPointers=['/rooms/4/items/2'];
+  state.ledger=[{id:'prior-booking',publicId:quote.publicId,quoteNumber:'TEST-API',customerName:'API Test Customer',revision:1,selectedPackageLabel:'Agreed room mix',amountRupees:50000,method:'NEFT / RTGS / IMPS',utrReference:'PRIOR-VERIFIED-BOOKING',status:'Verified Paid',submittedAt:'2026-11-01T07:00:00Z',verifiedAt:'2026-11-01T08:00:00Z'}];
+  const store=memoryStore(state);const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const route='/api/studio/quotes/ume-test-api/work-order';
+  assert.equal((await handleApi(request(route,'POST',{confirmAgreedScope:true}),store,environment)).status,401);
+  assert.equal((await handleApi(request(route,'POST',{},cookie),store,environment)).status,400);
+  const before=(await store.load()).state.ledger;
+  const changedSelection=structuredClone(quote.lastCustomerSelection);changedSelection.wholeHomeSelection.grade='Base';
+  assert.equal((await handleApi(request(route,'POST',{confirmAgreedScope:true,expectedRevision:1,expectedSelection:changedSelection},cookie),store,environment)).status,409);
+  assert.equal((await handleApi(request('/api/studio/quotes/ume-test-api/verified-payment','POST',{amountRupees:10000,reference:'STALE-SCOPE-NO-CREDIT',expectedRevision:1,expectedSelection:changedSelection},cookie),store,environment)).status,409);
+  assert.deepEqual((await store.load()).state.ledger,before);
+  const response=await handleApi(request(route,'POST',{confirmAgreedScope:true},cookie),store,environment);assert.equal(response.status,201);
+  const created=(await response.json() as any).quote.workOrder;assert.equal(created.selection.roomSelections[4].grade,'Normal');assert.deepEqual(created.selection.selectedOptionalPointers,['/rooms/4/items/2']);
+  assert.deepEqual((await store.load()).state.ledger,before);
+  const repeated=await handleApi(request(route,'POST',{confirmAgreedScope:true},cookie),store,environment);assert.equal(repeated.status,200);assert.deepEqual((await repeated.json() as any).quote.workOrder,created);
+  assert.deepEqual((await store.load()).state.ledger,before);
+});
+
+test('work-order creation blocks missing or unverified booking credit',async()=>{
+  const state=paymentFixture();state.ledger=[{id:'pending-booking',publicId:'ume-test-api',quoteNumber:'TEST-API',customerName:'API Test Customer',revision:1,selectedPackageLabel:'Premium',amountRupees:50000,method:'UPI / PhonePe',utrReference:'NOT-VERIFIED',status:'Payment submitted',submittedAt:'2026-11-01T07:00:00Z'}];
+  const store=memoryStore(state);const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const response=await handleApi(request('/api/studio/quotes/ume-test-api/work-order','POST',{confirmAgreedScope:true},cookie),store,environment);assert.equal(response.status,422);assert.equal((await response.json() as any).verifiedPaidRupees,0);assert.equal((await store.load()).state.quotes[0].workOrder,undefined);assert.equal((await store.load()).state.ledger.length,1);
+});
+
 test('publication blocks a new work type until its package rates are confirmed',async()=>{
   const store=memoryStore(paymentFixture());
   const cookie=cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
@@ -367,16 +392,21 @@ test('verified booking freezes the agreed selection into a work order and credit
   assert.equal(verified.status,201);
   const first=(await verified.json() as any).quote;
   assert.equal(first.workOrder.selection.wholeHomeSelection.grade,'Normal');
+  const confirmation=structuredClone(first.workOrder);
+  const further=await handleApi(request('/api/studio/quotes/ume-test-api/verified-payment','POST',{amountRupees:1000,reference:'BANK-VERIFIED-0002'},cookie),store,environment);
+  assert.equal(further.status,201);
+  assert.deepEqual((await further.json() as any).quote.workOrder,confirmation,'later payment credits retain original confirmation and agreed scope');
   assert.equal((await handleApi(request('/api/quotes/ume-test-api/selection','PATCH',{wholeHomeSelection:{...selected,grade:'Premium'}}),store,environment)).status,409);
   const draft=structuredClone(first.draft);draft.rooms[0].items[0].measure.per_item+=1;
   const revised=await handleApi(request('/api/studio/publish','POST',{draft,supersedePublicId:first.publicId,reviewedOwnerRequests:true},cookie),store,environment);
   assert.equal(revised.status,201);
   const next=(await revised.json() as any).record;
   assert.equal(next.workOrder.selection.wholeHomeSelection.grade,'Normal');
+  assert.equal(next.workOrder.confirmedAt,confirmation.confirmedAt,'revisions retain the original booking confirmation date');
   assert.equal(next.revision,2);
   const visible=await handleApi(request('/api/quotes/ume-test-api'),store,environment);
   const data=await visible.json() as any;
-  assert.equal(data.quote.publicId,next.publicId);assert.equal(data.verifiedPaidRupees,50000);assert.ok(data.quote.workOrder);
+  assert.equal(data.quote.publicId,next.publicId);assert.equal(data.verifiedPaidRupees,51000);assert.ok(data.quote.workOrder);
   assert.ok(data.quote.workOrder.totalRupees > first.workOrder.totalRupees);
   assert.equal((await handleApi(request('/api/studio/quotes/ume-test-api/verified-payment','POST',{amountRupees:50000,reference:'BANK-VERIFIED-0001'},cookie),store,environment)).status,409);
 });

@@ -7,7 +7,7 @@ import jsQR from 'jsqr';
 import { DeterministicQrCode } from '../components/BrandMark';
 import { DEFAULT_UME_CATALOGUE } from './catalogue';
 import { VIDYA_SAGAR_REDDY_DRAFT } from './historicalData';
-import { calculateQuotationPricing } from './pricing';
+import { calculateQuotationPricing,calculateMilestoneSchedule,computeCustomerSelectionTotal } from './pricing';
 
 function scanRenderedSvgQr(svg: string): string | undefined {
   const viewSize = Number(/viewBox="0 0 (\d+) \d+"/.exec(svg)?.[1]);
@@ -111,6 +111,17 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
     assert.doesNotMatch(preview,/aria-label="UPI booking"/);
     assert.doesNotMatch(preview,/aria-label="Online quotation"/);
     assert.match(preview,/Unpublished preview/);
+    const selection={grade:'Premium',protection:'Standard',finish:'High Gloss',brand_preference:null} as const;
+    const total=computeCustomerSelectionTotal(snapshot,{wholeHomeSelection:selection,mixByRoom:false,selectedOptionalPointers:[]}).grandTotal;
+    const advance=calculateMilestoneSchedule(total).advance50PercentTotal;
+    const work=(paid:number,preview=false)=>renderToStaticMarkup(<PrintableA4Sheet isWorkOrder isPreview={preview} workOrderConfirmedAt="2026-11-06T09:30:00Z" publicId="work-order-quote" revision={1} draft={draft} snapshot={snapshot} catalogue={catalogue} wholeHomeSelection={selection} mixByRoom={false} roomSelections={{}} selectedOptionalPointers={[]} approvedDiscountRupees={0} verifiedPaidRupees={paid}/>);
+    const workHtml=work(advance-5000);
+    const workSvg=/<svg\b[^>]*\baria-label="Next scheduled payment"[^>]*>[\s\S]*?<\/svg>/.exec(workHtml)?.[0];assert.ok(workSvg);
+    const workUrl=new URL(scanRenderedSvgQr(workSvg)!);assert.equal(workUrl.searchParams.get('am'),'5000');assert.equal(workUrl.searchParams.get('pa'),'edited.payments@bank');assert.equal(workUrl.searchParams.get('tn'),'Work order UME-TEST-EDITED-BANK');
+    assert.match(workHtml,/Agreed furniture scope/);assert.match(workHtml,/Confirmation date/);assert.match(workHtml,/2026-11-06/);assert.match(workHtml,/Verified payments/);assert.match(workHtml,/Online work order/);assert.doesNotMatch(workHtml,/quotation total|UPI booking|Online quotation/);
+    const overLimit=work(50000);const genericSvg=/<svg\b[^>]*\baria-label="UPI · enter amount"[^>]*>[\s\S]*?<\/svg>/.exec(overLimit)?.[0];assert.ok(genericSvg);assert.equal(new URL(scanRenderedSvgQr(genericSvg)!).searchParams.has('am'),false);
+    assert.doesNotMatch(work(total),/aria-label="Next scheduled payment"|aria-label="UPI · enter amount"/);
+    assert.doesNotMatch(work(advance-5000,true),/aria-label="Next scheduled payment"|aria-label="Online work order"/);
   } finally {
     stylesheetHook.deregister();
   }
