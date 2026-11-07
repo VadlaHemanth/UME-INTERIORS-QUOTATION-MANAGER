@@ -19,8 +19,7 @@ import {
   ResolvedPackageSelection,
 } from '../lib/schema';
 import { getQuotationBasisLabel, getQuotationEstimateNote } from '../lib/quotation-notes';
-import { documentTerms, materialLines, materialWording, packageWarrantyLabel, PLYWOOD_WARRANTY_CONDITIONS, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
-import { PackageWarrantyLabel } from './PackageWarrantyLabel';
+import { documentTerms, materialLines, materialWording, packageWarrantyLabel, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
 import { furnitureRelationshipLabel,quotationDisplayRooms, roomDisplayNumber } from '../lib/quotation-order';
 import { workOrderPaymentSummary } from '../lib/work-order-document';
 import { indiaDate } from '../lib/quote-workflow';
@@ -427,7 +426,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
   return (
     <A4Document reference={`${documentLabel} ${quoteRef}`}>
       {/* PAGE 1: LETTERHEAD, CLIENT DETAILS & SIDE-BY-SIDE 3-PACKAGE SUMMARY */}
-      <div className="pdf-flow-section" data-page-label={isWorkOrder?'Work order overview':'Quotation overview'}>
+      <div className="pdf-flow-section pdf-cover-section" data-page-label={isWorkOrder?'Work order overview':'Quotation overview'}>
         <header className="pdf-letterhead">
           <UmeLogoMark size="pdf" />
           <div className="pdf-company">
@@ -444,7 +443,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </header>
 
         {/* Non-Overflowing 4-Column Quotation Reference & Validity Metadata Bar */}
-        <div className="grid grid-cols-3 gap-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-3.5 text-xs">
+        <div className="pdf-cover-meta grid grid-cols-3 gap-3 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-3.5 text-xs">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#5C645F]">
               {documentLabel} No.
@@ -472,7 +471,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </div>
 
         {/* Client & Selected Package Overview Box */}
-        <div className="pdf-client-summary grid grid-cols-12 gap-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-5">
+        <div className="pdf-client-summary pdf-cover-client grid grid-cols-12 gap-4 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-5">
           <div className="col-span-7 space-y-1 pr-4 border-r border-[#E5DFD3] min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-[#1C3A2F]">
               Prepared for
@@ -524,24 +523,16 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
         </div>
 
-        {(estimateBasisLabel || estimateNote) && (
-          <section className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[11px] leading-relaxed print-avoid-break" aria-label="Quotation basis and notes">
-            <h2 className="font-bold text-[#18221D]">{estimateBasisLabel || 'Quotation note'}</h2>
-            {estimateNote && <p className="mt-1 text-[#4A524D] whitespace-pre-line break-words">{estimateNote}</p>}
-          </section>
-        )}
-
-        <p className="text-[11px] font-semibold">{materialWording(catalogue).materialsAndLabour}</p>
         {!isWorkOrder && <>
+
         {/* All 3 Packages Side-by-Side Executive Comparison Strip */}
-        <div className="space-y-2 print-avoid-break">
+        <div className="pdf-cover-prices space-y-2 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
             Package comparison · Included work before optional work and discount
           </p>
           <div className="grid grid-cols-3 gap-3">
             {ALL_GRADES.map((g) => {
               const dispName = getPackageDisplayName(g);
-              const gInfo = catalogue.grades[g];
               const stdTotal =
                 snapshot.baseWholeHomeTotals[makeComboKey(g, 'Standard', wholeHomeSelection.finish)] || 0;
               const pvcTotal =
@@ -575,13 +566,6 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       )}
                     </span>
                   </div>
-                  <PackageWarrantyLabel grade={gInfo}/>
-                  <p className="text-[10px] font-semibold text-[#1C3A2F] mt-0.5">
-                    {gInfo.termiteProofBadge}
-                  </p>
-                  <p className="text-[10px] text-[#5C645F] mt-0.5">
-                    Brands: {gInfo.approvedBrands.slice(0, 3).map((b) => b.name).join(', ')}
-                  </p>
                   <div className="mt-2 pt-2 border-t border-[#E5DFD3] space-y-1 font-mono tabular-nums">
                     <div className="flex items-center justify-between">
                       <span>Without PVC:</span>
@@ -596,9 +580,22 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               );
             })}
           </div>
-          <p className="text-[9.5px] leading-relaxed text-[#4A524D]">{PLYWOOD_WARRANTY_CONDITIONS}</p>
         </div>
 
+        </>}
+        <PlywoodSpecifications catalogue={catalogue} grades={documentGrades} selectedGrade={mixByRoom?null:wholeHomeSelection.grade} print/>
+      </div>
+
+      <div className="pdf-flow-section" data-page-label="Room summary and materials">
+        {(estimateBasisLabel || estimateNote) && (
+          <section className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[11px] leading-relaxed print-avoid-break" aria-label="Quotation basis and notes">
+            <h2 className="font-bold text-[#18221D]">{estimateBasisLabel || 'Quotation note'}</h2>
+            {estimateNote && <p className="mt-1 text-[#4A524D] whitespace-pre-line break-words">{estimateNote}</p>}
+          </section>
+        )}
+
+        <p className="text-[11px] font-semibold">{materialWording(catalogue).materialsAndLabour}</p>
+        {!isWorkOrder && <>
         {/* Room-by-Room Side-by-Side 3-Package Summary Table */}
         <div className="space-y-2 print-avoid-break">
           <p className="text-xs font-bold uppercase tracking-wider text-[#18221D]">
@@ -683,7 +680,6 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
         </div>
 
         </>}
-
         <div className="pdf-total-summary print-avoid-break">
           <span>Selected scope <strong>{formatINR(calc.baseScopeTotal)}</strong></span>
           {calc.optionalSelectedTotal > 0 && <span>Optional work <strong>+{formatINR(calc.optionalSelectedTotal)}</strong></span>}
@@ -691,8 +687,6 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           <span>{documentLabel} total <strong>{formatINR(calc.grandTotal)}</strong></span>
         </div>
 
-        {/* Material & Laminate Specifications */}
-        <PlywoodSpecifications catalogue={catalogue} grades={documentGrades} selectedGrade={mixByRoom?null:wholeHomeSelection.grade} print/>
         <div className="bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg p-4 text-[11px] space-y-1.5 print-avoid-break">
           <p className="font-bold uppercase tracking-wider text-[#1C3A2F] text-[10px]">
             Included materials, laminate and hardware

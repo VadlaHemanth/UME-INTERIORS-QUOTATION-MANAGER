@@ -19,8 +19,9 @@ test('plywood comparison exposes each saved product and warranty without an acco
     for(const grade of ['Base','Normal','Premium'] as const)for(const brand of catalogue.grades[grade].approvedBrands)assert.ok(html.includes(brand.name));
     assert.ok(html.includes('20 years'));assert.ok(html.includes('30 years'));assert.ok(html.includes('Warranty under manufacturer terms'));
     assert.equal((html.match(/class="plywood-package" data-selected="true"/g)||[]).length,1);
-    assert.ok(html.includes('<strong>Godrej</strong> · Berlin · Ebco · Nimmi'));
-    assert.ok(html.includes('<strong>Hettich</strong> · Sleek · Godrej · Berlin · Ebco · Nimmi'));
+    assert.ok(html.includes('<strong>Godrej</strong> · <strong>Berlin</strong> · <strong>Ebco</strong> · <strong>Nimmi</strong>'));
+    assert.ok(html.includes('<strong>Hettich</strong> · <strong>Sleek</strong> · <strong>Godrej</strong>'));
+    assert.match(html,/Hardware brands included/);assert.doesNotMatch(html,/preferred order|priority order/i);
     const print=renderToStaticMarkup(<PlywoodSpecifications catalogue={catalogue} grades={['Base','Normal','Premium']} print/>);
     assert.match(print,/plywood-print/);assert.doesNotMatch(print,/Swipe across/);
     for(const grade of ['Base','Normal','Premium'] as const)for(const brand of catalogue.grades[grade].approvedBrands)assert.ok(print.includes(brand.name));

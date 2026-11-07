@@ -1,4 +1,10 @@
-# Release verification — 6 November 2026
+# Release verification — 7 November 2026
+
+## PDF cover, white material comparison and item-specific rates
+
+The plywood/hardware comparison follows Package comparison on the PDF cover. Chromium-generated Basic, Standard and Premium PDFs each retained all 13 product options on page 1, one comparison in the document, one logo per page and no page-body overflow. The rendered cover was visually checked. Online widths of 320, 390 and 1440px showed white comparison surfaces, 26 bold plywood/hardware brand labels and no page-wide overflow. Hardware wording identifies brands included, soft-close wardrobe sliding fittings and hinges, and telescopic channels without promising soft-close channels. Basic's redundant laminate/hardware subtitle is removed.
+
+At 390px, an individual item's Standard unit rate was changed, saved with the reusable rate card, published and reset. Only the intended item changed; a different existing override remained intact through saving, publication and resetting. Item-only JSON uses sparse `custom_rates`; unchanged package rates and applicable PVC extras come from the saved work type. Automated coverage checks arithmetic, sibling isolation, invalid rates and assistant instructions. TypeScript, production build and all 105 automated tests pass. Mobile browser emulation was used; no physical Android hardware was available.
 
 ## Linked furniture, compact materials, hardware preferences and flexible dates
 

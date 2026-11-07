@@ -355,7 +355,6 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
   const previewDraft = useMemo(()=>{
     const draft=prepareQuotationDraft(workingDraft,editableCatalogue);
-    for (const room of draft.rooms) for (const item of room.items) if (item.work_type && JSON.stringify(editableCatalogue.workTypes[item.work_type]?.rates)!==JSON.stringify(catalogue.workTypes[item.work_type]?.rates)) item.custom_rates=null;
     draft.quote.notes=reviewedQuotationNotes(draft,reviewedOwnerRequests);
     draft.quote=completeQuoteDates(draft.quote,indiaDate());
     return draft;
@@ -549,7 +548,6 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     await onUpdateCatalogue(editableCatalogue);
     const publicationDraft = structuredClone(workingDraft);
     delete publicationDraft.rate_card_updates;
-    for (const room of publicationDraft.rooms) for (const item of room.items) if (item.work_type && JSON.stringify(editableCatalogue.workTypes[item.work_type]?.rates) !== JSON.stringify(catalogue.workTypes[item.work_type]?.rates)) item.custom_rates = null;
 
     const defaultPkg: ResolvedPackageSelection = {
       grade: workingDraft.recommended?.grade || 'Base',
@@ -615,10 +613,6 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     try {
       const next = structuredClone(workingDraft);
       delete next.rate_card_updates;
-      for (const room of next.rooms) for (const item of room.items) {
-        const definition = editableCatalogue.workTypes[item.work_type || ''];
-        if (definition && item.custom_rates) item.custom_rates = null;
-      }
       await onUpdateCatalogue(editableCatalogue);
       syncDraft(next);
       setRateFeedback({ok:true,message:'Rate card saved and applied to this draft. Publish an update to change an existing customer quotation.'});

@@ -6,7 +6,7 @@ import './rate-card-editor.css';
 
 const unitLabels = {sq_ft:'per sq.ft',running_ft:'per running ft',each:'each',lumpsum:'lump sum'};
 
-function RateAmount({ value, label, disabled, onChange }: {value:number;label:string;disabled:boolean;onChange:(value:number)=>void}) {
+export function RateAmount({ value, label, disabled, onChange }: {value:number;label:string;disabled:boolean;onChange:(value:number)=>void}) {
   const [text,setText]=useState(String(value));
   const focused=useRef(false);
   useEffect(()=>{if(!focused.current)setText(String(value));},[value]);

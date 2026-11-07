@@ -105,3 +105,5 @@ Each recommendation contains an existing zero-based `room_index`, a tailored `re
 New JSON must omit per-item `pvc`, `pvc.eligible` and `pvc.parts`; legacy copies are removed during normalization. Customer PVC package choices remain available. Explicit practice records require real-customer confirmation before publication; omitting `is_demo` from a legacy import does not itself make the job a demo.
 
 Account recovery and runtime secret changes are covered in the deployment guide. The user enters passwords directly in **Settings → Account** or the relevant private Cloudflare settings; no password is included in documentation.
+
+For a price exception on one furniture item, open **Rooms and furniture → Item rates**. Change the Basic, Standard or Premium rate per the displayed billing unit, then publish the quotation update. These item-only rates survive rate-card saves and revisions; **Reset item to saved rates** removes the exception. Assistant JSON uses sparse `item.custom_rates`, such as `{"Normal":1200}` for that item's Standard price, without changing the reusable rate card.

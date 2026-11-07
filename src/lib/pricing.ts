@@ -169,17 +169,17 @@ export function getUnitRateForItem(
   const effectiveProtection: ProtectionOption =
     protection === 'With PVC' && isPvcEligible ? 'With PVC' : 'Standard';
 
-  if (item.custom_rates && typeof item.custom_rates[grade] === 'number') {
-    const customBase = item.custom_rates[grade]!;
+  if (item.custom_rates && (typeof item.custom_rates[grade] === 'number' || typeof item.custom_rates.pvc_adder === 'number')) {
+    const customBase = item.custom_rates[grade] ?? workDef.rates[grade].Standard;
     const pvcAdder =
       effectiveProtection === 'With PVC'
         ? typeof item.custom_rates.pvc_adder === 'number'
           ? item.custom_rates.pvc_adder
-          : 75
+          : workDef.rates[grade]['With PVC'] - workDef.rates[grade].Standard
         : 0;
     const finishDelta =
       finish === 'High Gloss' && (item.measure?.unit || workDef.unit) === 'sq_ft'
-        ? catalogue.highGlossSheetUpgradeDelta
+        ? workDef.highGlossPremiumPerUnit + catalogue.highGlossSheetUpgradeDelta
         : 0;
     return customBase + pvcAdder + finishDelta;
   }

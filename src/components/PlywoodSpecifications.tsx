@@ -1,7 +1,7 @@
 import React from 'react';
 import { getPackageDisplayName,type StudioCatalogue } from '../lib/catalogue';
 import type { PlywoodGrade } from '../lib/schema';
-import { DEFAULT_HARDWARE_SCOPE,hardwareBrands,packageWarrantyLabel,PLYWOOD_WARRANTY_CONDITIONS } from '../lib/commercial-spec';
+import { customerHardwareScope,hardwareBrands,packageWarrantyLabel,PLYWOOD_WARRANTY_CONDITIONS } from '../lib/commercial-spec';
 import './plywood-comparison.css';
 
 export function plywoodProductDescription(spec:string):string {
@@ -23,9 +23,9 @@ export function PlywoodSpecifications({catalogue,grades,selectedGrade,print=fals
     <div className="plywood-comparison-scroll" tabIndex={print?-1:0} role="region" aria-label="Compare package materials">
       <table className="plywood-comparison-table"><thead><tr>{packages.map(grade=><th className="plywood-package" data-selected={selectedGrade===grade} key={grade} scope="col"><div><h3>{getPackageDisplayName(grade)}</h3>{selectedGrade===grade&&<span className="plywood-package-selected">Selected</span>}</div><p>{packageWarrantyLabel(catalogue.grades[grade])||'Warranty under manufacturer terms'}</p></th>)}</tr></thead>
       <tbody><tr>{packages.map(grade=><td data-selected={selectedGrade===grade} key={grade}><h4>Plywood options · brand warranty</h4><ul className="plywood-product-list">{catalogue.grades[grade].approvedBrands.map((brand,index)=><li className="plywood-option" key={index}><div><strong aria-label={brand.name}>{compactPlywoodProduct(brand).name}</strong><span className="plywood-option-warranty">{brand.warrantyYears>0?`${brand.warrantyYears} years`:'Manufacturer terms'}</span></div>{compactPlywoodProduct(brand).spec.toLowerCase().replace(/[^a-z0-9]/g,'')!==compactPlywoodProduct(brand).name.toLowerCase().replace(/[^a-z0-9]/g,'')&&<p>{compactPlywoodProduct(brand).spec||brand.spec}</p>}</li>)}</ul>{!catalogue.grades[grade].approvedBrands.length&&<p className="plywood-empty">Plywood specification to be confirmed by UME.</p>}</td>)}</tr>
-      <tr className="plywood-hardware-row">{packages.map(grade=>{const brands=hardwareBrands(catalogue,grade);return <td data-selected={selectedGrade===grade} key={grade}><h4>Hardware · preferred order</h4><p><strong>{brands[0]}</strong>{brands.length>1?` · ${brands.slice(1).join(' · ')}`:''}</p></td>;})}</tr></tbody></table>
+      <tr className="plywood-hardware-row">{packages.map(grade=><td data-selected={selectedGrade===grade} key={grade}><h4>Hardware brands included</h4><p>{hardwareBrands(catalogue,grade).map((brand,index)=><React.Fragment key={index}>{index>0?' · ':''}<strong>{brand}</strong></React.Fragment>)}</p></td>)}</tr></tbody></table>
     </div>
-    <p className="plywood-hardware-note">{catalogue.hardwareScope||DEFAULT_HARDWARE_SCOPE}</p>
+    <p className="plywood-hardware-note">{customerHardwareScope(catalogue)}</p>
     <p className="plywood-warranty-note">Brands are alternative options. {PLYWOOD_WARRANTY_CONDITIONS}</p>
   </section>;
 }
