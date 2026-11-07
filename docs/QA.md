@@ -1,5 +1,9 @@
 # Release verification — 7 November 2026
 
+## Shoe storage always last
+
+Entrance & Shoe Storage now follows every other room, including bathrooms and custom/unrecognised spaces. A fixture stored Shoe Storage first and Bathroom between other rooms; Studio, customer room comparisons/tabs at 390/1440px, quotation PDF, work-order screen/PDF and newly saved room-wise summaries all displayed Hall → Kitchen → Bathroom → Entrance & Shoe Storage. PDF numbering followed that order with no overflow. Original room indices and saved mixed-package choices were preserved. Regression coverage includes numbered shoe-storage names and footwear/shoes aliases. TypeScript, production build and all 105 tests pass; the generated assistant setup requires this category last in reviews and new JSON too.
+
 ## PDF cover, white material comparison and item-specific rates
 
 Follow-up: the automatic floor-plan notice now sits below the customer summary on PDF page 1, while the complete plywood/hardware comparison stays directly below Package comparison on that page. Basic, Standard, Premium and native-print PDFs retained the notice and all 13 plywood products on the cover with no overflow; a quotation with its floor-plan checkbox off omitted the notice. The rendered cover was visually checked. The online and PDF materials use cream headings/hardware rows and white product cells, with the selected header in pale forest green. Online checks at 320, 390 and 1440px showed no page-wide overflow.

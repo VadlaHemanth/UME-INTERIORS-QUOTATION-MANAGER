@@ -8,6 +8,7 @@ import { agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord,
 import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
 import { beginQuotationEdit,completeQuoteDates } from '../src/lib/quotation-dates';
+import { orderQuotationRooms } from '../src/lib/quotation-order';
 
 export interface PaymentLedgerEntry {
   id: string;
@@ -114,7 +115,7 @@ function buildSelectionSummaryLabel(
       wholeHome.brand_preference ? ` (${wholeHome.brand_preference})` : ''
     }`;
   }
-  const roomParts = snapshot.rooms.map((r) => {
+  const roomParts = orderQuotationRooms(snapshot.rooms).map((r) => {
     const sel = roomSelections[r.roomIndex] || wholeHome;
     return `${r.name}: ${getPackageDisplayName(sel.grade)}/${sel.protection === 'With PVC' ? '+PVC' : 'No-PVC'}/${sel.finish}`;
   });

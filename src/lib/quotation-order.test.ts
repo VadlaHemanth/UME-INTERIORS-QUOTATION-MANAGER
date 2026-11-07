@@ -5,11 +5,13 @@ import {calculateQuotationPricing,computeCustomerSelectionTotal} from './pricing
 import {VIDYA_SAGAR_REDDY_DRAFT} from './historicalData';
 
 test('walkthrough order starts Hall, Pooja and Kitchen without inventing rooms or changing equal-priority order',()=>{
-  const rooms=['Guest Bedroom','Kitchen','Master Bedroom','Children Bedroom','Pooja','Hall and Dining','Bedroom 2','Bedroom 1','Utility','Balcony','Other A','Other B'].map(name=>({name}));
+  const rooms=['Entrance & Shoe Storage','Guest Bedroom','Kitchen','Master Bedroom','Children Bedroom','Pooja','Hall and Dining','Bedroom 2','Bedroom 1','Utility','Balcony','Other A','Other B'].map(name=>({name}));
   const before=structuredClone(rooms);
-  assert.deepEqual(orderQuotationRooms(rooms).map(r=>r.name),['Hall and Dining','Pooja','Kitchen','Master Bedroom','Children Bedroom','Guest Bedroom','Bedroom 2','Bedroom 1','Utility','Balcony','Other A','Other B']);
+  assert.deepEqual(orderQuotationRooms(rooms).map(r=>r.name),['Hall and Dining','Pooja','Kitchen','Master Bedroom','Children Bedroom','Guest Bedroom','Bedroom 2','Bedroom 1','Utility','Balcony','Other A','Other B','Entrance & Shoe Storage']);
   assert.deepEqual(rooms,before);
   assert.deepEqual(orderQuotationRooms([{name:'Kitchen'}]),[{name:'Kitchen'}]);
+  assert.deepEqual(orderQuotationRooms([{name:'07. Entrance & Shoe Storage'},{name:'Bathroom'},{name:'Hall'}]).map(r=>r.name),['Hall','Bathroom','07. Entrance & Shoe Storage']);
+  assert.deepEqual(orderQuotationRooms([{name:'Footwear Storage'},{name:'Other'},{name:'Shoes Storage'}]).map(r=>r.name),['Other','Footwear Storage','Shoes Storage']);
   assert.equal(roomDisplayNumber(0),'01');assert.equal(roomDisplayNumber(10),'11');
 });
 

@@ -8,7 +8,8 @@ const words=(value:string|null|undefined)=>(value||'').toLowerCase().replace(/pa
 
 export function roomWalkthroughPriority(name:string|null):number {
   const text=words(name);
-  if(/\bshoe\b|\bfootwear\b/.test(text))return 95;
+  // Shoe storage follows even custom/unrecognised rooms (priority 100).
+  if(/\bshoes?\b|\bfootwear\b/.test(text))return 1000;
   if(/\bhall\b|\bliving\b|\blounge\b|\bfoyer\b|\bentrance\b/.test(text))return 0;
   if(/\bdining\b/.test(text))return 1;
   if(/\bpooja\b|\bpuja\b|\bprayer\b|\bmandir\b/.test(text))return 10;
