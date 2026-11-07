@@ -2,7 +2,7 @@
 
 ## PDF filenames and personalized link previews
 
-At 390px, Download PDF → Print / Save A4 PDF used **Customer Name - Quotation Number** as the print title, and the generated PDF metadata retained it. Confirmed work orders added **- Work Order**. Page bodies retained their measured fit. Standard and long-name 1200×630 PNG cards were visually checked in the forest/cream UME identity.
+At 390px, Download PDF → Print / Save A4 PDF used the customer name and quotation number as the print title, and the generated PDF metadata retained it. The naming format now starts with the document type: **Quotation - Customer Name - Quote Number** or **Work Order - Customer Name - Quote Number**. Page bodies retained their measured fit. Standard and long-name 1200×630 PNG cards were visually checked in the forest/cream UME identity.
 
 Raw crawler-style HTML included the customer, quotation number, absolute PNG URL, descriptions and OG/Twitter image dimensions without requiring JavaScript. No customer phone, site address, private note, bank information or financial fields entered the metadata model. Tests cover HTML/SVG escaping (including replacement-string tokens), latest-revision resolution, deleted/draft/demo/unknown links, read-only crawler access, HEAD/ETag behaviour, PNG signatures/dimensions and bounded rendering reuse. Live Cloudflare HTML and PNG requests returned 200, image dimensions were 1200×630 and conditional image requests returned 304. All 111 automated tests, TypeScript and the production build pass. Direct delivery through a physical phone's WhatsApp client was not tested; third-party preview caches remain outside the app's control.
 
