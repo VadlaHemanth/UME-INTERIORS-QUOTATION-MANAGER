@@ -44,10 +44,12 @@ test('item rate validation rejects invalid or unsupported values but accepts spa
 
 test('customer hardware wording removes ranking and soft-close channel promises from saved wording',()=>{
   const catalogue=structuredClone(DEFAULT_UME_CATALOGUE);
-  catalogue.hardwareScope='Bedroom wardrobe sliding-door fittings, soft-close hinges/mechanisms and soft-close telescopic channels. Brands are in preferred order. Handles use their separate allowance.';
+  catalogue.hardwareScope='Bedroom wardrobe sliding-door fittings, tandem systems, soft-close hinges/mechanisms and soft-close telescopic channels. Brands are in preferred order. Handles use their separate allowance.';
   const scope=customerHardwareScope(catalogue);
   assert.match(scope,/Soft-close bedroom wardrobe sliding-door fittings/);
+  assert.match(scope,/soft-close tandem systems/);
   assert.match(scope,/soft-close hinges and telescopic channels/);
   assert.doesNotMatch(scope,/preferred order|soft-close telescopic|hinges\/mechanisms/);
   assert.equal(customerHardwareScope({...catalogue,hardwareScope:DEFAULT_HARDWARE_SCOPE}),DEFAULT_HARDWARE_SCOPE);
+  assert.equal(customerHardwareScope({...catalogue,hardwareScope:'Soft-closing tandem drawer systems and telescopic channels.'}),'soft-close tandem drawer systems and telescopic channels.');
 });
