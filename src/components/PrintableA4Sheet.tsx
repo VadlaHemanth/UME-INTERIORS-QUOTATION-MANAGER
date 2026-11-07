@@ -523,6 +523,13 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
           </div>
         </div>
 
+        {(estimateBasisLabel || estimateNote) && (
+          <section className="pdf-cover-basis print-avoid-break" aria-label="Quotation basis and notes">
+            <h2>{estimateBasisLabel || 'Quotation note'}</h2>
+            {estimateNote && <p>{estimateNote}</p>}
+          </section>
+        )}
+
         {!isWorkOrder && <>
 
         {/* All 3 Packages Side-by-Side Executive Comparison Strip */}
@@ -587,13 +594,6 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
       </div>
 
       <div className="pdf-flow-section" data-page-label="Room summary and materials">
-        {(estimateBasisLabel || estimateNote) && (
-          <section className="p-3.5 bg-[#FAF8F4] border border-[#E5DFD3] rounded-lg text-[11px] leading-relaxed print-avoid-break" aria-label="Quotation basis and notes">
-            <h2 className="font-bold text-[#18221D]">{estimateBasisLabel || 'Quotation note'}</h2>
-            {estimateNote && <p className="mt-1 text-[#4A524D] whitespace-pre-line break-words">{estimateNote}</p>}
-          </section>
-        )}
-
         <p className="text-[11px] font-semibold">{materialWording(catalogue).materialsAndLabour}</p>
         {!isWorkOrder && <>
         {/* Room-by-Room Side-by-Side 3-Package Summary Table */}
