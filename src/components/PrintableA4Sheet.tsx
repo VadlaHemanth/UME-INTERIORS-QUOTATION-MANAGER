@@ -25,6 +25,7 @@ import { workOrderPaymentSummary } from '../lib/work-order-document';
 import { indiaDate } from '../lib/quote-workflow';
 import { formatQuotationDate } from '../lib/quotation-dates';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
+import { quotationFileName } from '../lib/document-filename';
 import {selectedRoomItems,selectedRoomPackageAmount} from '../lib/pricing';
 import {
   DeterministicQrCode,
@@ -54,7 +55,7 @@ function PreviewQrSpace({label}:{label:string}) {
 }
 
 /** The preview and native PDF share these exact measured A4 page nodes. */
-function A4Document({ children, reference }: { children: React.ReactNode; reference: string }) {
+function A4Document({ children, reference, documentTitle }: { children: React.ReactNode; reference: string; documentTitle:string }) {
   const sourceRef = useRef<HTMLDivElement>(null);
   const pagesRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -344,7 +345,7 @@ function A4Document({ children, reference }: { children: React.ReactNode; refere
   }, [children, reference]);
 
   return (
-    <div ref={viewportRef} className="quote-document" data-document-title={reference} role="document" aria-label="A4 document preview">
+    <div ref={viewportRef} className="quote-document" data-document-title={documentTitle} role="document" aria-label="A4 document preview">
       <div ref={sourceRef} className="pdf-source-layout" aria-hidden="true" inert>{children}</div>
       <div ref={pagesRef} className="pdf-pages" />
     </div>
@@ -424,7 +425,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
     stage3Cumulative + milestones.laminateCompletion10Percent;
 
   return (
-    <A4Document reference={`${documentLabel} ${quoteRef}`}>
+    <A4Document reference={`${documentLabel} ${quoteRef}`} documentTitle={quotationFileName(draft.customer.name,draft.quote.number,isWorkOrder)}>
       {/* PAGE 1: LETTERHEAD, CLIENT DETAILS & SIDE-BY-SIDE 3-PACKAGE SUMMARY */}
       <div className="pdf-flow-section pdf-cover-section" data-page-label={isWorkOrder?'Work order overview':'Quotation overview'}>
         <header className="pdf-letterhead">

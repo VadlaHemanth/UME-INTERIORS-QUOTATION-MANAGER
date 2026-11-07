@@ -48,6 +48,7 @@ import {
 } from '../lib/schema';
 import { DeterministicQrCode } from './BrandMark';
 import { printQuotation } from '../lib/print-quotation';
+import { quotationFileName } from '../lib/document-filename';
 import { PrintableA4Sheet } from './PrintableA4Sheet';
 import './customer-quotation.css';
 import { documentTerms, materialLines, materialWording, quotationCustomerNotes, scopeNotes } from '../lib/commercial-spec';
@@ -173,9 +174,9 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const displayRooms=useMemo(()=>quotationDisplayRooms(snapshot.rooms),[snapshot.rooms]);
   useEffect(() => {
     const previousTitle = document.title;
-    document.title = `${workOrder ? 'Work order' : 'Quotation'} - ${draft.quote.number || 'Unpublished preview'}`;
+    document.title = quotationFileName(draft.customer.name,draft.quote.number,Boolean(workOrder));
     return () => { document.title = previousTitle; };
-  }, [draft.quote.number, Boolean(workOrder)]);
+  }, [draft.customer.name,draft.quote.number,Boolean(workOrder)]);
   const resolvedStartingSelection = useMemo((): ResolvedPackageSelection => {
     if (initialSelection.savedByCustomer) {
       return initialSelection.wholeHomeSelection;

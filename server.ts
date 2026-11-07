@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import { handleApi, type StateStore } from './backend/api';
 import { emptyState, type StudioState } from './backend/routes';
+import {handleQuoteShareRequest} from './backend/quote-social';
+import {createSocialImageRenderer} from './backend/social-image';
 
 dotenv.config();
 // Optional isolated data path supports local previews without touching real records.
@@ -32,6 +34,8 @@ const store: StateStore = {
 
 async function startServer() {
   const app = express();
+  const vite=process.env.NODE_ENV!=='production'?await createViteServer({server:{middlewareMode:true},appType:'spa'}):null;
+  const renderSocialImage=createSocialImageRenderer(async()=>fs.promises.readFile(path.resolve('node_modules/@resvg/resvg-wasm/index_bg.wasm')),async assetPath=>new Uint8Array(await fs.promises.readFile(path.resolve('public',assetPath.slice(1)))));
   app.disable('x-powered-by');
   app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -65,8 +69,19 @@ async function startServer() {
     if (error?.type === 'entity.too.large') { res.status(413).json({ error: 'Request exceeds the 1 MB limit.' }); return; }
     next(error);
   });
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
+  app.use(async(req,res,next)=>{
+    if(!req.path.startsWith('/q/')){next();return;}
+    try{
+      const request=new Request(`${req.protocol}://${req.get('host')}${req.originalUrl}`,{method:req.method,headers:typeof req.headers['if-none-match']==='string'?{'If-None-Match':req.headers['if-none-match']}:undefined});
+      const response=await handleQuoteShareRequest(request,{store,html:async()=>{
+        const template=await fs.promises.readFile(path.resolve(vite?'index.html':'dist/index.html'),'utf8');
+        return vite?vite.transformIndexHtml(req.originalUrl,template):template;
+      },image:renderSocialImage});
+      if(!response){next();return;}
+      res.status(response.status);response.headers.forEach((value,name)=>res.setHeader(name,value));res.send(Buffer.from(await response.arrayBuffer()));
+    }catch(error){console.error('Quotation preview failed:',error instanceof Error?error.message:'Unknown error');res.status(503).send('Quotation temporarily unavailable. Please try again.');}
+  });
+  if (vite) {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));

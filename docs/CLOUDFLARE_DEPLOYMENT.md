@@ -2,6 +2,8 @@
 
 This app includes a Cloudflare Worker, static frontend and D1 storage. The commands explicitly select this app’s config so a parent folder’s Wrangler project cannot be selected accidentally. Deploy the Worker project in this repository. Uploading only `dist/` to Pages would leave login, saving and publishing without an API.
 
+Keep `/q/*` in `assets.run_worker_first`: quotation links need server-rendered social metadata and their PNG preview route. Wrangler bundles the `@resvg/resvg-wasm` WebAssembly module automatically; `npm run build` copies the UME logo and licensed Plus Jakarta Sans font into the assets. No extra image-service keys, new secrets or database migrations are needed for link previews.
+
 ## Current deployment
 
 Live app: https://quotation.umeinteriors.workers.dev

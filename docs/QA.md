@@ -1,5 +1,11 @@
 # Release verification — 7 November 2026
 
+## PDF filenames and personalized link previews
+
+At 390px, Download PDF → Print / Save A4 PDF used **Customer Name - Quotation Number** as the print title, and the generated PDF metadata retained it. Confirmed work orders added **- Work Order**. Page bodies retained their measured fit. Standard and long-name 1200×630 PNG cards were visually checked in the forest/cream UME identity.
+
+Raw crawler-style HTML included the customer, quotation number, absolute PNG URL, descriptions and OG/Twitter image dimensions without requiring JavaScript. No customer phone, site address, private note, bank information or financial fields entered the metadata model. Tests cover HTML/SVG escaping (including replacement-string tokens), latest-revision resolution, deleted/draft/demo/unknown links, read-only crawler access, HEAD/ETag behaviour, PNG signatures/dimensions and bounded rendering reuse. Live Cloudflare HTML and PNG requests returned 200, image dimensions were 1200×630 and conditional image requests returned 304. All 111 automated tests, TypeScript and the production build pass. Direct delivery through a physical phone's WhatsApp client was not tested; third-party preview caches remain outside the app's control.
+
 ## Shoe storage always last
 
 Entrance & Shoe Storage now follows every other room, including bathrooms and custom/unrecognised spaces. A fixture stored Shoe Storage first and Bathroom between other rooms; Studio, customer room comparisons/tabs at 390/1440px, quotation PDF, work-order screen/PDF and newly saved room-wise summaries all displayed Hall → Kitchen → Bathroom → Entrance & Shoe Storage. PDF numbering followed that order with no overflow. Original room indices and saved mixed-package choices were preserved. Regression coverage includes numbered shoe-storage names and footwear/shoes aliases. TypeScript, production build and all 105 tests pass; the generated assistant setup requires this category last in reviews and new JSON too.
