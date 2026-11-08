@@ -32,6 +32,9 @@ Confirmed glass, locks, shelves, mechanisms, locations, dimensions, grades and n
 - A shoe rack is distinct from a closed shoe cabinet. TV unit can describe a composition rather than just a low console.
 - Pooja cabinet shutters are distinct from room-entrance doors. CNC-only, glass-only and CNC-plus-glass scopes stay separate.
 - Box loft storage, loft front closures and fixed high-level panels stay separate. Parent links retain confirmed loft/unit associations.
+- Parent links group work; they do not imply Above for every child. Panelling under a loft is Below it, a loft is Above its own main unit, and internal components are Inside their cabinet.
+- A broad rate category is not a furniture name. Explicit Pooja entrance/cabinet CNC or glass facts determine the title; the rate key's slash does not confirm both materials.
+- TV Unit with Wall Panelling identifies an owner-confirmed combined scope. A wall-sized console measurement prompts one scope/orientation check; it never justifies automatic resizing, splitting or a new charge.
 - Combined wardrobe/dressing, loft/wardrobe or TV scopes are not automatically split, remeasured or repriced.
 
 Historical records and prices are not rewritten by this vocabulary update. New/revised scope is prepared through the shared contract; customer and PDF displays use the same formatter. The catalogue v12 upgrade changes only recognized stock definitions and duplicate saved corrections, preserving all saved rates and custom definitions.

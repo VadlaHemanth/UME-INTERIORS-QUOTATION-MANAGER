@@ -5,6 +5,7 @@ import { canonicalFurnitureName } from './furniture';
 type NamedRoom={name:string|null};
 type NamedFurniture={name:string|null;workType?:string|null;work_type?:string|null;itemIndex?:number;parentItemIndex?:number|null;parent_item_index?:number|null;sourceTextEn?:string;source_text_en?:string};
 const words=(value:string|null|undefined)=>(value||'').toLowerCase().replace(/paneling/g,'panelling').replace(/[^a-z0-9]+/g,' ').trim();
+const isTvAssembly=(name:string|null|undefined)=>/^tv (?:unit|console cabinet) with\b/.test(words(name));
 
 export function roomWalkthroughPriority(name:string|null):number {
   const text=words(name);
@@ -26,7 +27,7 @@ export function roomWalkthroughPriority(name:string|null):number {
 export function furnitureWalkthroughPriority(item:NamedFurniture,roomName:string|null):number {
   const name=words(canonicalFurnitureName(item.name||'',item.workType||item.work_type||'',roomName||'')),work=words(item.workType||item.work_type),room=words(roomName);
   if(/hall|living|lounge|dining|foyer|entrance/.test(room)) {
-    if(/\btv\b|television|media/.test(name)&&!/panelling|backdrop/.test(name))return 0;
+    if(/\btv\b|television|media/.test(name)&&(!/panelling|backdrop/.test(name)||isTvAssembly(name)))return 0;
     if(/crockery/.test(name))return 10;
     if(/vanity|wash basin|washbasin/.test(name))return 20;
     if(/\btv\b|television|media/.test(name)&&/panelling|backdrop/.test(name))return 30;
@@ -75,7 +76,7 @@ export function orderQuotationFurniture<T extends NamedFurniture>(items:readonly
   for(const entry of entries){
     const explicit=entry.item.parentItemIndex??entry.item.parent_item_index;
     if(explicit!=null&&explicit!==entry.id&&byId.has(explicit)){parents.set(entry.id,explicit);continue;}
-    const related=/panelling|backdrop|locker/i.test(entry.item.name||'');
+    const related=/panelling|backdrop|locker/i.test(entry.item.name||'')&&!isTvAssembly(entry.item.name);
     if(!isLoft(entry.item)&&!related)continue;
     const text=words(`${entry.item.name} ${entry.item.sourceTextEn||entry.item.source_text_en||''}`);
     const location=/dressing|vanity/.test(text)?/dressing|vanity/:/crockery/.test(text)?/crockery/:/wardrobe|cupboard/.test(text)?/wardrobe|cupboard/:/\btv\b|media/.test(text)?/\btv\b|media/:/breakfast/.test(text)?/breakfast/:null;
@@ -97,7 +98,10 @@ export function furnitureRelationshipLabel(item:NamedFurniture,items:readonly Na
   if(index==null)return null;
   const parent=items.find((candidate,i)=>(candidate.itemIndex??i)===index);
   if(!parent||parent===item)return null;
-  return `${/loft|low roof/i.test(`${item.name} ${item.workType||item.work_type||''}`)?'Above':'Grouped with'} ${parent.name}`;
+  const name=words(item.name),source=words(item.sourceTextEn||item.source_text_en),parentName=words(parent.name);
+  const panelling=/panelling|backdrop|panel\b/.test(name);
+  const direction=panelling&&/\bunder\b|\bbelow\b/.test(name+' '+source)&&/loft/.test(parentName)?'Below':panelling?'Grouped with':/loft|low roof/i.test(`${item.name} ${item.workType||item.work_type||''}`)?'Above':/locker|internal.*drawer/.test(name)?'Inside':'Grouped with';
+  return `${direction} ${canonicalFurnitureName(parent.name||'',parent.workType||parent.work_type||'','',parent.sourceTextEn||parent.source_text_en||'')}`;
 }
 export const roomDisplayNumber=(index:number)=>String(index+1).padStart(2,'0');
 export function quotationDisplayRooms(rooms:PricedQuotationSnapshot['rooms'],agreedOptionalPointers?:readonly string[]):PricedQuotationSnapshot['rooms'] {

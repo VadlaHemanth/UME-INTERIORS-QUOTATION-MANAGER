@@ -40,6 +40,7 @@ export const FURNITURE_VOCABULARY = [
   ['Shoe Storage Cabinet','shoe cabinet, foyer shoe cabinet'],
   ['Shoe Rack','open shoe rack, shoe rack'],
   ['TV Console Cabinet','TV console, TV base cabinet, media console cabinet'],
+  ['TV Unit with Wall Panelling','combined TV cabinet and wall panelling, complete TV unit with wall panel'],
   ['TV Wall Cabinet','upper TV cabinet'],
   ['TV Wall Panelling','TV backing panel, TV back panel, TV wall paneling'],
   ['TV Console Cabinet with Louvers','TV console cabinet with louvres'],
@@ -92,6 +93,15 @@ export function furnitureConstructionConflict(name:string,source:string,workType
 export function canonicalFurnitureName(raw:string,workType='',room='',source=''):string {
   const name=raw.trim().replace(/\s+/g,' '),n=key(name),wt=key(workType),context=key(source),inKitchen=/kitchen/.test(key(room));
   if(!name)return name;
+  // A rate-category label is not a product title. Resolve only from explicit item facts.
+  if(n===key('Pooja CNC / glass door paneling')){
+    const entrance=/\bentrance\b/.test(context),cabinet=/\bcabinet\b/.test(context),cnc=/\bcnc\b/.test(context),glass=/\bglass\b/.test(context);
+    if(entrance&&cnc&&!glass)return 'Pooja Entrance CNC Doors';
+    if(entrance&&glass&&!cnc)return 'Pooja Entrance Glass Doors';
+    if(cabinet&&cnc&&!glass)return 'Pooja Cabinet CNC Shutters';
+    if(cabinet&&glass&&!cnc)return 'Pooja Cabinet Glass Shutters';
+    return name;
+  }
   // Preserve the scope of explicitly combined furniture and its existing billing basis.
   if(/wardrobe/.test(n)&&/dressing/.test(n)&&/\band\b/.test(n))return 'Wardrobe and Dressing Unit';
   if(/wardrobe/.test(n)&&/loft/.test(n)&&/\band\b/.test(n))return 'Wardrobe and Loft Unit';
@@ -176,19 +186,25 @@ export function standardFurnitureSpecification(name:string,workType:string):stri
 /** Lock generic wording, preserve every meaningful exception and confirmed component. */
 export function formatFurnitureSpecification(raw:string,name:string,workType:string,room=''):string {
   const title=canonicalFurnitureName(name,workType,room,raw),standard=standardFurnitureSpecification(title,workType);
-  const cleaned=raw.trim().replace(/\bbox[- ]type\b/gi,'Box-type').replace(/\bframe[- ]type\b/gi,'Frame-and-shutter').replace(/draws\b/gi,'drawers').replace(/\s+/g,' ');
+  const supplied=raw.trim().replace(/\bbox[- ]type\b/gi,'Box-type').replace(/\bframe[- ]type\b/gi,'Frame-and-shutter').replace(/draws\b/gi,'drawers').replace(/\s+/g,' ');
+  const cleaned=supplied.replace(/^(?:Box[- ]type|Frame[- ]and[- ]shutter) construction\.\s*/i,'');
   const text=cleaned.replace(/[. ]+$/,'');
-  if(furnitureConstructionConflict(name,raw,workType))return text?text+'.':'See the agreed item specification.';
+  if(furnitureConstructionConflict(name,raw,workType))return supplied?supplied.replace(/[. ]+$/,'')+'.':'See the agreed item specification.';
   // Only vocabulary/finish words may be replaced. Numbers, locations, special
   // materials, shelves, locks, glass, models and operation details are retained.
-  const common=new Set('a an the for of box type frame and shutter shutters construction cabinet carcass with inside outside internal external laminate laminated finish finished high glossy gloss sf matte modular unit storage furniture wardrobe cupboard study dressing table kitchen base lower under counter overhead wall upper tall utility full height pantry breakfast crockery display wash area laundry shoe tv console pooja mandir book bookshelf locker compartment loft on both faces'.split(' '));
-  const hardware=new Set('a an the of for with and or soft close kitchen drawer drawers system systems tandem type ss stainless steel pull out basket baskets runner runners specified fittings fitting hardware channels telescopic installation unit units one two three four five six seven eight nine ten'.split(' '));
+  const common=new Set('a an the for of box type frame and shutter shutters construction cabinet carcass with inside outside internal external laminate laminated finish finished high glossy gloss sf matte modular unit storage furniture wardrobe cupboard study dressing table kitchen base lower under counter overhead wall upper tall utility full height pantry breakfast crockery display wash area laundry shoe tv console media pooja mandir book bookshelf locker compartment loft on both faces'.split(' '));
+  if(title==='Kitchen Overhead Wall Cabinet')common.add('mounted'); // Already explicit in this title.
+  if(title==='Loft Frame and Shutters'||title==='Low-Roof Frame and Shutters')for(const word of ['framing','enclosure'])common.add(word);
+  const hardware=new Set('a an the of for with and or soft close modular kitchen drawer drawers system systems tandem type ss stainless steel pull out basket baskets runner runners specified fittings fitting hardware channels telescopic installation unit units one two three four five six seven eight nine ten'.split(' '));
   if(title==='SS 304 Pull-Out Basket'){hardware.add('304');hardware.add('grade');hardware.add('ss304');}
   const plain=key(text).split(' ').filter(Boolean),generic=plain.length>0&&plain.every(word=>(furnitureConstruction(workType)?common:hardware).has(word));
   if(standard&&generic)return standard;
   if(!text)return standard||'See the agreed item specification.';
   const construction=furnitureConstruction(workType);
-  if(construction&&!/^(?:Box-type|Frame-and-shutter|Frame and shutters|Loft frame and shutters)/i.test(text))return `${construction==='box'?'Box-type':'Frame-and-shutter'} construction. ${text}.`;
+  if(construction&&!/\b(?:Box-type|Frame-and-shutter|frame(?:work)? and shutters|frame and shutter)\b/i.test(text)){
+    if(construction==='box'&&/^(?:wall[- ]mounted |floor[- ]standing |under[- ]counter )?(?:cabinet|wardrobe|dressing|study|utility|kitchen|tv|crockery|shoe|pooja|storage)\b/i.test(text))return `Box-type ${text[0].toLowerCase()+text.slice(1)}.`;
+    return `${construction==='box'?'Box-type':'Frame-and-shutter'} unit: ${text}.`;
+  }
   return text+'.';
 }
 
@@ -251,6 +267,7 @@ OMISSION-CHECK EXAMPLES
 export function buildFurnitureContractInstructions():string {
   return `APPROVED NAMING AND SPECIFICATION CONTRACT
 Use this one dictionary in every quotation. Repeat exactly the same canonical name and base sentence for the same confirmed product/construction; change wording only when the actual scope changes. Cabinet type must explicitly appear in source_text_en, not only in the rate key. No new construction JSON field is needed.
+Never copy a broad work_type category such as Pooja CNC / glass door paneling as the furniture name. Name the confirmed product instead: entrance CNC doors, entrance glass doors or cabinet shutters. A slash in a rate category does not confirm that both materials are supplied. Preserve explicitly confirmed double shutters, glass thickness or CNC work; ask once when the actual product is unclear.
 ${FURNITURE_VOCABULARY.map(([name,aliases])=>`- ${name}: ${aliases}.${nouns[name]?` Exact template function: "${nouns[name]}".`:''}`).join('\n')}
 
 FIXED CONSTRUCTION-FIRST WORDING
@@ -267,6 +284,8 @@ These laminate sentences describe the approved standard scope. Preserve actual a
 SS means stainless steel. Owner usage "tandem basket" maps to Soft-Close Kitchen Drawer System; it is distinct from an SS pull-out basket and does not promise Blum, TANDEMBOX, a particular model, steel grade, load rating or metal-side construction. Confirmed branded products keep their actual brand/model in the specification. Only say SS 304 if grade 304 was confirmed. Telescopic channels are not automatically soft-close. If the owner expressly offers tandem or SS as alternatives, use Kitchen Drawer Systems / Stainless-Steel Baskets and retain the alternative in the specification; six total is not six of each. Do not invent the split of an approved mixture.
 
 SAFE ALIASES AND SCOPE
+Do not add the standalone prefixes "Box-type construction." or "Frame-and-shutter construction." before an otherwise complete sentence. Use the exact base sentence below or integrate the confirmed type naturally with bespoke details. Retain wall-mounted/wall-anchored facts when they distinguish the actual unit. A TV Console Cabinet is the cabinet scope; a complete cabinet plus wall-panel assembly uses TV Unit with Wall Panelling, only after the owner confirms that combined scope. A conspicuously wall-sized console measurement is a reason to ask once about scope/orientation, not a reason to silently rename, resize, split or reprice it. Never convert decimal feet to feet-and-inches.
+parent_item_index groups related work; it does not mean every child is ABOVE its parent. A loft can be above its main cabinet; Wall Panelling Under Loft is BELOW its linked loft; an internal component is inside its cabinet. Do not write a contradictory relationship into the specification or create a separate charged panel merely to fix a label.
 Pull-out does not mean stainless-steel basket. Opposite-side does not mean tall/full-height. Mini crockery does not prove overhead/display. A locker nickname does not prove a supplied lock. Shoe Rack stays distinct from a closed cabinet. TV unit may be a composition; do not silently reduce it to a console. Pooja cabinet shutters are not room-entrance doors, and CNC/glass alternatives are not automatically supplied together. Keep box lofts, front closures and fixed panels distinct. Preserve material, face-finish, dimensions, location and components. Never auto-split a combined wardrobe/dressing, loft/wardrobe or TV item or reallocate its measured frontage, PVC basis or price without approval. Name/rate construction conflicts need one consolidated owner clarification. Do not rename machine work_type keys or change rates to correct English.
 
 OWNER KITCHEN DEFAULT AND SIZE_TEXT

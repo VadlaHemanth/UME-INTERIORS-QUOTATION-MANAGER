@@ -104,7 +104,7 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
 
   assert.equal(
     formatCleanItemDescription('Cabinet with confirmed 24 inch depth and 1.0 mm outside laminate.', 'Wardrobe', 'Box type', 'Bedroom'),
-    'Box-type construction. Cabinet with confirmed 24 inch depth and 1.0 mm outside laminate.'
+    'Box-type cabinet with confirmed 24 inch depth and 1.0 mm outside laminate.'
   );
   assert.equal(
     standardizeCompetitorItemName('Tandem or SS baskets', 'Tandem or SS baskets', 'Kitchen'),

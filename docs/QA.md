@@ -1,5 +1,11 @@
 # Release verification — 8 November 2026
 
+## Published-quotation wording and relationship correction
+
+A supplied published quotation was checked against its draft, immutable price snapshot and package totals. Confirmed display issues included an under-loft panel labelled Above its loft, ordinary description variants receiving a redundant construction prefix, and a broad Pooja rate category being used as a furniture title. Corrections preserve wall-mounted/anchored facts, specified door components and conflicting construction evidence. An owner-confirmed complete TV cabinet/panel assembly retains its combined billing and main-unit walkthrough priority.
+
+The isolated corrected quote passed 320/390/1440px layout checks. PDF preview and native print each produced eight pages with identical text, one logo per page, no measured overflow, the floor-plan notice and all thirteen plywood products on page 1. A furniture page was rendered and inspected. Correction preparation checks preserve every measure, count, rate, optional/parent identity, all twelve package totals, customer/date metadata and selection, with a recorded revision and stale-write protection. External AI execution and physical Android sharing were not tested. All 119 automated tests and TypeScript pass.
+
 ## Common-scope template and omission review
 
 The generated assistant setup includes a room-specific usual-scope proposal, a combined missing-facts review, explicit exclusions, limited-scope/revision handling and reusable scope corrections. Instruction review covers unchanged usual scope with missing geometry, five rather than six kitchen fittings, no-loft exclusions, kitchen-only jobs, combined furniture coverage and declined recommendations. No template candidates are inserted into app records or prices by this change. The supported JSON schema is unchanged; accepted work and unresolved agreed facts use the existing item and clarification fields.

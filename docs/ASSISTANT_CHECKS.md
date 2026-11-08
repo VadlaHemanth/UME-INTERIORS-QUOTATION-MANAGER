@@ -4,6 +4,10 @@ These checks exercise supported JSON, pricing, validation, presentation and gene
 
 | Scenario | Expected behaviour | Verification |
 |---|---|---|
+| Wall panelling is linked to the loft above it | Label it Below the loft, while an actual loft is Above its cabinet | Relationship-label regression and rendered quote/PDF checks |
+| A generic rate category is pasted as the Pooja item title | Use the explicitly specified entrance/cabinet CNC/glass product; do not infer glass from a slash | Source-aware title regression |
+| A console name has a wall-sized measurement | Ask about combined TV scope and orientation; preserve the confirmed combined billing | Assistant instructions and owner-confirmed correction checks |
+| Generic description synonyms trigger repeated construction prefixes | Normalize ordinary variants, keep mounting/custom components and preserve conflicting evidence for validation | Description/idempotency/conflict regressions |
 | New home brief omits usual room elements | Show one relevant scope checklist and ask whether to keep/change it; exclude unaccepted candidates from JSON/totals | Generated instruction review |
 | Owner says same but dimensions/construction are missing | Preserve the accepted displayed scope and saved rates, then collect all missing agreed facts together | Explicit interview/output rules |
 | Owner excludes lofts, specifies five baskets or requests kitchen-only work | Respect the exclusion/count/limited scope without repeating or broadening it | Omission-check examples and instruction cross-check |

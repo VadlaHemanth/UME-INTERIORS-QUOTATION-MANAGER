@@ -41,11 +41,28 @@ test('like-for-like cabinet facts use fixed construction-first wording across al
   assert.equal(standardFurnitureSpecification('Wardrobe Frame and Shutters','Frame type'),'Frame-and-shutter construction for the wardrobe, with inside and outside laminate finish.');
   const source='Cabinet with confirmed 24 inch depth, 6 mm tinted glass and two lockable drawers, finished in acrylic.';
   const result=formatCleanItemDescription(source,'Wardrobe Cabinet','Box type','Bedroom');
-  assert.ok(result.startsWith('Box-type construction.'));assert.ok(result.includes(source));assert.doesNotMatch(result,/inside and outside laminate/);
+  assert.ok(result.startsWith('Box-type cabinet'));assert.ok(result.includes(source.slice(1)));assert.doesNotMatch(result,/inside and outside laminate/);
   assert.equal(formatCleanItemDescription(result,'Wardrobe Cabinet','Box type','Bedroom'),result);
   assert.equal(formatCleanItemDescription('Six tandem baskets with hardware fitting.','tandem basket','Tandem or SS baskets','Kitchen'),'Soft-close kitchen drawer system (tandem type), with the specified runners and fittings.');
   assert.equal(formatCleanItemDescription('SS baskets with hardware fitting.','SS basket','Tandem or SS baskets','Kitchen'),'Stainless-steel pull-out basket with the specified fittings.');
   assert.match(formatCleanItemDescription('SS304 wire basket with 450 mm runners.','SS basket','Tandem or SS baskets','Kitchen'),/wire basket with 450 mm runners/);
+});
+
+test('revised quotation descriptions remove redundant type prefixes while preserving mounting and specified door scope',()=>{
+  const rows=[
+    ['TV Console Cabinet','Box type','Box-type construction. TV media console cabinet with inside and outside laminate finish.','Box-type construction for TV console storage, with inside and outside laminate finish.'],
+    ['Kitchen Overhead Wall Cabinet','Box type','Box-type construction. Overhead wall-mounted kitchen cabinet with inside and outside laminate finish.','Box-type construction for kitchen overhead storage, with inside and outside laminate finish.'],
+    ['Loft Frame and Shutters','Loft - frame and shutter','Frame-and-shutter construction. Overhead kitchen loft framing and shutter enclosure with inside and outside laminate finish.','Loft frame and shutters with inside and outside laminate finish.'],
+    ['Soft-Close Kitchen Drawer System','Tandem or SS baskets','Modular kitchen soft-close tandem drawer systems with channels and fittings.','Soft-close kitchen drawer system (tandem type), with the specified runners and fittings.'],
+    ['Wash Area Utility Cabinet','Box type','Box-type construction. Wall-mounted utility storage cabinet with inside and outside laminate finish.','Box-type wall-mounted utility storage cabinet with inside and outside laminate finish.'],
+    ['Wardrobe Frame and Shutters','Frame type','Frame-and-shutter construction. Wall-anchored wardrobe framework and shutters with inside and outside laminate finish.','Wall-anchored wardrobe framework and shutters with inside and outside laminate finish.'],
+  ];
+  for(const [name,type,source,expected] of rows){const result=formatCleanItemDescription(source,name,type,'Kitchen');assert.equal(result,expected);assert.equal(formatCleanItemDescription(result,name,type,'Kitchen'),result);}
+  const source='Pooja entrance door framing and double shutters incorporating CNC jali cut-outs and laminate finish.';
+  assert.equal(canonicalFurnitureName('Pooja CNC / Glass Door Paneling','Pooja CNC / glass door paneling','Pooja',source),'Pooja Entrance CNC Doors');
+  assert.equal(formatCleanItemDescription(source,'Pooja Entrance CNC Doors','Pooja CNC / glass door paneling','Pooja'),source);
+  assert.equal(canonicalFurnitureName('Pooja CNC / Glass Door Paneling','Pooja CNC / glass door paneling','Pooja','Design to be confirmed.'),'Pooja CNC / Glass Door Paneling');
+  assert.equal(canonicalFurnitureName('TV Unit with Wall Panelling','Box type','Hall'),'TV Unit with Wall Panelling');
 });
 
 test('changing construction updates standard sentences but preserves bespoke specifications for owner review',()=>{
@@ -66,6 +83,7 @@ test('construction conflicts block publication while combined approved scope and
   assert.equal(furnitureConstructionConflict('Wardrobe Frame and Shutters','Box-type wardrobe.','Frame type'),true);
   assert.equal(furnitureConstructionConflict('Wardrobe and Dressing Unit','Box-type wardrobe and frame-type dressing unit.','Box type'),false);
   assert.equal(furnitureConstructionConflict('Custom furniture','Box-type and frame-type fabrication.','Owner composite work'),false);
+  assert.equal(formatCleanItemDescription('Box-type construction. Cabinet with inside and outside laminate finish.','Kitchen Base Cabinet','Frame type','Kitchen'),'Box-type construction. Cabinet with inside and outside laminate finish.','conflicting construction evidence must remain visible to the publish gate');
   item.name='Wardrobe and Dressing Unit';item.source_text_en='Combined wardrobe and dressing table with acrylic doors and a mirror.';item.custom_rates={Base:900,Normal:1200,Premium:1500};
   const before=calculateQuotationPricing(draft);const after=prepareQuotationDraft(draft,DEFAULT_UME_CATALOGUE);
   assert.equal(after.rooms[0].items.length,draft.rooms[0].items.length);assert.match(after.rooms[0].items[0].source_text_en,/acrylic doors and a mirror/);assert.deepEqual(calculateQuotationPricing(after).baseWholeHomeTotals,before.baseWholeHomeTotals);assert.deepEqual(after.rooms[0].items[0].custom_rates,item.custom_rates);
