@@ -1,6 +1,6 @@
 import { FinishOption, PlywoodGrade, ProtectionOption } from './schema';
 import { canonicalFurnitureName } from './furniture';
-import {buildCommonScopeInstructions,buildFurnitureContractInstructions,formatFurnitureSpecification,OWNER_FRAME_TYPE_DEFINITION,KITCHEN_FITTINGS_DEFINITION,KITCHEN_DEFAULT_LESSON,COUNT_ITEM_LESSON,normalizedAssistantLessons} from './furniture-contract';
+import {buildCommonScopeInstructions,buildFurnitureContractInstructions,formatFurnitureSpecification,OWNER_FRAME_TYPE_DEFINITION,KITCHEN_FITTINGS_DEFINITION,KITCHEN_DEFAULT_LESSON,COUNT_ITEM_LESSON,normalizedAssistantLessons,simplifyFurnitureLanguage} from './furniture-contract';
 import { packageRates } from './rate-card';
 import { DEFAULT_HARDWARE_SCOPE,customerHardwareScope,hardwareBrands,documentTerms, materialLines, packageAllowances, packageWarrantyLabel, scopeNotes, type MaterialWording, type PackageAllowances } from './commercial-spec';
 
@@ -1266,11 +1266,11 @@ export function buildDynamicGemInstructions(catalogue: StudioCatalogue = DEFAULT
       { path: '/customer/site', question: 'What is the full site address?' },
       { path: '/customer/phone', question: 'What is the customer’s mobile number?' },
     ],
-    suggested_addons: [{room_index: 0, reason: 'A fold-away desk could add a compact work surface alongside the wardrobe. Confirm that the household needs a desk and has a clear wall before adding it.', item: {
+    suggested_addons: [{room_index: 0, reason: 'Provides a place to study; confirm it is needed and there is wall space.', item: {
       name: 'Wall-Mounted Folding Table', work_type: 'Folding table', size_text: null,
       measure: {unit: 'sq_ft', per_item: null}, quantity: null,
       optional: true,
-      source_text_en: 'Fold-away wall desk with laminate finish and folding brackets; final specification to be confirmed.',
+      source_text_en: 'Wall-mounted folding table with laminate finish and folding brackets; confirm the dimensions.',
     }}],
   };
   return `You are Quotation Studio, the private quotation and rate-card assistant for ${catalogue.company.brandName} (${catalogue.company.legalName}; Proprietor ${catalogue.company.proprietor}).
@@ -1403,7 +1403,7 @@ This is the only complete rate reference. For the conversational review, show on
 ${reviewRateTable}
 
 WORK TYPE MEANINGS — exact keys, no additional rates
-${Object.entries(catalogue.workTypes).map(([key,work])=>`- ${key}: ${work.label}. ${work.plainEnglishDefinition}`).join('\n')}
+${Object.entries(catalogue.workTypes).map(([key,work])=>`- ${key}: ${work.label}. ${simplifyFurnitureLanguage(work.plainEnglishDefinition)}`).join('\n')}
 
 APPROVED BRAND POOLS
 ${brandLines}

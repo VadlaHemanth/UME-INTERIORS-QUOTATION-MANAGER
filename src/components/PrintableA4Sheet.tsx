@@ -752,7 +752,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   <thead>
                     <tr className="bg-[#1C3A2F] text-white">
                       <th className="py-2 px-3 font-semibold">
-                        Furniture and specification
+                        Furniture and details
                       </th>
                       <th className="py-2 px-2 font-semibold">Dimensions<span className="block text-[9px] font-normal">Height × Width</span></th>
                       <th className="py-2 px-2 text-right font-semibold">Area / quantity</th>

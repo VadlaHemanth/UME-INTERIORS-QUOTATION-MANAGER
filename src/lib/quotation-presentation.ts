@@ -2,6 +2,7 @@ import { formatCleanItemDescription, standardizeCompetitorItemName, type StudioC
 import { applyStandardPvcScopes } from './pvc-scope';
 import type { QuotationDraftV2 } from './schema';
 import { normalizeFurnitureLayout } from './furniture-layout';
+import {simplifyFurnitureLanguage} from './furniture-contract';
 
 /** Preview and publication use the same customer-facing vocabulary and scope. */
 export function prepareQuotationDraft(draft: QuotationDraftV2, catalogue: StudioCatalogue): QuotationDraftV2 {
@@ -29,6 +30,15 @@ export function prepareQuotationDraft(draft: QuotationDraftV2, catalogue: Studio
       if(item.measure.per_item==null)item.measure.per_item=1;
     }
     if (item.source_text_en) item.source_text_en=formatCleanItemDescription(item.source_text_en,item.name,item.work_type || '',room.name || '');
+  }
+  if(Array.isArray(next.suggested_addons))for(const suggestion of next.suggested_addons){
+    if(!suggestion||typeof suggestion!=='object'||!suggestion.item||typeof suggestion.item!=='object')continue;
+    const item=suggestion.item,room=next.rooms[suggestion.room_index]?.name||'';
+    if(typeof item.name==='string'&&typeof item.work_type==='string'&&typeof item.source_text_en==='string'){
+      item.name=standardizeCompetitorItemName(item.name,item.work_type,room,item.source_text_en);
+      item.source_text_en=formatCleanItemDescription(item.source_text_en,item.name,item.work_type,room);
+    }
+    if(typeof suggestion.reason==='string')suggestion.reason=simplifyFurnitureLanguage(suggestion.reason);
   }
   return next;
 }

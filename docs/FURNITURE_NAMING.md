@@ -15,6 +15,8 @@ Approved 8 November 2026. The app and generated assistant setup share [the same 
 
 Generic, otherwise identical cabinet facts use the same simple sentence every time. Use TV Unit for the complete arrangement; reserve TV Console Cabinet for an explicitly cabinet-only scope. Media is not a required qualifier. A kitchen base/wall or crockery unit can be either box or frame construction; its functional title alone must not select its rate. Examples:
 
+Plain English applies to the whole quotation: every furniture description, proposed addition, recommendation reason, room review and job-specific note. Use Study table with storage when the storage type is not stated, or Study table with drawers when drawers are actually supplied. Avoid repeated names such as study table workstation, sales claims and long noun stacks. Keep confirmed counts, locks, materials, measurements, mechanisms, brands and Box/Frame scope. App-owned payment/material/warranty/terms content must not be duplicated or weakened in AI notes.
+
 | Product | Confirmed rate type | Specification |
 |---|---|---|
 | TV Unit | Box type | Box-type TV unit with inside and outside laminate finish, and decorative louvers or charcoal panelling, as selected. |

@@ -55,7 +55,7 @@ test('revised quotation descriptions remove redundant type prefixes while preser
     ['Loft Frame and Shutters','Loft - frame and shutter','Frame-and-shutter construction. Overhead kitchen loft framing and shutter enclosure with inside and outside laminate finish.','Loft frame and shutters with inside and outside laminate finish.'],
     ['Soft-Close Kitchen Drawer System','Tandem or SS baskets','Modular kitchen soft-close tandem drawer systems with channels and fittings.','Soft-close kitchen drawer system (tandem type), with the specified runners and fittings.'],
     ['Wash Area Utility Cabinet','Box type','Box-type construction. Wall-mounted utility storage cabinet with inside and outside laminate finish.','Box-type wall-mounted utility storage cabinet with inside and outside laminate finish.'],
-    ['Wardrobe Frame and Shutters','Frame type','Frame-and-shutter construction. Wall-anchored wardrobe framework and shutters with inside and outside laminate finish.','Wall-anchored wardrobe framework and shutters with inside and outside laminate finish.'],
+    ['Wardrobe Frame and Shutters','Frame type','Frame-and-shutter construction. Wall-anchored wardrobe framework and shutters with inside and outside laminate finish.','Wall-anchored wardrobe frame and shutters with inside and outside laminate finish.'],
   ];
   for(const [name,type,source,expected] of rows){const result=formatCleanItemDescription(source,name,type,'Kitchen');assert.equal(result,expected);assert.equal(formatCleanItemDescription(result,name,type,'Kitchen'),result);}
   const source='Pooja entrance door framing and double shutters incorporating CNC jali cut-outs and laminate finish.';
@@ -72,6 +72,21 @@ test('changing construction updates standard sentences but preserves bespoke spe
   assert.equal(retypeFurnitureSpecification(loft,'Loft Frame and Shutters','Loft - frame and shutter','Box type','Bedroom'),standardFurnitureSpecification('Loft Storage Cabinet','Box type'));
   const custom='Box-type wardrobe with 6 mm glass doors.';
   assert.equal(retypeFurnitureSpecification(custom,'Wardrobe Cabinet','Box type','Frame type','Bedroom'),custom);
+});
+
+test('plain wording covers confirmed room work and unaccepted suggestions without losing storage details or changing prices',()=>{
+  const rows=[
+    ['Study Table','Study table workstation with storage and inside and outside laminate finish.','Box-type study table with storage and inside and outside laminate finish.'],
+    ['Study Table','Study table workstation with drawer storage and inside and outside laminate finish.','Box-type study table with drawers and inside and outside laminate finish.'],
+    ['Breakfast Counter Cabinet','Breakfast counter console with inside and outside laminate finish.','Box-type breakfast counter cabinet with inside and outside laminate finish.'],
+    ['Dressing Table','Dressing table with storage and inside and outside laminate finish.','Box-type dressing table with storage and inside and outside laminate finish.'],
+  ];
+  for(const [name,source,expected]of rows){const result=formatCleanItemDescription(source,name,'Box type','Hall');assert.equal(result,expected);assert.equal(formatCleanItemDescription(result,name,'Box type','Hall'),result);}
+  const detailed='Study table workstation with 2 lockable drawers, 18 inch cabinet depth and 6 mm glass, using Owner Premium Series hinges.';
+  const detailedResult=formatCleanItemDescription(detailed,'Study Table','Box type','Bedroom');assert.match(detailedResult,/2 lockable drawers/);assert.match(detailedResult,/18 inch cabinet depth/);assert.match(detailedResult,/6 mm glass/);assert.match(detailedResult,/Owner Premium Series hinges/);assert.doesNotMatch(detailedResult,/workstation/);
+  const d=structuredClone(VIDYA_SAGAR_REDDY_DRAFT);d.suggested_addons=[{room_index:0,reason:'A study table workstation with storage could hold books; confirm it is needed.',item:{name:'study table workstation',work_type:'Box type',size_text:null,measure:{unit:'sq_ft',per_item:null},quantity:null,optional:true,source_text_en:'Study table workstation with drawer storage and inside and outside laminate finish.'}}];
+  const before=structuredClone(d),after=prepareQuotationDraft(d,DEFAULT_UME_CATALOGUE);assert.deepEqual(d,before);assert.deepEqual(calculateQuotationPricing(after).baseWholeHomeTotals,calculateQuotationPricing(before).baseWholeHomeTotals);assert.equal(after.suggested_addons![0].item.name,'Study Table');assert.match(after.suggested_addons![0].item.source_text_en,/study table with drawers/);assert.equal(after.suggested_addons![0].item.quantity,null);assert.equal(after.suggested_addons![0].item.measure.per_item,null);assert.doesNotMatch(after.suggested_addons![0].reason,/workstation/);assert.deepEqual(prepareQuotationDraft(after,DEFAULT_UME_CATALOGUE),after);
+  const setup=buildDynamicGemInstructions(DEFAULT_UME_CATALOGUE);assert.match(setup,/PLAIN ENGLISH FOR THE WHOLE QUOTATION/);assert.match(setup,/Study table with storage/);assert.match(setup,/Study table with drawers/);assert.match(setup,/Package named Premium|package named Premium/);assert.match(setup,/Pooja entrance doors/);assert.match(setup,/Wash area cabinet/);assert.match(setup,/Shoe storage/);
 });
 
 test('plain TV-unit wording preserves the included decorative choice and keeps console-only scope distinct',()=>{

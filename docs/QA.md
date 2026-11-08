@@ -1,5 +1,13 @@
 # Release verification — 8 November 2026
 
+## Plain language across all quotation content
+
+The assistant now has a whole-quotation plain-English guide covering every room group and furniture family, proposed extras, reasons, owner questions and job-specific notes. It retains confirmed storage/drawer distinctions, counts, locks, dimensions, materials, brands, construction and pricing. Premium package/product names are explicitly exempt from the no-hype rule. Standard app-owned payment/material/warranty/terms content must not be duplicated or weakened in JSON.
+
+Guarded wording clean-up removes redundant study-table/workstation phrases, says drawers rather than drawer storage, preserves generic storage when stated, and uses cabinet depth/body instead of carcass. Proposed additions receive the same preparation while retaining null unknowns and optional status; language changes do not add work or change prices. Simple furniture headings and the cabinet-body payment-stage wording are shared by online/PDF views. Term-clause clean-up only substitutes the same guarded phrases, retaining the saved obligations and amounts.
+
+All 121 automated tests, TypeScript and the production build pass. An isolated synthetic quotation containing the study-table example passed 320/390/1440px checks without page-wide overflow or console errors. The eight-page PDF retained one logo per page, no measured overflow and the simplified wording; a furniture page was rendered and inspected. Studio and its download contained exactly the same whole-quotation guide and current isolated catalogue. No external Gemini/Custom GPT execution is claimed.
+
 ## Plain furniture descriptions and included TV treatment
 
 Ordinary descriptions now use direct wording such as Box-type wardrobe and Frame and shutters for the kitchen base cabinet. TV Unit identifies a complete arrangement; TV Console Cabinet remains a distinct explicitly cabinet-only scope. The owner confirmed that louvers or charcoal panelling is included in new complete TV units. The assistant setup states that alternative in the TV item, excludes a second paid recommendation for the same work, retains a selected single finish or exclusion, and does not infer a panel material, brand or thickness. Existing recorded scopes are not expanded by description clean-up.

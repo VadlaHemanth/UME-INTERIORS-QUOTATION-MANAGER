@@ -1336,10 +1336,10 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-[#18221D]">
-                      Furniture & specifications
+                      Furniture details
                     </h2>
                     <p className="text-[13px] text-[#5C645F] mt-0.5">
-                      Furniture specifications, dimensions, billable area, and side-by-side package prices.
+                      Furniture details, dimensions, area and package prices.
                     </p>
                   </div>
 
@@ -1454,7 +1454,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                             <thead>
                               <tr className="bg-[#EFECE3] text-[#18221D] border-b border-[#E5DFD3] text-[11px]">
                                 <th className="py-3 px-4 font-bold w-[40%] min-w-[240px]">
-                                  Furniture Item & Specification
+                                  Furniture and details
                                 </th>
                                 <th className="py-3 px-2.5 font-bold whitespace-nowrap">
                                   Dimensions
@@ -1959,7 +1959,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                             Step 3 · 35% Plywood Structure Completion
                           </p>
                           <p className="text-[11px] text-[#4A524D] mt-0.5">
-                            Due after all plywood carcasses, frames & lofts are completed at site
+                            Due after all plywood cabinet bodies, frames and lofts are completed at site
                           </p>
                         </td>
                         <td className="py-3 px-2.5 text-right font-sans font-bold tabular-nums whitespace-nowrap">

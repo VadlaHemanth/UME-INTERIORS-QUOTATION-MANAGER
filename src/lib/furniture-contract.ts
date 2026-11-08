@@ -186,10 +186,26 @@ export function standardFurnitureSpecification(name:string,workType:string):stri
   return construction==='box'?`Box-type ${noun} with inside and outside laminate finish.`:`Frame and shutters for the ${noun}, with inside and outside laminate finish.`;
 }
 
+/** Remove familiar redundant phrases without discarding confirmed components. */
+export function simplifyFurnitureLanguage(raw:string):string {
+  const phrases:[RegExp,string][]=[
+    [/\bstudy\s+table\s+work\s*station\b/gi,'study table'],[/\bstudy\s+work\s*station\b/gi,'study table'],
+    [/\bTV\s+media\s+console\s+cabinet\b/gi,'TV console cabinet'],
+    [/\bbreakfast\s+counter\s+console(?:\s+cabinet)?\b/gi,'breakfast counter cabinet'],
+    [/\bwith\s+(?:drawer\s+storage|storage\s+drawers)\b/gi,'with drawers'],
+    [/\bwardrobe\s+framework\b/gi,'wardrobe frame'],[/\bcarcass\s+depth\b/gi,'cabinet depth'],
+    [/\bcarcass\s+cabinet\b/gi,'cabinet'],[/\bcarcasses\b/gi,'cabinet bodies'],[/\bcarcass\b/gi,'cabinet body'],
+    [/\boutside\s+decorative\s+laminate\s+finish\b/gi,'outside laminate finish'],
+  ];
+  let text=raw;
+  for(const [pattern,replacement] of phrases)text=text.replace(pattern,match=>match[0]===match[0].toUpperCase()?replacement[0].toUpperCase()+replacement.slice(1):replacement);
+  return text.replace(/\s+/g,' ').trim();
+}
+
 /** Lock generic wording, preserve every meaningful exception and confirmed component. */
 export function formatFurnitureSpecification(raw:string,name:string,workType:string,room=''):string {
   const title=canonicalFurnitureName(name,workType,room,raw),standard=standardFurnitureSpecification(title,workType);
-  const supplied=raw.trim().replace(/\bbox[- ]type\b/gi,'Box-type').replace(/\bframe[- ]type\b/gi,'Frame-and-shutter').replace(/draws\b/gi,'drawers').replace(/\s+/g,' ');
+  const supplied=simplifyFurnitureLanguage(raw).replace(/\bbox[- ]type\b/gi,'Box-type').replace(/\bframe[- ]type\b/gi,'Frame-and-shutter').replace(/draws\b/gi,'drawers');
   const cleaned=supplied.replace(/^(?:Box[- ]type|Frame[- ]and[- ]shutter) construction\.\s*/i,'');
   const text=cleaned.replace(/[. ]+$/,'');
   if(furnitureConstructionConflict(name,raw,workType))return supplied?supplied.replace(/[. ]+$/,'')+'.':'See the agreed item specification.';
@@ -201,6 +217,7 @@ export function formatFurnitureSpecification(raw:string,name:string,workType:str
   const hardware=new Set('a an the of for with and or soft close modular kitchen drawer drawers system systems tandem type ss stainless steel pull out basket baskets runner runners specified fittings fitting hardware channels telescopic installation unit units one two three four five six seven eight nine ten'.split(' '));
   if(title==='SS 304 Pull-Out Basket'){hardware.add('304');hardware.add('grade');hardware.add('ss304');}
   const plain=key(text).split(' ').filter(Boolean),generic=plain.length>0&&plain.every(word=>(furnitureConstruction(workType)?common:hardware).has(word));
+  if(standard&&generic&&['Study Table','Dressing Table'].includes(title)&&/\bstorage\b/.test(key(text)))return standard.replace('with inside and outside laminate finish','with storage and inside and outside laminate finish');
   if(standard&&generic)return standard;
   if(!text)return standard||'See the agreed item specification.';
   const construction=furnitureConstruction(workType);
@@ -229,6 +246,42 @@ export function normalizedAssistantLessons(lessons:readonly string[]=[]):string[
     if(lesson.trim()&&!result.includes(lesson.trim()))result.push(lesson.trim());
   }
   return result;
+}
+
+export function buildPlainLanguageInstructions():string {
+  return `PLAIN ENGLISH FOR THE WHOLE QUOTATION
+Apply this to EVERY room, furniture name, item specification, proposed add-on, recommendation reason, job-specific note, review table and owner question. The goal is for a customer to understand what is supplied on the first reading. Use familiar words and short factual sentences. This is not limited to the study table or TV unit.
+Use the approved functional name, then only the confirmed construction, useful storage/features and finish. Do not stack synonyms such as study table workstation desk, TV media entertainment console cabinet, wardrobe storage solution or breakfast counter console unit. Reuse the same plain term for the same product. Keep the approved dictionary's scope distinctions; do not rename every cabinet to storage or every pull-out to basket.
+Avoid sales language such as bespoke, curated, luxurious, sophisticated, elevated aesthetic, enhanced ambience, premium look, seamless integration, state-of-the-art or ergonomic design without specific confirmed facts. A genuine package named Premium, exact manufacturer/product name or an owner-confirmed technical feature must remain unchanged. Do not delete a product name merely because it contains an adjective.
+
+| Work | Plain wording to follow when those facts are confirmed |
+|---|---|
+| Study table, storage unspecified | Study table with storage. Do not invent drawers or shelves. |
+| Study table, drawers confirmed | Study table with drawers. Keep any confirmed number, locks or drawer fittings. |
+| Box-type study table | Box-type study table with storage and inside and outside laminate finish. Say drawers instead of storage when drawers are confirmed. |
+| Folding study table | Wall-mounted folding table with laminate finish. Keep confirmed brackets, size and load details; do not add heavy-duty as praise. |
+| Complete TV unit | TV Unit; use the approved Box-type TV unit sentence and its included louvers/charcoal choice. Do not call the full setup a media console. |
+| Crockery storage | Crockery cabinet with storage. Use overhead or display only when confirmed; do not add showcase, glass or lighting. |
+| Kitchen lower cabinets | Box-type kitchen base cabinet with inside and outside laminate finish. |
+| Kitchen upper cabinets | Box-type kitchen overhead wall cabinet with inside and outside laminate finish. |
+| Kitchen tall/pantry storage | Tall kitchen storage cabinet; retain a confirmed pantry/food-storage or full-height function rather than inventing one. |
+| Kitchen drawer systems | Soft-close kitchen drawer system (tandem type). Keep the agreed count and confirmed fittings; SS basket is a different product. |
+| Wardrobe | Box-type wardrobe, or wardrobe frame and shutters, with the confirmed laminate finish. |
+| Loft and low-roof storage | Loft frame and shutters, low-roof frame and shutters, or box-type loft storage cabinet, according to the confirmed work. |
+| Storage inside wardrobe | Wardrobe storage compartment, locker or drawer, as confirmed. Do not promise a lock from the word locker alone. |
+| Dressing table | Dressing table with storage; mention a mirror or drawers only when included. |
+| Pooja | Pooja cabinet; Pooja entrance doors with CNC-cut design or glass, as actually specified. Keep cabinet shutters separate from entrance doors. |
+| Breakfast counter | Breakfast counter cabinet with storage. Do not add console or a countertop material unless confirmed. |
+| Wash area / washbasin | Wash area cabinet or cabinet below the washbasin. Keep their actual locations and supplied scope distinct. |
+| Shoe storage | Shoe storage cabinet for a closed cabinet; shoe rack for an open rack. |
+| Wall / pillar panels | Wall panelling or pillar panelling, with the confirmed material and finish. Use below/above only for the actual location. |
+| Mirror, bookshelf, bed and ceiling | Use the exact confirmed object: mirror backing panel, bookshelf, wall-mounted bed, folding bed or gypsum false ceiling. Do not add multifunctional, luxury, floating or space-saving mechanisms. |
+
+These are writing patterns, not a list of mandatory furniture, included features or new work_type keys. Keep the existing canonical product title and exact machine rate key. Preserve all confirmed dimensions, counts, drawer/shelf details, locks, soft-close mechanisms, material/grade/thickness, brands, mounting, combined work and Box/Frame type. Shorter wording must not broaden, reduce, duplicate or reprice the work. For example, two lockable drawers must not become generic storage; unspecified storage must not become two drawers.
+Use cabinet body or cabinet depth instead of carcass when the meaning is the same. Use laminate finish instead of an inflated phrase about aesthetic appeal. Technical terms needed for accuracy stay, with a short ordinary explanation where useful. A plain name does not prove a different material, warranty, rate or construction.
+Keep each add-on reason to a direct benefit and a relevant condition, usually one short sentence: "Adds space for books; confirm the wall space." Do not claim it will transform the home, enhance the aesthetic or suit a guessed household habit. Do not repeat the item name as a longer sales pitch. Keep unknown measurements null and respect all existing optional-scope rules.
+For owner questions use direct wording such as "What are the height and width?" or "Does this include drawers?" Collect missing facts together instead of a formal interview for each item. Use simple text for genuine job-specific notes. Standard bank/payment/material/warranty/terms sections remain app-generated; do not rewrite, duplicate, weaken or invent them in JSON to achieve simpler language.
+Before final JSON, read EVERY title, source_text_en, suggested_addons reason/specification and approved note. Replace wordy phrases with the shortest accurate wording, check that no included detail or scope changed, and remove unsupported praise. Do not change customer names, brand/product names, Basic/Standard/Premium labels, machine keys, pricing or package policy during this language pass.`;
 }
 
 /** Interview checklist, never an automatic bill of quantities or customer note. */
@@ -272,6 +325,8 @@ export function buildFurnitureContractInstructions():string {
 Use this one dictionary in every quotation. Repeat exactly the same canonical name and base sentence for the same confirmed product/construction; change wording only when the actual scope changes. Cabinet type must explicitly appear in source_text_en, not only in the rate key. No new construction JSON field is needed.
 Never copy a broad work_type category such as Pooja CNC / glass door paneling as the furniture name. Name the confirmed product instead: entrance CNC doors, entrance glass doors or cabinet shutters. A slash in a rate category does not confirm that both materials are supplied. Preserve explicitly confirmed double shutters, glass thickness or CNC work; ask once when the actual product is unclear.
 ${FURNITURE_VOCABULARY.map(([name,aliases])=>`- ${name}: ${aliases}.${nouns[name]?` Exact template function: "${nouns[name]}".`:''}`).join('\n')}
+
+${buildPlainLanguageInstructions()}
 
 FIXED CUSTOMER-FRIENDLY WORDING
 Use direct, familiar sentences. Do not inflate "TV unit" into "TV media console cabinet" or add "construction for" to every item. TV Unit is the normal title for the complete TV arrangement; TV Console Cabinet is reserved for an explicitly cabinet-only/console-only scope. "Media" is unnecessary unless it describes a real distinction supplied by the owner. Preserve an explicitly confirmed combined TV Unit with Wall Panelling identity in an existing revision rather than narrowing it to a console.

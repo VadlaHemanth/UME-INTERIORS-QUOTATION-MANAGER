@@ -4,6 +4,9 @@ These checks exercise supported JSON, pricing, validation, presentation and gene
 
 | Scenario | Expected behaviour | Verification |
 |---|---|---|
+| Any room or proposed extra uses inflated wording | Use short functional names and factual sentences throughout; all room groups have plain examples | Whole-quotation language contract and guarded description/recommendation cleanup |
+| Storage is unspecified versus explicitly supplied drawers | Say with storage or with drawers respectively, retaining confirmed counts/locks | Plain-language scope-preservation regression |
+| An exact brand or package is named Premium | Preserve the name and machine key despite the no-hype writing rule | Explicit exception and unchanged pricing/snapshot checks |
 | Owner requests a normal complete TV unit | Use TV Unit and the included louvers/charcoal choice in its scope, with no second paid suggestion | Approved default in generated setup and preserved-finish regression |
 | Owner specifies console-only or a selected decorative finish | Retain that limit/choice without promising a different assembly, both finishes or a particular material | Distinct vocabulary, custom-finish and scope-preservation rules |
 | Old JSON contains obsolete assistant memory entries | Do not carry them into new output; use current truthful size/default/exclusion rules | Explicit current-setup precedence and existing lesson migration tests |
