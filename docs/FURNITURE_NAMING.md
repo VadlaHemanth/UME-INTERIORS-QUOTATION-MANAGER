@@ -9,16 +9,18 @@ Approved 8 November 2026. The app and generated assistant setup share [the same 
 - The customer's name for UME's tandem-type fitting is **Soft-Close Kitchen Drawer System**. It does not promise a brand, model, drawer-side material, capacity or branded TANDEMBOX product. An expressly offered tandem/SS alternative stays an alternative rather than becoming two supplies.
 - The existing kitchen default is six drawer/basket units total. Explicit job counts or exclusions take precedence, and duplicate saved six-unit instructions do not create twelve units. Later owner-approved reusable defaults can replace the original default.
 - Telescopic channels remain described as telescopic channels unless soft-close channels are explicitly supplied.
+- For new complete TV units, decorative louvers or charcoal panelling is an included choice within the agreed TV unit price. It belongs in that item's scope, not a duplicate paid suggestion. A selected single finish, console-only brief or explicit owner exclusion takes precedence; no material/brand/thickness is inferred from charcoal.
 
 ## Stable wording
 
-Generic, otherwise identical cabinet facts use the same construction-first sentence every time. A kitchen base/wall or crockery unit can be either box or frame construction; its functional title alone must not select its rate. Examples:
+Generic, otherwise identical cabinet facts use the same simple sentence every time. Use TV Unit for the complete arrangement; reserve TV Console Cabinet for an explicitly cabinet-only scope. Media is not a required qualifier. A kitchen base/wall or crockery unit can be either box or frame construction; its functional title alone must not select its rate. Examples:
 
 | Product | Confirmed rate type | Specification |
 |---|---|---|
-| Wardrobe Cabinet | Box type | Box-type construction for wardrobe, with inside and outside laminate finish. |
-| Wardrobe Frame and Shutters | Frame type | Frame-and-shutter construction for the wardrobe, with inside and outside laminate finish. |
-| Kitchen Base Cabinet | Frame type | Frame-and-shutter construction for kitchen base storage, with inside and outside laminate finish. |
+| TV Unit | Box type | Box-type TV unit with inside and outside laminate finish, and decorative louvers or charcoal panelling, as selected. |
+| Wardrobe Cabinet | Box type | Box-type wardrobe with inside and outside laminate finish. |
+| Wardrobe Frame and Shutters | Frame type | Wardrobe frame and shutters with inside and outside laminate finish. |
+| Kitchen Base Cabinet | Frame type | Frame and shutters for the kitchen base cabinet, with inside and outside laminate finish. |
 | Loft Frame and Shutters | Loft - frame and shutter | Loft frame and shutters with inside and outside laminate finish. |
 | Loft Storage Cabinet | Box type | Box-type loft storage cabinet with inside and outside laminate finish. |
 

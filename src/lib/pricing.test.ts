@@ -99,7 +99,7 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
       'Box type',
       'Kitchen'
     ),
-    'Box-type construction for kitchen base storage, with inside and outside laminate finish.'
+    'Box-type kitchen base cabinet with inside and outside laminate finish.'
   );
 
   assert.equal(

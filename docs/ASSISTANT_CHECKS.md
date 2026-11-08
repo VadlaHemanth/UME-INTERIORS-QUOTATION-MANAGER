@@ -4,6 +4,9 @@ These checks exercise supported JSON, pricing, validation, presentation and gene
 
 | Scenario | Expected behaviour | Verification |
 |---|---|---|
+| Owner requests a normal complete TV unit | Use TV Unit and the included louvers/charcoal choice in its scope, with no second paid suggestion | Approved default in generated setup and preserved-finish regression |
+| Owner specifies console-only or a selected decorative finish | Retain that limit/choice without promising a different assembly, both finishes or a particular material | Distinct vocabulary, custom-finish and scope-preservation rules |
+| Old JSON contains obsolete assistant memory entries | Do not carry them into new output; use current truthful size/default/exclusion rules | Explicit current-setup precedence and existing lesson migration tests |
 | Wall panelling is linked to the loft above it | Label it Below the loft, while an actual loft is Above its cabinet | Relationship-label regression and rendered quote/PDF checks |
 | A generic rate category is pasted as the Pooja item title | Use the explicitly specified entrance/cabinet CNC/glass product; do not infer glass from a slash | Source-aware title regression |
 | A console name has a wall-sized measurement | Ask about combined TV scope and orientation; preserve the confirmed combined billing | Assistant instructions and owner-confirmed correction checks |

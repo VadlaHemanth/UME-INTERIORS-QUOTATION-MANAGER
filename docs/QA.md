@@ -1,5 +1,11 @@
 # Release verification — 8 November 2026
 
+## Plain furniture descriptions and included TV treatment
+
+Ordinary descriptions now use direct wording such as Box-type wardrobe and Frame and shutters for the kitchen base cabinet. TV Unit identifies a complete arrangement; TV Console Cabinet remains a distinct explicitly cabinet-only scope. The owner confirmed that louvers or charcoal panelling is included in new complete TV units. The assistant setup states that alternative in the TV item, excludes a second paid recommendation for the same work, retains a selected single finish or exclusion, and does not infer a panel material, brand or thickness. Existing recorded scopes are not expanded by description clean-up.
+
+Regression checks preserve the included/selected finish text and TV acronym, keep console-only scope distinct, retain all package totals/item counts, and check that obsolete memory entries are not automatically re-emitted in new JSON. A synthetic quote using the longer TV sentence passed 320/390/1440px checks; its eight-page PDF retained the exact sentence, one logo per page and no measured overflow. The furniture page was rendered and inspected. All 120 automated tests, TypeScript and the production build pass; no external Gemini/Custom GPT execution is claimed.
+
 ## Published-quotation wording and relationship correction
 
 A supplied published quotation was checked against its draft, immutable price snapshot and package totals. Confirmed display issues included an under-loft panel labelled Above its loft, ordinary description variants receiving a redundant construction prefix, and a broad Pooja rate category being used as a furniture title. Corrections preserve wall-mounted/anchored facts, specified door components and conflicting construction evidence. An owner-confirmed complete TV cabinet/panel assembly retains its combined billing and main-unit walkthrough priority.

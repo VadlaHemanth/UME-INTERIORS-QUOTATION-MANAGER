@@ -33,12 +33,12 @@ test('approved dictionary is idempotent and aliases do not invent materials, hei
 });
 
 test('like-for-like cabinet facts use fixed construction-first wording across aliases and repeated preparation',()=>{
-  const expected='Box-type construction for wardrobe, with inside and outside laminate finish.';
+  const expected='Box-type wardrobe with inside and outside laminate finish.';
   for(const [name,source] of [['box-type wardrobe','Box type wardrobe with inside laminate and outside laminate finish'],['Wardrobe Cabinet','Wardrobe cabinet with inside and outside laminate finish.']]){
     const result=formatCleanItemDescription(source,name,'Box type','Bedroom');assert.equal(result,expected);assert.equal(formatCleanItemDescription(result,name,'Box type','Bedroom'),result);
   }
-  assert.equal(formatFurnitureSpecification('Kitchen base cabinet with inside and outside laminate finish.','Kitchen Base Cabinet','Frame type','Kitchen'),'Frame-and-shutter construction for kitchen base storage, with inside and outside laminate finish.');
-  assert.equal(standardFurnitureSpecification('Wardrobe Frame and Shutters','Frame type'),'Frame-and-shutter construction for the wardrobe, with inside and outside laminate finish.');
+  assert.equal(formatFurnitureSpecification('Kitchen base cabinet with inside and outside laminate finish.','Kitchen Base Cabinet','Frame type','Kitchen'),'Frame and shutters for the kitchen base cabinet, with inside and outside laminate finish.');
+  assert.equal(standardFurnitureSpecification('Wardrobe Frame and Shutters','Frame type'),'Wardrobe frame and shutters with inside and outside laminate finish.');
   const source='Cabinet with confirmed 24 inch depth, 6 mm tinted glass and two lockable drawers, finished in acrylic.';
   const result=formatCleanItemDescription(source,'Wardrobe Cabinet','Box type','Bedroom');
   assert.ok(result.startsWith('Box-type cabinet'));assert.ok(result.includes(source.slice(1)));assert.doesNotMatch(result,/inside and outside laminate/);
@@ -50,8 +50,8 @@ test('like-for-like cabinet facts use fixed construction-first wording across al
 
 test('revised quotation descriptions remove redundant type prefixes while preserving mounting and specified door scope',()=>{
   const rows=[
-    ['TV Console Cabinet','Box type','Box-type construction. TV media console cabinet with inside and outside laminate finish.','Box-type construction for TV console storage, with inside and outside laminate finish.'],
-    ['Kitchen Overhead Wall Cabinet','Box type','Box-type construction. Overhead wall-mounted kitchen cabinet with inside and outside laminate finish.','Box-type construction for kitchen overhead storage, with inside and outside laminate finish.'],
+    ['TV Console Cabinet','Box type','Box-type construction. TV media console cabinet with inside and outside laminate finish.','Box-type TV console cabinet with inside and outside laminate finish.'],
+    ['Kitchen Overhead Wall Cabinet','Box type','Box-type construction. Overhead wall-mounted kitchen cabinet with inside and outside laminate finish.','Box-type kitchen overhead wall cabinet with inside and outside laminate finish.'],
     ['Loft Frame and Shutters','Loft - frame and shutter','Frame-and-shutter construction. Overhead kitchen loft framing and shutter enclosure with inside and outside laminate finish.','Loft frame and shutters with inside and outside laminate finish.'],
     ['Soft-Close Kitchen Drawer System','Tandem or SS baskets','Modular kitchen soft-close tandem drawer systems with channels and fittings.','Soft-close kitchen drawer system (tandem type), with the specified runners and fittings.'],
     ['Wash Area Utility Cabinet','Box type','Box-type construction. Wall-mounted utility storage cabinet with inside and outside laminate finish.','Box-type wall-mounted utility storage cabinet with inside and outside laminate finish.'],
@@ -72,6 +72,22 @@ test('changing construction updates standard sentences but preserves bespoke spe
   assert.equal(retypeFurnitureSpecification(loft,'Loft Frame and Shutters','Loft - frame and shutter','Box type','Bedroom'),standardFurnitureSpecification('Loft Storage Cabinet','Box type'));
   const custom='Box-type wardrobe with 6 mm glass doors.';
   assert.equal(retypeFurnitureSpecification(custom,'Wardrobe Cabinet','Box type','Frame type','Bedroom'),custom);
+});
+
+test('plain TV-unit wording preserves the included decorative choice and keeps console-only scope distinct',()=>{
+  assert.equal(canonicalFurnitureName('TV media unit','Box type','Hall'),'TV Unit');
+  assert.equal(canonicalFurnitureName('television unit','Box type','Hall'),'TV Unit');
+  assert.equal(canonicalFurnitureName('TV console cabinet','Box type','Hall'),'TV Console Cabinet');
+  const included='Box-type TV unit with inside and outside laminate finish, and decorative louvers or charcoal panelling, as selected.';
+  assert.equal(formatCleanItemDescription(included,'TV Unit','Box type','Hall'),included);
+  assert.equal(formatCleanItemDescription(included.replace('Box-type ',''),'TV Unit','Box type','Hall'),included,'TV acronym keeps its capital letters');
+  const chosen='Box-type TV unit with inside and outside laminate finish, and decorative louvers.';
+  assert.equal(formatCleanItemDescription(chosen,'TV Unit','Box type','Hall'),chosen);
+  assert.doesNotMatch(standardFurnitureSpecification('TV Console Cabinet','Box type')!,/charcoal|louver|wall panelling/);
+  assert.doesNotMatch(standardFurnitureSpecification('TV Unit','Box type')!,/charcoal|louver|wall panelling/,'display clean-up does not insert new scope into a historical record');
+  const draft=structuredClone(VIDYA_SAGAR_REDDY_DRAFT);draft.rooms[0].items[0].name='TV Unit';draft.rooms[0].items[0].work_type='Box type';draft.rooms[0].items[0].source_text_en=included;
+  const after=prepareQuotationDraft(draft,DEFAULT_UME_CATALOGUE);assert.deepEqual(calculateQuotationPricing(after).baseWholeHomeTotals,calculateQuotationPricing(draft).baseWholeHomeTotals);assert.equal(after.rooms[0].items.length,draft.rooms[0].items.length);assert.equal(after.rooms[0].items[0].source_text_en,included);
+  const setup=buildDynamicGemInstructions(DEFAULT_UME_CATALOGUE);assert.ok(setup.includes(included));assert.match(setup,/decorative louvers or charcoal panelling is included/i);assert.match(setup,/do not create a second paid panel item/);assert.match(setup,/Do not copy assistant_memory_updates from an old quotation/);
 });
 
 test('construction conflicts block publication while combined approved scope and custom rate definitions remain intact',()=>{
