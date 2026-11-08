@@ -1,5 +1,6 @@
 import { FinishOption, PlywoodGrade, ProtectionOption } from './schema';
-import { canonicalFurnitureName, FURNITURE_VOCABULARY } from './furniture';
+import { canonicalFurnitureName } from './furniture';
+import {buildFurnitureContractInstructions,formatFurnitureSpecification,OWNER_FRAME_TYPE_DEFINITION,KITCHEN_FITTINGS_DEFINITION,KITCHEN_DEFAULT_LESSON,COUNT_ITEM_LESSON,normalizedAssistantLessons} from './furniture-contract';
 import { packageRates } from './rate-card';
 import { DEFAULT_HARDWARE_SCOPE,customerHardwareScope,hardwareBrands,documentTerms, materialLines, packageAllowances, packageWarrantyLabel, scopeNotes, type MaterialWording, type PackageAllowances } from './commercial-spec';
 
@@ -231,9 +232,10 @@ export function resolveStandardDepthInches(
 export function standardizeCompetitorItemName(
   rawName: string,
   workType: string,
-  roomName = ''
+  roomName = '',
+  sourceText = ''
 ): string {
-  return canonicalFurnitureName(rawName || '', workType, roomName);
+  return canonicalFurnitureName(rawName || '',workType,roomName,sourceText);
 }
 
 /**
@@ -266,7 +268,7 @@ export function formatCleanItemDescription(
     cleaned += '.';
   }
 
-  return cleaned || 'See the agreed item specification.';
+  return formatFurnitureSpecification(cleaned,itemName,workType,roomName);
 }
 
 export interface StudioCatalogue {
@@ -313,7 +315,7 @@ export interface StudioCatalogue {
 }
 
 export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
-  version: 'ume-catalogue-2026.11.v11',
+  version: 'ume-catalogue-2026.11.v12',
   hardwareScope:DEFAULT_HARDWARE_SCOPE,
   assistantLessons:[],
   company: {
@@ -521,7 +523,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       label: 'Frame and doors',
       unit: 'sq_ft',
       plainEnglishDefinition:
-        'Plywood frame fixed to an existing wall recess or stone shelves, with laminated doors at the front. Billed by front area (height × width).',
+        OWNER_FRAME_TYPE_DEFINITION,
       pvcDefaultEligible: true,
       pvcDefaultParts: ['Wall-contact perimeter frame'],
       rates: packageRates(750, 900, 1050, 60),
@@ -609,7 +611,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       label: 'Tandem drawers or stainless-steel baskets',
       unit: 'each',
       plainEnglishDefinition:
-        'Kitchen pull-out tandem drawer or stainless-steel basket with the specified channels and installation. Confirm the basket grade and hardware model in the agreed item specification.',
+        KITCHEN_FITTINGS_DEFINITION,
       pvcDefaultEligible: false,
       pvcDefaultParts: [],
       rates: {
@@ -1318,11 +1320,7 @@ Order MAIN units by the walkthrough, then put each unit's confirmed loft, shutte
 LINKED FURNITURE: Every confirmed loft above a named wardrobe, dressing table, crockery cabinet or other unit uses item.parent_item_index: the zero-based ITEM index of that main unit in the SAME room. Example array: wardrobe index 0; its loft index 1 has parent_item_index:0; dressing index 2; its loft index 3 has parent_item_index:2. Main units use null or omit it. This is display grouping, not a second charge or quantity multiplier. Never self-link, reference another room, form a cycle or reuse the wrong parent after moving rows. If multiple lofts have unclear locations, ask ONCE which main unit each belongs above in the consolidated review; do not guess or duplicate a loft. A child panel can link to its confirmed loft/main unit. Keep canonical furniture names and confirmed location details; the app shows the main-unit association separately.
 SHOE STORAGE: Confirmed shoe/footwear storage belongs in a separate room/category named “Entrance & Shoe Storage”, not Hall & Dining or a bedroom. Always place this category last in the compact room review and final JSON rooms array, after every other room, including custom/unrecognised spaces. Include its confirmed related work there. Online quotes, room selectors, Studio editors, PDFs, work orders and newly saved room-wise selection summaries follow this same last-priority rule; display numbering follows the final order. This is a category, not an assumption that it is physically indoors; preserve the owner's actual entrance/outdoor location in source_text_en. Do not invent an entrance item or a shoe cabinet when none was requested. The app also separates shoe storage in editable/newly published drafts; historical revisions remain intact.
 Apply this ordering before the final review and JSON for a new quotation, then recompute suggested_addons[].room_index, every parent_item_index and all room/item JSON Pointer paths so they identify the correct final room/item. When editing existing JSON, preserve its identities and confirmed choices; if rearranging its arrays, remap every affected reference rather than simply changing the numbers. The app also displays existing quotations in this walkthrough order while keeping stored room/item indices and saved customer selections intact. Display order never changes quantities, rates, selected optional items or the agreed work.
-CANONICAL FURNITURE VOCABULARY
-Use exactly the same canonical name for the same furniture every time, even if the owner dictates a nickname, incorrect English, Telugu or Hindi alias. Preserve scope distinctions: base cabinets, overhead wall cabinets, tall utility cabinets and pull-out baskets are different products. Never convert an ambiguous “pull cabinet” into an overhead cabinet; ask which construction/location is intended. Keep the original intent, measurements and work_type pricing. Known names and aliases:
-${FURNITURE_VOCABULARY.map(([name, aliases]) => `- ${name}: ${aliases}.`).join('\n')}
-For an unlisted item, choose one clear conventional English name, reuse it consistently throughout the quotation and later revisions, and retain any distinction such as frame construction, louvers, CNC or glass. Use “drawer”, never “draw”.
-source_text_en is a short professional English specification. For confirmed cabinet, wardrobe and loft work with laminate on both faces, use “with inside and outside laminate finish”. Do not repeat the shared SF/high-gloss choice, sheet allowance, shared laminate thickness, dimensions or prices in every item. Retain confirmed item-specific construction facts, such as an actual glass thickness or a different specified material. External wall panelling has an outside laminate finish; do not invent inside laminate or other construction. Include a carcass depth only if confirmed. Do not infer missing measurements, depth, rates, guarantees, tax treatment or exclusions.
+${buildFurnitureContractInstructions()}
 
 2. EXACT SCHEMA AND MEASUREMENTS
 Output quotation-studio.draft.v2. All keys and human-readable JSON values must be English. languages may contain only te, hi and en; output_language is always en. The customer package names are Basic, Standard and Premium. Their exact machine keys are Base, Normal and Premium respectively. Protection is Standard or With PVC; this “Standard” protection value means no PVC upgrade and is separate from the Standard package. Finish is SF or High Gloss. The selected default package is the root recommended object; only quote.show_recommended_package controls its Recommended label. Do not rename machine keys.
@@ -1372,7 +1370,7 @@ When the owner pastes a validation error, identify its exact field and cause, co
 For a reusable correction the owner asks to remember, quotation-studio.draft.v2 supports optional root assistant_memory_updates:["one concise process rule"]. Use at most 20 rules, 500 characters each; never include customer names, sites, phone numbers, passwords, financial references or unapproved rates. The app saves approved imported rules in its assistant setup and the studio's Assistant instructions tab lets the owner edit them. For a rate-card-only response, save any reusable correction through that tab; do not add an unsupported memory field to ratecard.v2. Do not claim that JSON edits an external Gem/Custom GPT configuration.
 Conversation memory is not guaranteed across new chats. The current app copy button includes the latest saved rates AND saved corrections below. After saving changes, the owner must copy it into the Gem/Custom GPT's saved instructions, or paste the refreshed setup at the start of a new chat. Use that fresh setup over an older chat memory. You cannot silently rewrite your own saved system instructions or sync with an app you are not connected to.
 SAVED OWNER CORRECTIONS — apply to every new quotation using this setup:
-${(catalogue.assistantLessons||[]).filter(Boolean).map(line=>`- ${line}`).join('\n')||'None recorded. Apply all built-in checks in these instructions.'}
+${normalizedAssistantLessons(catalogue.assistantLessons).filter(line=>line!==KITCHEN_DEFAULT_LESSON&&line!==COUNT_ITEM_LESSON).map(line=>`- ${line}`).join('\n')||'None additional. Apply the approved naming, kitchen-default and size_text rules above.'}
 
 4. TAILORED OPTIONAL RECOMMENDATIONS
 Think like a thoughtful interior designer: look at the actual room list, furniture already requested, stated storage needs, household habits, accessibility needs, available space and budget. When useful, ask one short question about priorities (for example extra storage, work-from-home, children or senior-friendly use); do not assume those household facts. Propose a small ranked set of genuinely relevant extras, usually 2-5 for a full home, fewer for a limited scope. Do not fill a quota, duplicate existing scope, upsell expensive features without a reason, or propose items outside the contractor's capabilities. Explain the specific benefit and any condition to confirm for THIS home, not generic advertising.

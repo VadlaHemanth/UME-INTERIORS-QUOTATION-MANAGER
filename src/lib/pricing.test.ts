@@ -99,20 +99,20 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
       'Box type',
       'Kitchen'
     ),
-    'Box-type kitchen base cabinet unit with inside and outside laminate finish.'
+    'Box-type construction for kitchen base storage, with inside and outside laminate finish.'
   );
 
   assert.equal(
     formatCleanItemDescription('Cabinet with confirmed 24 inch depth and 1.0 mm outside laminate.', 'Wardrobe', 'Box type', 'Bedroom'),
-    'Cabinet with confirmed 24 inch depth and 1.0 mm outside laminate.'
+    'Box-type construction. Cabinet with confirmed 24 inch depth and 1.0 mm outside laminate.'
   );
   assert.equal(
     standardizeCompetitorItemName('Tandem or SS baskets', 'Tandem or SS baskets', 'Kitchen'),
-    'Tandem Drawers / Stainless-Steel Pull-Out Baskets'
+    'Kitchen Drawer Systems / Stainless-Steel Baskets'
   );
   assert.equal(
     standardizeCompetitorItemName('Kitchen cabinet unit (opposite to base cabinet)', 'Box type', 'Kitchen'),
-    'Kitchen Full-Height Utility Cabinet'
+    'Kitchen Storage Cabinet'
   );
 
   // With PVC adds PVC substitution ONLY to eligible items (Folding table, Tandem baskets, Pooja CNC doors stay unchanged)

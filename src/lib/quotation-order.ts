@@ -40,9 +40,9 @@ export function furnitureWalkthroughPriority(item:NamedFurniture,roomName:string
   }
   if(/kitchen/.test(room)) {
     if(/base cabinet|under counter|lower cabinet/.test(name))return 0;
-    if(/tandem|basket|pull out/.test(name+' '+work))return 10;
+    if(/tandem|basket|pull out|drawer system|wooden kitchen drawer/.test(name+' '+work))return 10;
     if(/overhead|wall cabinet/.test(name)&&!/crockery|panelling/.test(name))return 20;
-    if(/full height|pantry|tall/.test(name))return 30;
+    if(/full height|pantry|tall|kitchen storage cabinet/.test(name))return 30;
     if(/loft/.test(name+' '+work)&&!/panelling/.test(name+' '+work))return 40;
     if(/under loft/.test(name))return 50;
     if(/wash area|wash cabinet/.test(name))return 60;

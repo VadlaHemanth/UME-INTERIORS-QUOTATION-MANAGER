@@ -1,4 +1,12 @@
-# Release verification — 7 November 2026
+# Release verification — 8 November 2026
+
+## Approved furniture names and construction wording
+
+The app and generated assistant setup now share one approved dictionary and construction specification contract. Regression checks cover canonical aliases/case/idempotency, SS versus tandem distinctions, no inferred basket grade from screws/channels, retained acrylic/glass/locks/locations, combined scope without price allocation, truthful count labels, explicit kitchen counts and saved-rate preservation. The v12 catalogue upgrade replaces only recognized stock frame/fitting descriptions and duplicate saved corrections; custom descriptions and all saved rates are retained.
+
+An isolated synthetic quotation passed Chromium checks at 320, 390 and 1440px without page-wide overflow. The mobile editor changed a standard wardrobe from Box type to Frame type with the matching name and sentence while retaining bespoke details on another item. A contradictory construction specification returned HTTP 422. Current-catalogue instructions included the correct isolated live-rate-shaped values, contained the six-unit rule once, and downloaded with exactly the same text shown in Studio.
+
+Quotation and owner-preview PDFs each contained seven pages; the confirmed work order contained six. Every page had one logo and no measured print-body overflow. The PDF cover retained the floor-plan notice and all thirteen plywood options; rendered furniture pages retained bordered tables, construction-first descriptions, custom details, count-item labels and the selected-package highlight. These are browser-emulation and local synthetic-data checks, not a physical Android share test or an external Gemini/Custom GPT execution. All 117 automated tests, TypeScript and the production build passed.
 
 ## PDF filenames and personalized link previews
 

@@ -96,6 +96,8 @@ Generated package photographs are illustrative material compositions, not produc
 
 ## Assistant JSON and tailored recommendations
 
+Furniture titles and construction-first specifications use the shared [approved naming contract](docs/FURNITURE_NAMING.md). Studio's **Copy Master Gem Instructions** and **Download instructions** include the current catalogue, saved rates and corrections. Refresh the external assistant setup after changing them. The repository's public instruction text is a shipped-default baseline rather than a copy of private live settings.
+
 Copy the current **Assistant instructions** into your Gemini Gem or Custom GPT before requesting a quotation, and refresh that saved configuration after reusable rate-card changes. The snapshot is not a live sync. The app does not require an AI API key or send customer data to an AI service itself.
 
 The instructions require one complete JSON object inside one copyable fenced `json` block, with no surrounding prose. The loader accepts either the copied JSON contents or the complete fenced block. Final quotation output always includes `suggested_addons`, using `[]` when no useful recommendation fits the actual brief.

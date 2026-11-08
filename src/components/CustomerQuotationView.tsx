@@ -1512,7 +1512,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                   const cleanTitle = standardizeCompetitorItemName(
                                     item.name,
                                     item.workType,
-                                    room.name
+                                    room.name,
+                                    item.sourceTextEn
                                   );
                                   const cleanDescription = formatCleanItemDescription(
                                     item.sourceTextEn,

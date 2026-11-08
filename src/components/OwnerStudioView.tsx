@@ -1835,12 +1835,12 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     Includes all <strong>{Object.keys(editableCatalogue.workTypes).length} current work types</strong> and prices. Copy these instructions into your Gem or Custom GPT again after changing reusable rates. The assistant prepares JSON; you review and publish it here.
                   </p>
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(dynamicGemInstructions);
-                    setCopiedPrompt(true);
-                    setTimeout(() => setCopiedPrompt(false), 2000);
+                  onClick={async () => {
+                    try{if(!navigator.clipboard)throw Error('Clipboard unavailable');await navigator.clipboard.writeText(dynamicGemInstructions);setCopiedPrompt(true);setTimeout(() => setCopiedPrompt(false), 2000);}
+                    catch{setAssistantMemoryFeedback('Copy is unavailable in this browser. Use Download instructions to open the complete setup as a text file.');}
                   }}
                   className="px-5 py-2.5 bg-[#2B5B48] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-xs font-bold inline-flex items-center gap-2 cursor-pointer shadow-xs"
                 >
@@ -1849,6 +1849,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     ? 'Copied Master Gem Instructions ✓'
                     : 'Copy Master Gem Instructions'}
                 </button>
+                <button type="button" className="owner-action-secondary inline-flex items-center gap-2" onClick={()=>{const blob=new Blob([dynamicGemInstructions],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='UME-Quotation-Studio-Instructions.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}}><Download size={15}/> Download instructions</button>
+                </div>
               </div>
 
               <pre className="owner-instructions p-4 bg-[#18221D] text-[#FAF8F4] rounded-xl text-xs font-mono whitespace-pre-wrap leading-relaxed max-h-[460px] overflow-y-auto">

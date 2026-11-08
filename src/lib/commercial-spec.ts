@@ -1,6 +1,7 @@
 import type { GradeInfo, StudioCatalogue } from './catalogue';
 import type { PlywoodGrade, QuotationDraftV2 } from './schema';
 import { applyApprovedCoreRates } from './rate-card';
+import {OWNER_FRAME_TYPE_DEFINITION,KITCHEN_FITTINGS_DEFINITION,normalizedAssistantLessons} from './furniture-contract';
 
 export interface PackageAllowances {
   handleRupees: number;
@@ -95,15 +96,23 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
 
 /** Upgrade the old shipped defaults once; retain owner-entered brands and rates. */
 export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
-  if (catalogue.version === 'ume-catalogue-2026.11.v11') return catalogue;
+  if (catalogue.version === 'ume-catalogue-2026.11.v12') return catalogue;
   const next = structuredClone(catalogue);
+  if(catalogue.version==='ume-catalogue-2026.11.v11'){
+    const frame=next.workTypes['Frame type'],fittings=next.workTypes['Tandem or SS baskets'];
+    if(frame&&['Wall-anchored framework with shutters, internal lining, and external decorative laminate finish.','Plywood frame fixed to an existing wall recess or stone shelves, with laminated doors at the front. Billed by front area (height × width).'].includes(frame.plainEnglishDefinition))frame.plainEnglishDefinition=OWNER_FRAME_TYPE_DEFINITION;
+    if(fittings&&['Modular kitchen tandem drawers or stainless steel wire pull-out baskets including hardware channels and fitting.','Kitchen pull-out tandem drawer or stainless-steel basket with the specified channels and installation. Confirm the basket grade and hardware model in the agreed item specification.'].includes(fittings.plainEnglishDefinition))fittings.plainEnglishDefinition=KITCHEN_FITTINGS_DEFINITION;
+    next.assistantLessons=normalizedAssistantLessons(next.assistantLessons);
+    next.version='ume-catalogue-2026.11.v12';
+    return next;
+  }
   if(catalogue.version==='ume-catalogue-2026.11.v10'){
     for(const grade of ['Base','Normal','Premium'] as const)next.grades[grade].hardwareBrands||=[...DEFAULT_HARDWARE_BRANDS[grade]];
     next.hardwareScope||=DEFAULT_HARDWARE_SCOPE;
     next.assistantLessons||=[];
     next.commonMaterials=next.commonMaterials.filter(line=>line!=='Soft-Close Hinges & Telescopic Channels (Berlin / Ebco / Nimmi)');
     next.version='ume-catalogue-2026.11.v11';
-    return next;
+    return upgradeCatalogue(next);
   }
   if(catalogue.version==='ume-catalogue-2026.11.v9') {
     applyApprovedCoreRates(next);

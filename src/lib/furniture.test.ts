@@ -39,7 +39,7 @@ test('canonical furniture names keep aliases consistent without confusing pull-o
   for(const alias of ['frame type wardrobe','Wardrobe Frame and Shutter']) assert.equal(canonicalFurnitureName(alias,'Frame type','Bedroom'),'Wardrobe Frame and Shutters');
   assert.equal(canonicalFurnitureName('pull cabinet','Box type','Kitchen'),'pull cabinet','an ambiguous term is not silently mapped to another product');
   assert.equal(canonicalFurnitureName('SS basket','Tandem or SS baskets','Kitchen'),'Stainless-Steel Pull-Out Basket','do not invent steel grade');
-  assert.equal(formatCleanItemDescription('Cabinet with inside laminate and outside laminate finish','Cabinet','Box type'),'Cabinet with inside and outside laminate finish.');
+  assert.equal(formatCleanItemDescription('Cabinet with inside laminate and outside laminate finish','Cabinet','Box type'),'Box-type construction. Cabinet with inside and outside laminate finish.');
 });
 test('material allowances and exclusions use editable values and all package names are stable',()=>{
   const catalogue=structuredClone(DEFAULT_UME_CATALOGUE);

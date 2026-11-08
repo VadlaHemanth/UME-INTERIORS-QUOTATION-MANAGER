@@ -5,6 +5,7 @@
 
 import { validateAddonSuggestions } from './addon-suggestions';
 import { expiryFromIssue } from './quotation-dates';
+import {furnitureConstructionConflict} from './furniture-contract';
 
 export type InputLanguageCode = 'te' | 'hi' | 'en';
 export type PlywoodGrade = 'Base' | 'Normal' | 'Premium';
@@ -501,6 +502,7 @@ export function validateQuotationDraftV2(
           checkStringField(item.work_type, `${iPath}/work_type`, true);
           checkStringField(item.size_text, `${iPath}/size_text`, true);
           checkStringField(item.source_text_en, `${iPath}/source_text_en`, true);
+          if(furnitureConstructionConflict(item.name||'',item.source_text_en||'',item.work_type||''))issues.push({path:`${iPath}/work_type`,severity:'publish_blocker',code:'SCHEMA_MISMATCH',message:`The construction wording for "${item.name||'item'}" conflicts with its selected rate type. Confirm Box type or Frame type, then make the specification and rate selection agree. Prices are not changed automatically.`});
           if (item.custom_rates != null) {
             if (typeof item.custom_rates !== 'object' || Array.isArray(item.custom_rates)) {
               issues.push({path:`${iPath}/custom_rates`,severity:'publish_blocker',code:'SCHEMA_MISMATCH',message:'Item rates must be an object containing confirmed package prices.'});

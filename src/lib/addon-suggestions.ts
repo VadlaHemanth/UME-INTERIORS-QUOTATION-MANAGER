@@ -20,7 +20,7 @@ function positive(value: unknown, integer = false): boolean {
 function identity(value: unknown, roomName = ''): string | null {
   if (!record(value) || typeof value.name !== 'string' || typeof value.work_type !== 'string') return null;
   const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  return `${normalize(canonicalFurnitureName(value.name,value.work_type,roomName))}|${normalize(value.work_type)}`;
+  return `${normalize(canonicalFurnitureName(value.name,value.work_type,roomName,typeof value.source_text_en==='string'?value.source_text_en:''))}|${normalize(value.work_type)}`;
 }
 
 function validItem(value: unknown): value is DraftItem {

@@ -20,7 +20,14 @@ export function prepareQuotationDraft(draft: QuotationDraftV2, catalogue: Studio
       const candidates=room.items.map((other,index)=>({other,index})).filter(({other})=>other!==item&&!/loft|low roof/i.test(`${other.name} ${other.work_type}`)&&match?.test(other.name||''));
       if(candidates.length===1)item.parent_item_index=candidates[0].index;
     }
-    item.name=standardizeCompetitorItemName(item.name || '',item.work_type || '',room.name || '');
+    const originalName=item.name||'';
+    item.name=standardizeCompetitorItemName(originalName,item.work_type || '',room.name || '',item.source_text_en||'');
+    if(/opposite/i.test(originalName)&&!/opposite/i.test(item.source_text_en))item.source_text_en=(item.source_text_en.trim()+' Position: opposite side of the kitchen.').trim();
+    if(/lower.*(?:pillar|column)/i.test(originalName)&&!/lower/i.test(item.source_text_en))item.source_text_en=(item.source_text_en.trim()+' Position: lower part of the pillar.').trim();
+    if(item.measure?.unit==='each'&&(!item.size_text?.trim()||/^standard (?:size|unit)$/i.test(item.size_text.trim()))){
+      item.size_text=/basket/i.test(item.name)?(/drawer/i.test(item.name)?'Per drawer system or basket':'Per pull-out basket'):/drawer system/i.test(item.name)?'Per drawer system':/drawer/i.test(item.name)?'Per additional drawer':'Per item';
+      if(item.measure.per_item==null)item.measure.per_item=1;
+    }
     if (item.source_text_en) item.source_text_en=formatCleanItemDescription(item.source_text_en,item.name,item.work_type || '',room.name || '');
   }
   return next;

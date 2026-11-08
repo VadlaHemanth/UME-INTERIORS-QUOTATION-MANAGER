@@ -785,7 +785,8 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                         const cleanTitle = standardizeCompetitorItemName(
                           item.name,
                           item.workType,
-                          room.name
+                          room.name,
+                          item.sourceTextEn
                         );
                         const cleanDesc = formatCleanItemDescription(
                           item.sourceTextEn,
