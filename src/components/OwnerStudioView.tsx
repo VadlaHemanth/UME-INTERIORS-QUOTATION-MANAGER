@@ -1832,7 +1832,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     Copy & Paste into Your Single Gemini Gem or Custom GPT Instructions
                   </h2>
                   <p className="text-xs text-[#5C645F] mt-1">
-                    Includes all <strong>{Object.keys(editableCatalogue.workTypes).length} current work types</strong> and prices. Copy these instructions into your Gem or Custom GPT again after changing reusable rates. The assistant prepares JSON; you review and publish it here.
+                    Includes all <strong>{Object.keys(editableCatalogue.workTypes).length} current work types</strong>, prices and a room-by-room checklist for common omissions. Update reusable scope defaults under Saved corrections below, then copy the refreshed instructions into your Gem or Custom GPT. The assistant prepares JSON; you review and publish it here.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

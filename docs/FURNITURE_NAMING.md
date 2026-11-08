@@ -38,6 +38,8 @@ Historical records and prices are not rewritten by this vocabulary update. New/r
 
 ## Assistant handoff
 
+The setup includes a usual-home scope checklist for each supplied room. It carries saved defaults and asks once about relevant unmentioned work, dimensions and counts. The owner can keep the proposed scope or list changes/exclusions. Template candidates are not automatically charged; explicit limited scope, previous exclusions, combined units and the confirmed scope of a revision take precedence. Only the saved six-unit kitchen allowance is a built-in numeric scope default. New reusable rules can be saved under Assistant instructions → Saved corrections and copied into the external assistant setup.
+
 Use Studio → Assistant instructions → **Copy Master Gem Instructions** or **Download instructions**. Both use the currently loaded catalogue and prices. The public repository text is a baseline generated from shipped defaults, not a live rate-card sync. Do not use old archive prices to replace saved rates.
 
 Countable items can use factual size text such as Per drawer system, Per pull-out basket or Per additional drawer with one billable unit per item and the actual quantity. This does not assert a physical size. Unknown square-foot geometry remains a clarification; suggestions outside agreed scope may keep unknown measurements until accepted.

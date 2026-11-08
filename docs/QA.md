@@ -1,5 +1,11 @@
 # Release verification — 8 November 2026
 
+## Common-scope template and omission review
+
+The generated assistant setup includes a room-specific usual-scope proposal, a combined missing-facts review, explicit exclusions, limited-scope/revision handling and reusable scope corrections. Instruction review covers unchanged usual scope with missing geometry, five rather than six kitchen fittings, no-loft exclusions, kitchen-only jobs, combined furniture coverage and declined recommendations. No template candidates are inserted into app records or prices by this change. The supported JSON schema is unchanged; accepted work and unresolved agreed facts use the existing item and clarification fields.
+
+The isolated Assistant instructions tab passed 320/390/1440px browser checks without page-wide overflow or console errors. Downloaded text matched the rendered setup and current isolated catalogue exactly, including the new template. All 117 automated tests, TypeScript and the production build passed. External Gemini/Custom GPT execution was not performed; the owner must replace its saved setup to use the new interview behaviour.
+
 ## Approved furniture names and construction wording
 
 The app and generated assistant setup now share one approved dictionary and construction specification contract. Regression checks cover canonical aliases/case/idempotency, SS versus tandem distinctions, no inferred basket grade from screws/channels, retained acrylic/glass/locks/locations, combined scope without price allocation, truthful count labels, explicit kitchen counts and saved-rate preservation. The v12 catalogue upgrade replaces only recognized stock frame/fitting descriptions and duplicate saved corrections; custom descriptions and all saved rates are retained.

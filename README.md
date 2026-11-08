@@ -98,6 +98,8 @@ Generated package photographs are illustrative material compositions, not produc
 
 Furniture titles and construction-first specifications use the shared [approved naming contract](docs/FURNITURE_NAMING.md). Studio's **Copy Master Gem Instructions** and **Download instructions** include the current catalogue, saved rates and corrections. Refresh the external assistant setup after changing them. The repository's public instruction text is a shipped-default baseline rather than a copy of private live settings.
 
+The assistant setup also includes a usual-home scope checklist. It carries confirmed defaults, asks about relevant unmentioned units once, and collects missing measurements/counts together. The owner can keep the proposed scope or list changes/exclusions; unaccepted template items do not enter the quotation or prices. Reusable scope rules can be saved under **Assistant instructions → Saved corrections** and included in the refreshed setup.
+
 Copy the current **Assistant instructions** into your Gemini Gem or Custom GPT before requesting a quotation, and refresh that saved configuration after reusable rate-card changes. The snapshot is not a live sync. The app does not require an AI API key or send customer data to an AI service itself.
 
 The instructions require one complete JSON object inside one copyable fenced `json` block, with no surrounding prose. The loader accepts either the copied JSON contents or the complete fenced block. Final quotation output always includes `suggested_addons`, using `[]` when no useful recommendation fits the actual brief.

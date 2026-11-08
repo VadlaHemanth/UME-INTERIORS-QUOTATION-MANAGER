@@ -4,6 +4,11 @@ These checks exercise supported JSON, pricing, validation, presentation and gene
 
 | Scenario | Expected behaviour | Verification |
 |---|---|---|
+| New home brief omits usual room elements | Show one relevant scope checklist and ask whether to keep/change it; exclude unaccepted candidates from JSON/totals | Generated instruction review |
+| Owner says same but dimensions/construction are missing | Preserve the accepted displayed scope and saved rates, then collect all missing agreed facts together | Explicit interview/output rules |
+| Owner excludes lofts, specifies five baskets or requests kitchen-only work | Respect the exclusion/count/limited scope without repeating or broadening it | Omission-check examples and instruction cross-check |
+| Revision already includes combined scope | Apply requested changes only; no duplicated kitchen allowance, lofts or internal components | Shared scope rules plus existing pricing/combined-scope regressions |
+| Owner asks to remember a usual scope change | Save a customer-free supported assistant_memory_updates rule and refresh the setup | Existing persistence/privacy coverage and precedence instructions |
 | Owner uses different names for the same confirmed furniture | Reuse one approved canonical title and exact construction-first sentence | Alias, title-case, repeated preparation and generic-specification tests |
 | Owner says SS basket or tandem basket | Distinguish stainless-steel baskets from soft-close kitchen drawer systems; never infer a brand or basket grade from fittings | Manufacturer terminology review and source-aware alias tests |
 | Confirmed frame-type unit | State frames/shutters with inside and outside laminate; lining, shelves and partitions only when specified | Shared contract, stock-definition migration and editor/browser checks |
