@@ -7,12 +7,19 @@ export type CompanySettingsValidation = {
   company?: CompanySettings;
 };
 
-/** A contact/payment update must not discard an owner's unsaved rate-card work. */
+/** Keep unsaved edits to rates or instructions when other catalogue settings are saved. */
 export function syncCatalogueDraft(previousSaved: StudioCatalogue, incoming: StudioCatalogue, localDraft: StudioCatalogue): StudioCatalogue {
-  const { company: previousCompany, ...previousRates } = previousSaved;
-  const { company: incomingCompany, ...incomingRates } = incoming;
-  if (JSON.stringify(previousRates) !== JSON.stringify(incomingRates)) return structuredClone(incoming);
-  return { ...localDraft, company: structuredClone(incomingCompany) };
+  const unchanged = (before: unknown, after: unknown) => JSON.stringify(before) === JSON.stringify(after);
+  const next = structuredClone(incoming);
+  for (const [key, work] of Object.entries(localDraft.workTypes)) {
+    if (unchanged(previousSaved.workTypes[key], incoming.workTypes[key])) {
+      next.workTypes[key] = structuredClone(work);
+    }
+  }
+  if (unchanged(previousSaved.assistantLessons,incoming.assistantLessons)) {
+    next.assistantLessons = structuredClone(localDraft.assistantLessons);
+  }
+  return next;
 }
 
 /** Accept a website address with or without its http(s) prefix. */

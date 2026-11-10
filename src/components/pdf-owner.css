@@ -43,7 +43,8 @@
 .pdf-pagination-measure { position: fixed; left: -100000px; top: 0; width: 210mm; max-width: none; visibility: hidden; pointer-events: none; zoom: 1; }
 .pdf-source-layout { position: fixed; left: -100000px; top: 0; width: 186mm; visibility: hidden; pointer-events: none; }
 .pdf-flow-section { display: flex; flex-direction: column; gap: 16px; }
-.pdf-pages { width: 210mm; zoom: var(--pdf-preview-scale, 1); }
+/* Scale the preview without reflowing the measured page on small screens. */
+.pdf-pages { display: flow-root; width: 210mm; transform: scale(var(--pdf-preview-scale, 1)); transform-origin: top left; }
 .pdf-page { position: relative; width: 210mm; height: calc(297mm - 1px); padding: 12mm; box-sizing: border-box; margin: 0 0 24px; background: #fff; color: #18221d; box-shadow: 0 3px 18px #26382e16; }
 /*
  * Keep a real safety band above the absolute footer. The pagination engine
@@ -118,9 +119,9 @@
 .quote-document .pdf-room-comparison td:nth-child(5) { font-size: 10px; }
 .quote-document .pdf-payment-table th { font-size: 10px; }
 @media print {
-  .quote-document { width: 210mm; max-width: none; margin: 0; overflow: visible; }
+  .quote-document { width: 210mm; max-width: none; height: auto !important; margin: 0; overflow: visible; }
   .pdf-source-layout { display: none !important; }
-  .pdf-pages { zoom: 1; }
+  .pdf-pages { transform: none; }
   .pdf-page { margin: 0; box-shadow: none; break-after: page; page-break-after: always; break-inside: avoid; }
   .pdf-page:last-child { break-after: auto; page-break-after: auto; }
 }

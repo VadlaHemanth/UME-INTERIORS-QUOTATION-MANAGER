@@ -3,7 +3,7 @@ import { canonicalFurnitureName } from './furniture';
 
 /** Sort only the presentation. Original room/item indices remain payment/selection identities. */
 type NamedRoom={name:string|null};
-type NamedFurniture={name:string|null;workType?:string|null;work_type?:string|null;itemIndex?:number;parentItemIndex?:number|null;parent_item_index?:number|null;sourceTextEn?:string;source_text_en?:string};
+type NamedFurniture={name:string|null;workType?:string|null;work_type?:string|null;itemIndex?:number;parentItemIndex?:number|null;parent_item_index?:number|null;sourceTextEn?:string;source_text_en?:string;manualParent?:true;manual_parent?:true;ownerText?:{name?:true}};
 const words=(value:string|null|undefined)=>(value||'').toLowerCase().replace(/paneling/g,'panelling').replace(/[^a-z0-9]+/g,' ').trim();
 const isTvAssembly=(name:string|null|undefined)=>/^tv (?:unit|console cabinet) with\b/.test(words(name));
 
@@ -76,6 +76,7 @@ export function orderQuotationFurniture<T extends NamedFurniture>(items:readonly
   for(const entry of entries){
     const explicit=entry.item.parentItemIndex??entry.item.parent_item_index;
     if(explicit!=null&&explicit!==entry.id&&byId.has(explicit)){parents.set(entry.id,explicit);continue;}
+    if(entry.item.manualParent===true||entry.item.manual_parent===true)continue;
     const related=/panelling|backdrop|locker/i.test(entry.item.name||'')&&!isTvAssembly(entry.item.name);
     if(!isLoft(entry.item)&&!related)continue;
     const text=words(`${entry.item.name} ${entry.item.sourceTextEn||entry.item.source_text_en||''}`);
@@ -101,7 +102,7 @@ export function furnitureRelationshipLabel(item:NamedFurniture,items:readonly Na
   const name=words(item.name),source=words(item.sourceTextEn||item.source_text_en),parentName=words(parent.name);
   const panelling=/panelling|backdrop|panel\b/.test(name);
   const direction=panelling&&/\bunder\b|\bbelow\b/.test(name+' '+source)&&/loft/.test(parentName)?'Below':panelling?'Grouped with':/loft|low roof/i.test(`${item.name} ${item.workType||item.work_type||''}`)?'Above':/locker|internal.*drawer/.test(name)?'Inside':'Grouped with';
-  return `${direction} ${canonicalFurnitureName(parent.name||'',parent.workType||parent.work_type||'','',parent.sourceTextEn||parent.source_text_en||'')}`;
+  return `${direction} ${parent.ownerText?.name===true?parent.name:canonicalFurnitureName(parent.name||'',parent.workType||parent.work_type||'','',parent.sourceTextEn||parent.source_text_en||'')}`;
 }
 export const roomDisplayNumber=(index:number)=>String(index+1).padStart(2,'0');
 export function quotationDisplayRooms(rooms:PricedQuotationSnapshot['rooms'],agreedOptionalPointers?:readonly string[]):PricedQuotationSnapshot['rooms'] {

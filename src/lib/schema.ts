@@ -86,6 +86,10 @@ export interface DraftItem {
   optional: boolean | null;
   source_text_en: string;
   custom_rates?: ItemCustomRates | null;
+  /** The studio preserves text the owner explicitly edits. */
+  owner_text?: { name?: true; specification?: true };
+  /** A null main unit can be an explicit choice rather than a request to infer one. */
+  manual_parent?: true;
 }
 
 export interface DraftRoom {
@@ -244,26 +248,58 @@ export function detectPlaceholders(text: string): string | null {
   return null;
 }
 
+/** Reject malformed imports before formatters or editors read nested fields. */
+export function quotationDraftShapeIssue(draft: unknown): ValidationIssue | undefined {
+  const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === 'object' && !Array.isArray(value));
+  const fail = (path: string, expected: string): ValidationIssue => ({
+    path, severity:'error', code:'SCHEMA_MISMATCH', message:'Expected ' + expected + ' at ' + (path || 'the quotation root') + '.',
+  });
+  const text = (value: unknown) => value == null || typeof value === 'string';
+  if (!record(draft)) return fail('', 'a quotation object');
+  if (!record(draft.customer)) return fail('/customer', 'a customer object');
+  if (!record(draft.quote)) return fail('/quote', 'a quotation details object');
+  for (const key of ['name','site','phone']) if (!text(draft.customer[key])) return fail('/customer/' + key, 'text or null');
+  for (const key of ['number','date','valid_until']) if (!text(draft.quote[key])) return fail('/quote/' + key, 'text or null');
+  if (draft.quote.notes !== undefined && (!Array.isArray(draft.quote.notes) || draft.quote.notes.some(note => typeof note !== 'string'))) return fail('/quote/notes', 'a list of notes');
+  if (draft.recommended != null) {
+    const value = draft.recommended;
+    if (!record(value) || !text(value.brand_preference) ||
+      (value.grade != null && !['Base','Normal','Premium'].includes(value.grade as string)) ||
+      (value.protection != null && !['Standard','With PVC'].includes(value.protection as string)) ||
+      (value.finish != null && !['SF','High Gloss'].includes(value.finish as string))) return fail('/recommended', 'valid package options or null');
+  }
+  if (!Array.isArray(draft.rooms)) return fail('/rooms', 'a list of rooms');
+  for (const [ri, room] of draft.rooms.entries()) {
+    const roomPath = '/rooms/' + ri;
+    if (!record(room) || !text(room.name) || !Array.isArray(room.items)) return fail(roomPath, 'a room with a name and an items list');
+    for (const [ii, item] of room.items.entries()) {
+      const path = roomPath + '/items/' + ii;
+      if (!record(item)) return fail(path, 'a furniture item');
+      for (const key of ['name','work_type','size_text']) if (!text(item[key])) return fail(path + '/' + key, 'text or null');
+      if (!text(item.source_text_en)) return fail(path + '/source_text_en', 'specification text or null');
+      if (!record(item.measure) || !text(item.measure.unit)) return fail(path + '/measure', 'a measurement object with a billing unit');
+      if (item.measure.per_item != null && typeof item.measure.per_item !== 'number') return fail(path + '/measure/per_item', 'a number or null');
+      if (item.quantity != null && typeof item.quantity !== 'number') return fail(path + '/quantity', 'a number or null');
+      if (item.optional != null && typeof item.optional !== 'boolean') return fail(path + '/optional', 'true, false or null');
+    }
+  }
+  for (const [key, field] of [['owner_requests','text'], ['needs_clarification','question']]) {
+    const list = draft[key];
+    if (!Array.isArray(list)) return fail('/' + key, 'a list');
+    for (const [index, entry] of list.entries()) {
+      if (!record(entry) || typeof entry.path !== 'string' || typeof entry[field] !== 'string') return fail('/' + key + '/' + index, 'a review entry with a path and message');
+    }
+  }
+}
+
 export function validateQuotationDraftV2(
   draft: unknown,
   options: { reviewedOwnerRequests?: boolean } = {}
 ): ValidationResult {
   const issues: ValidationIssue[] = [];
 
-  if (!draft || typeof draft !== 'object') {
-    return {
-      validForDraft: false,
-      readyForPublish: false,
-      issues: [
-        {
-          path: '',
-          severity: 'error',
-          code: 'SCHEMA_MISMATCH',
-          message: 'Root payload must be a JSON object.',
-        },
-      ],
-    };
-  }
+  const shapeIssue = quotationDraftShapeIssue(draft);
+  if (shapeIssue) return { validForDraft:false, readyForPublish:false, issues:[shapeIssue] };
 
   const d = draft as Partial<QuotationDraftV2>;
 
@@ -523,7 +559,7 @@ export function validateQuotationDraftV2(
             !item.measure ||
             item.measure.per_item === null ||
             item.measure.per_item === undefined ||
-            item.measure.per_item <= 0
+            !Number.isFinite(item.measure.per_item) || item.measure.per_item <= 0
           ) {
             issues.push({
               path: `${iPath}/measure/per_item`,
@@ -532,7 +568,7 @@ export function validateQuotationDraftV2(
               message: `Missing or non-positive billable measure (per_item) for "${item.name || 'item'}" in ${room.name || 'room'}.`,
             });
           }
-          if (item.quantity === null || item.quantity === undefined || item.quantity <= 0) {
+          if (item.quantity === null || item.quantity === undefined || !Number.isSafeInteger(item.quantity) || item.quantity <= 0) {
             issues.push({
               path: `${iPath}/quantity`,
               severity: 'publish_blocker',

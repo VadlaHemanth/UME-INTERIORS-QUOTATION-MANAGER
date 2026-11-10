@@ -59,3 +59,44 @@ export function normalizeFurnitureLayout(draft:QuotationDraftV2):QuotationDraftV
   next.rooms=finalRooms.map(entry=>entry.room);
   return next;
 }
+
+/** Remove scope and keep its index-based links and review pointers aligned. */
+export function removeQuotationScope(draft: QuotationDraftV2, roomIndex: number, itemIndex?: number): QuotationDraftV2 {
+  const next = structuredClone(draft);
+  const remapParent = (item: DraftItem) => {
+    if (itemIndex === undefined || item.parent_item_index == null) return;
+    if (item.parent_item_index === itemIndex) {
+      item.parent_item_index = null;
+      item.manual_parent = true;
+    } else if (item.parent_item_index > itemIndex) {
+      item.parent_item_index--;
+    }
+  };
+  if (itemIndex === undefined) {
+    next.rooms.splice(roomIndex, 1);
+    next.suggested_addons = next.suggested_addons?.filter(addon => addon.room_index !== roomIndex);
+    next.suggested_addons?.forEach(addon => { if (addon.room_index > roomIndex) addon.room_index--; });
+  } else {
+    const room = next.rooms[roomIndex];
+    room.items.splice(itemIndex, 1);
+    room.items.forEach(remapParent);
+    next.suggested_addons?.filter(addon => addon.room_index === roomIndex).forEach(addon => remapParent(addon.item));
+  }
+  const remapReviews = <T extends { path: string }>(reviews: T[]): T[] => reviews.flatMap(review => {
+    const match = /^\/rooms\/(\d+)(?:\/items\/(\d+))?(?=\/|$)/.exec(review.path);
+    if (!match) return [review];
+    const room = Number(match[1]);
+    const item = match[2] === undefined ? undefined : Number(match[2]);
+    if (room === roomIndex && (itemIndex === undefined || item === itemIndex)) return [];
+    if (itemIndex === undefined && room > roomIndex) {
+      return [{...review, path: review.path.replace(/^\/rooms\/\d+/, '/rooms/' + (room - 1))}];
+    }
+    if (room === roomIndex && itemIndex !== undefined && item !== undefined && item > itemIndex) {
+      return [{...review, path: review.path.replace(/^\/rooms\/\d+\/items\/\d+/, '/rooms/' + room + '/items/' + (item - 1))}];
+    }
+    return [review];
+  });
+  next.owner_requests = remapReviews(next.owner_requests);
+  next.needs_clarification = remapReviews(next.needs_clarification);
+  return next;
+}

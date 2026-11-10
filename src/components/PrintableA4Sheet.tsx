@@ -1,9 +1,8 @@
+import { quotationFurnitureText } from '../lib/quotation-presentation';
 import React, { useLayoutEffect, useRef } from 'react';
 import './pdf-owner.css';
 import {
-  formatCleanItemDescription,
   getPackageDisplayName,
-  standardizeCompetitorItemName,
   StudioCatalogue,
 } from '../lib/catalogue';
 import {
@@ -71,6 +70,7 @@ function A4Document({ children, reference, documentTitle }: { children: React.Re
       const paperPixels = 210 * 96 / 25.4;
       const scale = Math.min(1, viewport.clientWidth / paperPixels);
       viewport.style.setProperty('--pdf-preview-scale', String(scale));
+      viewport.style.height = (pages.offsetHeight * scale) + 'px';
     };
     const rebuild = () => {
       if (!active) return;
@@ -634,7 +634,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                   return (
                     <tr key={r.roomIndex}>
                       <td className="py-2.5 px-3 font-bold text-[#18221D]">
-                        {roomDisplayNumber(displayIndex)}. {r.name} ({selectedRoomItems(r,selectedOptionalPointers).length} units)
+                        {roomDisplayNumber(displayIndex)}. {r.name} ({selectedRoomItems(r,selectedOptionalPointers).length} {selectedRoomItems(r,selectedOptionalPointers).length===1?'unit':'units'})
                       </td>
                       <td className={`py-2.5 px-2.5 text-right font-mono tabular-nums ${rSel.grade === 'Base' ? 'pdf-selected-cell' : 'text-[#4A524D]'}`}>
                         {formatINR(stdRoom)}
@@ -782,18 +782,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                             ? 'running ft'
                             : item.unit;
 
-                        const cleanTitle = standardizeCompetitorItemName(
-                          item.name,
-                          item.workType,
-                          room.name,
-                          item.sourceTextEn
-                        );
-                        const cleanDesc = formatCleanItemDescription(
-                          item.sourceTextEn,
-                          item.name,
-                          item.workType,
-                          room.name
-                        );
+                        const {name:cleanTitle,specification:cleanDesc} = quotationFurnitureText(item,room.name);
 
                         return (
                           <tr key={`${room.roomIndex}-${item.itemIndex}`}>
@@ -812,7 +801,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                                 ? `${item.quantity} ${item.quantity === 1 ? 'item' : 'items'}`
                                 : `${item.totalMeasure.toFixed(2)} ${uLabel}`}
                             </td>
-                            {(isWorkOrder ? [rSel.grade] : ALL_GRADES).map(grade => { const combo = makeComboKey(grade,rSel.protection,rSel.finish); return <td key={grade} className={`py-2 px-2 text-right font-mono tabular-nums ${rSel.grade === grade ? 'pdf-selected-cell' : ''}`}><div className="font-semibold">{formatINR(item.exactAmounts[combo] || 0)}</div><div className="text-[9.5px] text-[#5C645F]">@{formatINR(item.unitRates[combo] || 0)}</div></td>; })}
+                            {(isWorkOrder ? [rSel.grade] : ALL_GRADES).map(grade => { const combo = makeComboKey(grade,rSel.protection,rSel.finish); const rate = item.unitRates[combo] || 0; return <td key={grade} className={`py-2 px-2 text-right font-mono tabular-nums ${rSel.grade === grade ? 'pdf-selected-cell' : ''}`}><div className="font-semibold">{formatINR(item.exactAmounts[combo] || 0)}</div><div className="text-[9.5px] text-[#5C645F]">@{formatINR(rate,!Number.isInteger(rate))}</div></td>; })}
                           </tr>
                         );
                       })}

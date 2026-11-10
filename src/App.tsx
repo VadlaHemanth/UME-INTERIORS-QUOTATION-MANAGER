@@ -193,7 +193,6 @@ export default function App() {
         );
         return;
       }
-      if (data.catalogue) setCatalogue(data.catalogue);
       if (data.catalogue) setCustomerCatalogue(data.catalogue);
       setCustomerQuoteRecord(data.quote);
       setCustomerVerifiedPaid(data.verifiedPaidRupees || 0);
@@ -307,18 +306,15 @@ export default function App() {
     } catch (err) { setActionError(String(err)); throw err; }
   };
 
-  const handleUpdateQuoteDraft = async (publicId: string, updatedDraft: QuotationDraftV2, defaultSentPackage?: ResolvedPackageSelection) => {
-    try {
-      const res = await fetch(`/api/quotes/${publicId}/draft`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({draft: updatedDraft, defaultSentPackage}),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save quotation.');
-      if (Array.isArray(data.quotes)) setQuotes(data.quotes);
-      if (data.catalogue) setCatalogue(data.catalogue);
-      if (data.catalogue) setCustomerCatalogue(data.catalogue);
-      if (data.quote) setCustomerQuoteRecord(prev => prev?.publicId === publicId ? data.quote : prev);
-    } catch (err) { setActionError(String(err)); throw err; }
+  const handleUpdateQuoteDraft = async (publicId: string, updatedDraft: QuotationDraftV2, expectedRevision: number) => {
+    const res = await fetch(`/api/quotes/${publicId}/draft`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({draft: updatedDraft, expectedRevision}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save quotation.');
+    if (Array.isArray(data.quotes)) setQuotes(data.quotes);
+    if (data.catalogue) setCustomerCatalogue(data.catalogue);
+    if (data.quote) setCustomerQuoteRecord(prev => prev?.publicId === publicId ? data.quote : prev);
   };
 
   const returnToStudio = async () => {
@@ -386,10 +382,11 @@ export default function App() {
     draft: QuotationDraftV2;
     reviewedOwnerRequests: boolean;
     supersedePublicId?: string;
+    expectedRevision?: number;
     approvedDiscountRupees: number;
     defaultSentPackage?: ResolvedPackageSelection;
     confirmWorkOrderSelection?: boolean;
-  }): Promise<{ ok: boolean; shareUrl?: string; publicId?: string; error?: string }> => {
+  }): Promise<{ ok: boolean; shareUrl?: string; publicId?: string; record?: PublishedQuoteSummary; error?: string }> => {
     try {
       const res = await fetch('/api/studio/publish', {
         method: 'POST',
@@ -401,7 +398,7 @@ export default function App() {
         return {
           ok: false,
           error:
-            data.error ||
+            data.validation?.issues?.[0]?.message || data.error ||
             'Quotation failed validation gates. Resolve open questions before publishing.',
         };
       }
@@ -415,6 +412,7 @@ export default function App() {
         ok: true,
         shareUrl: data.shareUrl,
         publicId: data.record?.publicId,
+        record: data.record,
       };
     } catch (err: any) {
       return { ok: false, error: err?.message || 'Failed to publish draft.' };
@@ -424,7 +422,7 @@ export default function App() {
   const handleSaveOwnerDraft = async (draft: QuotationDraftV2, publicId?: string, approvedDiscountRupees = 0) => {
     const response = await fetch('/api/studio/drafts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({draft,publicId,approvedDiscountRupees})});
     const data = await response.json();
-    if(!response.ok) throw new Error(data.error || 'Could not save the draft.');
+    if(!response.ok) throw new Error(data.validation?.issues?.[0]?.message || data.error || 'Could not save the draft.');
     setQuotes(data.quotes);
     return data.record as PublishedQuoteSummary;
   };
@@ -666,8 +664,8 @@ export default function App() {
             existingFeedback={customerQuoteRecord.customerFeedback}
             workOrder={customerQuoteRecord.workOrder}
             onSaveSelection={handleSaveSelection}
-            onUpdateQuoteDraft={({draft, defaultSentPackage}) =>
-              handleUpdateQuoteDraft(customerQuoteRecord.publicId, draft, defaultSentPackage)
+            onUpdateQuoteDraft={draft =>
+              handleUpdateQuoteDraft(customerQuoteRecord.publicId,draft,customerQuoteRecord.revision)
             }
             onSubmitPayment={handleSubmitPayment}
             onSwitchQuote={(pid) => fetchSingleCustomerQuote(pid)}
@@ -695,7 +693,6 @@ export default function App() {
             onPublishDraft={handlePublishDraft}
             onSaveOwnerDraft={handleSaveOwnerDraft}
             onUpdateDefaultPackage={handleUpdateDefaultPackage}
-            onUpdateQuoteDraft={handleUpdateQuoteDraft}
             onUpdateCatalogue={handleUpdateCatalogue}
             onVerifyOrRejectPayment={handleVerifyOrRejectPayment}
             onRecordVerifiedPayment={handleRecordVerifiedPayment}

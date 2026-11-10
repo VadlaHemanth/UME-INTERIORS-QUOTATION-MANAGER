@@ -54,11 +54,11 @@ import {
   QuotationDraftV2,
   ResolvedPackageSelection,
   validateQuotationDraftV2,
+  quotationDraftShapeIssue,
 } from '../lib/schema';
 import { getQuotationBasisLabel, getQuotationEstimateNote, isFloorPlanEstimate } from '../lib/quotation-notes';
 import { indiaDate, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../lib/quote-workflow';
 import { CustomerQuotationView } from './CustomerQuotationView';
-import { FURNITURE_VOCABULARY } from '../lib/furniture';
 import { packageAllowances } from '../lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../lib/quotation-presentation';
 import { RoomScopeEditor } from './RoomScopeEditor';
@@ -138,18 +138,14 @@ interface OwnerStudioViewProps {
     draft: QuotationDraftV2;
     reviewedOwnerRequests: boolean;
     supersedePublicId?: string;
+    expectedRevision?: number;
     approvedDiscountRupees: number;
     defaultSentPackage?: ResolvedPackageSelection;
     confirmWorkOrderSelection?: boolean;
-  }) => Promise<{ ok: boolean; shareUrl?: string; publicId?: string; error?: string }>;
+  }) => Promise<{ ok: boolean; shareUrl?: string; publicId?: string; record?: PublishedQuoteSummary; error?: string }>;
   onUpdateDefaultPackage?: (
     publicId: string,
     defaultSentPackage: ResolvedPackageSelection
-  ) => Promise<void>;
-  onUpdateQuoteDraft?: (
-    publicId: string,
-    updatedDraft: QuotationDraftV2,
-    defaultSentPackage?: ResolvedPackageSelection
   ) => Promise<void>;
   onUpdateCatalogue: (nextCatalogue: StudioCatalogue) => Promise<void>;
   onVerifyOrRejectPayment: (
@@ -210,7 +206,6 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   onPublishDraft,
   onSaveOwnerDraft,
   onUpdateDefaultPackage,
-  onUpdateQuoteDraft,
   onUpdateCatalogue,
   onVerifyOrRejectPayment,
   onRecordVerifiedPayment,
@@ -224,9 +219,12 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
   // Unified Quotation + Rate Card Studio State
   const [workingDraft, setWorkingDraft] = useState<QuotationDraftV2>(() => createEmptyOwnerDraft(quotes));
-  const [rawJsonText, setRawJsonText] = useState<string>(() =>
-    JSON.stringify(createEmptyOwnerDraft(quotes), null, 2)
-  );
+  const [pendingJson, setPendingJson] = useState<string | null>(null);
+  const [importFeedback, setImportFeedback] = useState<{ok:boolean;message:string} | null>(null);
+  const [loadingJson, setLoadingJson] = useState(false);
+  const [editorGeneration, setEditorGeneration] = useState(0);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const rawJsonText = useMemo(() => pendingJson ?? JSON.stringify(workingDraft,null,2), [pendingJson,workingDraft]);
   const [editableCatalogue, setEditableCatalogue] = useState<StudioCatalogue>(() =>
     structuredClone(catalogue)
   );
@@ -281,6 +279,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const [creatingWorkOrder,setCreatingWorkOrder]=useState(false);
   const [workOrderFeedback,setWorkOrderFeedback]=useState<{ok:boolean;message:string}|null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  const editorBusy = loadingJson || isPublishing || savingDraft || savingRates || savingNewWork;
   const [updateWorkOrderSelection,setUpdateWorkOrderSelection] = useState(false);
   const currentQuotes = useMemo(() => quotes.filter(q => !q.supersededByPublicId || !quotes.some(next => next.publicId === q.supersededByPublicId)).sort((a,b) => b.publishedAt.localeCompare(a.publishedAt)), [quotes]);
   const paymentRecord=currentQuotes.find(quote=>quote.publicId===paymentQuote&&quote.status!=='Draft');
@@ -358,27 +357,40 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     draft.quote.notes=reviewedQuotationNotes(draft,reviewedOwnerRequests);
     draft.quote=completeQuoteDates(draft.quote,indiaDate());
     return draft;
-  },[workingDraft,editableCatalogue,catalogue,reviewedOwnerRequests,quotes,supersedeId]);
+  },[workingDraft,editableCatalogue,reviewedOwnerRequests]);
   const previewSnapshot=useMemo(()=>calculateQuotationPricing(previewDraft,editableCatalogue),[previewDraft,editableCatalogue]);
   const editingRecord=quotes.find(quote=>quote.publicId===supersedeId);
   const previewDefaultPackage:ResolvedPackageSelection={grade:previewDraft.recommended?.grade||'Base',protection:previewDraft.recommended?.protection||'Standard',finish:previewDraft.recommended?.finish||'SF',brand_preference:previewDraft.recommended?.brand_preference||null};
   const previewWorkOrder=editingRecord?.workOrder?workOrderPreview(editingRecord.draft,previewDraft,editingRecord.workOrder,previewSnapshot,approvedDiscount,updateWorkOrderSelection?previewDefaultPackage:undefined):undefined;
   const previewVerifiedPaid=editingRecord?.workOrder?verifiedForQuote(editingRecord.publicId):0;
 
-  const syncDraft = (next: QuotationDraftV2) => {
-    const withAutomaticProtection = applyStandardPvcScopes(next, editableCatalogue);
-    setWorkingDraft(withAutomaticProtection);
-    setRawJsonText(JSON.stringify(withAutomaticProtection, null, 2));
+  const syncDraft = (next: QuotationDraftV2, dirty = true) => {
+    setWorkingDraft(next);
+    setDraftDirty(dirty);
     setPublishResult(null);
+  };
+
+  const loadEditorDraft = (next: QuotationDraftV2, dirty = false) => {
+    setPendingJson(null);
+    setImportFeedback(null);
+    setEditorGeneration(generation => generation + 1);
+    syncDraft(applyStandardPvcScopes(next,editableCatalogue),dirty);
   };
 
   /**
    * Unified JSON Loader: Accepts EITHER a Quotation JSON (with optional rate_card_updates / custom_rates / new work_types)
    * OR a Rate Card JSON, and automatically updates both the Rate Card Catalogue and the Quotation Editor in ONE click!
    */
-  const processUnifiedJsonText = async (jsonString: string, sourceLabel = 'JSON') => {
+  const processUnifiedJsonText = async (readText: () => Promise<string>, sourceLabel = 'JSON') => {
+    if (editorBusy) return;
+    setLoadingJson(true);
+    setImportFeedback(null);
     try {
-      const parsed = parseStudioJson(jsonString) as Record<string, any>;
+      const jsonString = await readText();
+      setPendingJson(jsonString);
+      const value = parseStudioJson(jsonString);
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Paste one quotation or rate card JSON object.');
+      const parsed = value as Record<string, any>;
 
       // Case A: Pure Rate Card JSON (`quotation-studio.ratecard.v2` without `rooms`)
       if (
@@ -388,23 +400,20 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         const merged = mergeRateCardJsonIntoCatalogue(editableCatalogue, parsed);
         await onUpdateCatalogue(merged.catalogue);
         setEditableCatalogue(merged.catalogue);
-        setPublishResult({
+        setPendingJson(null);
+        setImportFeedback({
           ok: true,
           message: `Merged ${merged.addedOrUpdatedKeys.length} work element(s) (${merged.addedOrUpdatedKeys.join(', ')}) into your Rate Card Memory!`,
         });
         return;
       }
 
+      if (!Array.isArray(parsed.rooms)) throw new Error('The quotation JSON must include a rooms list.');
       const v2 = (parsed.schema_version === 'quotation-studio.draft.v2' ? parsed : migrateV1ToV2Draft(parsed)) as QuotationDraftV2;
-      if (!v2.customer || !v2.quote || !Array.isArray(v2.rooms) ||
-        !Array.isArray(v2.owner_requests) || !Array.isArray(v2.needs_clarification) ||
-        v2.rooms.some((room: any) => !room || !Array.isArray(room.items) || room.items.some((item: any) =>
-          !item || !item.measure))) {
-        throw new Error('The draft must include customer, quote, rooms/items, measurements, owner_requests and needs_clarification.');
-      }
+      const shapeIssue = quotationDraftShapeIssue(v2);
+      if (shapeIssue) throw new Error(shapeIssue.message);
       const addonValidation = validateAddonSuggestions(v2);
       if (!addonValidation.valid) throw new Error(addonValidation.errors.join(' '));
-      validateQuotationDraftV2(v2, { reviewedOwnerRequests: false });
       const autoRateMerge = extractAndMergeRateCardFromDraft(editableCatalogue, v2);
       if (autoRateMerge.addedOrUpdatedKeys.length > 0||autoRateMerge.assistantMemoryChanged) {
         await onUpdateCatalogue(autoRateMerge.catalogue);
@@ -415,53 +424,59 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       const existing = currentQuotes.find(q => q.draft.quote.number && q.draft.quote.number === v2.quote.number);
       setSupersedeId(existing?.publicId || '');
       v2.quote.number ||= nextQuoteNumber(quotes);
-      v2.quote=existing?beginQuotationEdit(v2.quote,indiaDate()):completeQuoteDates(v2.quote,indiaDate());
+      v2.quote = completeQuoteDates(v2.quote,indiaDate());
+      v2.recommended = {
+        grade:v2.recommended?.grade || 'Base',
+        protection:v2.recommended?.protection || 'Standard',
+        finish:v2.recommended?.finish || 'SF',
+        brand_preference:v2.recommended?.brand_preference || null,
+      };
       setReviewedOwnerRequests(false);
-      syncDraft(prepareQuotationDraft(v2,autoRateMerge.catalogue));
-      setPublishResult({
+      setApprovedDiscount(existing?.approvedDiscountRupees || 0);
+      setUpdateWorkOrderSelection(false);
+      loadEditorDraft(prepareQuotationDraft(v2,autoRateMerge.catalogue),true);
+      setImportFeedback({
         ok: true,
         message:
           autoRateMerge.addedOrUpdatedKeys.length > 0
             ? `${sourceLabel} loaded! Also auto-saved ${autoRateMerge.addedOrUpdatedKeys.length} work type(s) (${autoRateMerge.addedOrUpdatedKeys.join(', ')}) into your Rate Card Memory.`
-            : `${sourceLabel} parsed, validated, and loaded into the Unified Quote & Rate Card Studio.`,
+            : `${sourceLabel} loaded. Review the quotation details below.`,
       });
-    } catch (err: any) {
-      setPublishResult({
-        ok: false,
-        message: `Unable to load JSON: ${err?.message || 'Please check that you copied the complete JSON object from your Gemini Gem or Custom GPT.'}`,
-      });
+    } catch (error) {
+      setImportFeedback({ok:false,message:'Unable to load JSON. ' + (error instanceof Error ? error.message : 'Copy the complete quotation JSON and try again.')});
+    } finally {
+      setLoadingJson(false);
     }
   };
 
-  const handlePasteFromClipboard = async () => {
+  const handlePasteFromClipboard = () => processUnifiedJsonText(async () => {
     try {
-      const text = await navigator.clipboard.readText();
-      if (text && text.trim()) {
-        setRawJsonText(text.trim());
-        await processUnifiedJsonText(text.trim(), 'Clipboard JSON');
-      }
+      return await navigator.clipboard.readText();
     } catch {
-      setPublishResult({
-        ok: false,
-        message:
-          'Browser blocked clipboard read. Please press Ctrl+V / Cmd+V inside the JSON box below and click Load Unified JSON.',
-      });
+      throw new Error('Paste into the JSON box, then choose Load quotation & rates.');
     }
+  }, 'Clipboard JSON');
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (file) void processUnifiedJsonText(() => file.text(), 'File "' + file.name + '"');
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const text = String(reader.result || '');
-      setRawJsonText(text);
-      await processUnifiedJsonText(text, `File "${file.name}"`);
-    };
-    reader.readAsText(file);
+  const editorHasChanges = draftDirty || pendingJson !== null;
+  const canReplaceEditor = () => !editorHasChanges || window.confirm('Discard unsaved changes to the quotation editor?');
+
+  const loadPracticeDraft = (example: QuotationDraftV2) => {
+    if (!canReplaceEditor()) return;
+    setSupersedeId('');
+    setApprovedDiscount(0);
+    setReviewedOwnerRequests(false);
+    setUpdateWorkOrderSelection(false);
+    loadEditorDraft({...structuredClone(example),is_demo:true});
   };
 
   const handleStartNewQuotation = () => {
+    if (editorBusy || !canReplaceEditor()) return;
     const clean = createEmptyOwnerDraft(quotes);
     setSupersedeId('');
     setApprovedDiscount(0);
@@ -469,26 +484,30 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     setUpdateWorkOrderSelection(false);
     setPreviewMode(null);
     setActiveTab('unified_studio');
-    syncDraft(clean);
+    loadEditorDraft(clean);
     window.scrollTo({top:0, behavior:'instant'});
   };
 
   const handleAutoAddMissingWorkTypesToRateCard = async () => {
-    if (unmappedWorkTypes.length === 0) return;
+    if (editorBusy || unmappedWorkTypes.length === 0) return;
+    setSavingNewWork(true);
     setPublishResult(null);
     try {
       const merged = extractAndMergeRateCardFromDraft(editableCatalogue, workingDraft);
+      if (!merged.addedOrUpdatedKeys.length) throw new Error('Enter the missing work-type rates in the rate card before saving.');
       await onUpdateCatalogue(merged.catalogue);
       setEditableCatalogue(merged.catalogue);
       setPublishResult({ ok: true, message: `Saved ${merged.addedOrUpdatedKeys.join(', ')} to the rate card.` });
     } catch (error) {
       setPublishResult({ ok: false, message: error instanceof Error ? error.message : 'Unable to save the new work types. Please try again.' });
+    } finally {
+      setSavingNewWork(false);
     }
   };
 
   const handleAddCustomWorkElementForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if(savingNewWork)return;
+    if(editorBusy)return;
     const cleanLabel = newWorkLabel.trim();
     if (!cleanLabel) return;
     if(editableCatalogue.workTypes[cleanLabel]) {setRateFeedback({ok:false,message:'This work type already exists. Edit its rates in the list above.'});return;}
@@ -535,8 +554,31 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     } finally {setSavingNewWork(false);}
   };
 
+  const handleSaveDraftClick = async () => {
+    if (editorBusy) return;
+    if (pendingJson !== null) {
+      setPublishResult({ok:false,message:'Load or discard the pasted JSON before saving.'});
+      return;
+    }
+    setSavingDraft(true);
+    try {
+      const saved = await onSaveOwnerDraft(workingDraft,supersedeId || undefined,approvedDiscount);
+      syncDraft(saved.draft,false);
+      setSupersedeId(saved.publicId);
+      setPublishResult({ok:true,message:'Draft saved. It appears in Quotations and remains private until published.'});
+    } catch (error) {
+      setPublishResult({ok:false,message:error instanceof Error ? error.message : 'Could not save draft.'});
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handlePublishClick = async () => {
-    if (isPublishing) return;
+    if (editorBusy) return;
+    if (pendingJson !== null) {
+      setPublishResult({ok:false,message:'Load or discard the pasted JSON before publishing.'});
+      return;
+    }
     if (!validation.readyForPublish || unmappedWorkTypes.length) {
       setPublishResult({ ok: false, message: 'Resolve the review issues and missing work-type rates before publishing.' });
       return;
@@ -545,7 +587,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
     setIsPublishing(true);
     try {
     // Ensure any inline rate changes in editableCatalogue are persisted first
-    await onUpdateCatalogue(editableCatalogue);
+    if (JSON.stringify(editableCatalogue) !== JSON.stringify(catalogue)) await onUpdateCatalogue(editableCatalogue);
     const publicationDraft = structuredClone(workingDraft);
     delete publicationDraft.rate_card_updates;
 
@@ -559,12 +601,15 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       draft: publicationDraft,
       reviewedOwnerRequests,
       supersedePublicId: supersedeId || undefined,
+      expectedRevision: editingRecord?.revision,
       approvedDiscountRupees: approvedDiscount,
       defaultSentPackage: defaultPkg,
       confirmWorkOrderSelection:updateWorkOrderSelection,
     });
     if (res.ok) {
       if (res.publicId) setSupersedeId(res.publicId);
+      if (res.record) syncDraft(res.record.draft,false);
+      setUpdateWorkOrderSelection(false);
       setPublishResult({
         ok: true,
         message: `${supersedeId ? 'Updated quotation published' : 'Quotation published'} · ${getPackageDisplayName(defaultPkg.grade)} package. The customer link opens the latest version.`,
@@ -608,13 +653,13 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
   const quotePageCount = Math.max(1, Math.ceil(filteredQuotes.length / pageSize));
   const visibleQuotes = filteredQuotes.slice((Math.min(quotePage, quotePageCount) - 1) * pageSize, Math.min(quotePage, quotePageCount) * pageSize);
   const saveRateCard = async () => {
-    if(savingRates)return;
+    if(editorBusy)return;
     setSavingRates(true); setPublishResult(null); setRateFeedback(null);
     try {
       const next = structuredClone(workingDraft);
       delete next.rate_card_updates;
       await onUpdateCatalogue(editableCatalogue);
-      syncDraft(next);
+      syncDraft(next,draftDirty);
       setRateFeedback({ok:true,message:'Rate card saved and applied to this draft. Publish an update to change an existing customer quotation.'});
       setPublishResult({ok:true,message:'Rate card saved. This draft now uses the updated rates. Publish an update to apply them to the customer quotation.'});
     } catch(error) { const message=error instanceof Error ? error.message : 'Could not save rates. Your edits are preserved; try again.'; setRateFeedback({ok:false,message}); setPublishResult({ok:false,message}); }
@@ -668,7 +713,6 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
   return (
     <div className={`min-h-screen bg-[#F4F1EA] text-[#18221D] pb-16 ${previewMode === null ? 'owner-studio no-print' : 'owner-preview-host'}`}>
-      <datalist id="ume-furniture-names">{FURNITURE_VOCABULARY.map(([name]) => <option key={name} value={name}/>)}</datalist>
       <datalist id="ume-worktypes-datalist">
         {Object.keys(editableCatalogue.workTypes).map((wt) => (
           <option key={wt} value={wt} />
@@ -676,7 +720,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       </datalist>
 
       {/* Studio Header & Unified Segmented Navigation */}
-      <div hidden={previewMode !== null} className="bg-white border-b border-[#E5DFD3] no-print">
+      <fieldset disabled={editorBusy} hidden={previewMode !== null} className="min-w-0 bg-white border-b border-[#E5DFD3] no-print">
         <div className="max-w-[1380px] mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -745,7 +789,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
             </button>
           </div>
         </div>
-      </div>
+      </fieldset>
 
       {previewMode && <section className="owner-preview">
         <div className="owner-preview-toolbar no-print"><div><strong>Unpublished preview</strong><p>Check the customer experience before publishing. Changes here are temporary.</p></div><div><button type="button" onClick={() => openPreview('online')} aria-pressed={previewMode === 'online'}>Online</button><button type="button" onClick={() => openPreview('pdf')} aria-pressed={previewMode === 'pdf'}>PDF</button><button type="button" onClick={closePreview}>Back to editor</button></div></div>
@@ -757,7 +801,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         )}
         {/* TAB 1: UNIFIED CREATE QUOTE & RATE CARD STUDIO */}
         {activeTab === 'unified_studio' && (
-          <div className="owner-create-layout grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <fieldset disabled={editorBusy} aria-busy={editorBusy} className="owner-create-layout min-w-0 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Left 5 Cols: Paste Unified JSON (Auto-Extracts Rate Card + Quotation) & Validation Gate */}
             <div className="lg:col-span-5 space-y-6">
               <details className="bg-white border border-[#E5DFD3] rounded-2xl p-6 space-y-4 owner-import">
@@ -805,14 +849,14 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </span>
                     <button
                       type="button"
-                      onClick={() => syncDraft({ ...structuredClone(VIDYA_SAGAR_REDDY_DRAFT), is_demo: true })}
+                      onClick={() => loadPracticeDraft(VIDYA_SAGAR_REDDY_DRAFT)}
                       className="px-2.5 py-1 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#E5DFD3] rounded-lg text-[11px] font-semibold cursor-pointer"
                     >
                       3BHK practice template
                     </button>
                     <button
                       type="button"
-                      onClick={() => syncDraft({ ...structuredClone(APPENDIX_PRACTICE_DRAFT), is_demo: true })}
+                      onClick={() => loadPracticeDraft(APPENDIX_PRACTICE_DRAFT)}
                       className="px-2.5 py-1 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#E5DFD3] rounded-lg text-[11px] font-semibold cursor-pointer"
                     >
                       2BHK practice template
@@ -823,7 +867,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     aria-label="Paste JSON from Gemini Gem or Custom GPT"
                     rows={13}
                     value={rawJsonText}
-                    onChange={(e) => setRawJsonText(e.target.value)}
+                    onChange={(event) => {setPendingJson(event.target.value);setImportFeedback(null);}}
                     placeholder='Paste your unified {"schema_version": "quotation-studio.draft.v2", "rate_card_updates": {...}, "rooms": [...]} JSON here...'
                     className="w-full p-3.5 text-xs font-mono bg-[#18221D] text-[#FAF8F4] rounded-xl focus:outline-none"
                   />
@@ -831,7 +875,14 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => navigator.clipboard?.writeText(rawJsonText)}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(rawJsonText);
+                          setImportFeedback({ok:true,message:'JSON copied.'});
+                        } catch {
+                          setImportFeedback({ok:false,message:'The browser could not copy this JSON. Select and copy the text in the box.'});
+                        }
+                      }}
                       className="px-3 py-2 bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
                     >
                       <Copy className="w-3.5 h-3.5" />
@@ -840,13 +891,18 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
 
                     <button
                       type="button"
-                      onClick={() => processUnifiedJsonText(rawJsonText, 'JSON')}
+                      onClick={() => void processUnifiedJsonText(async () => rawJsonText)}
                       className="px-4 py-2.5 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <Check className="w-4 h-4" />
-                      Load quotation & rates
+                      {loadingJson ? 'Loading…' : 'Load quotation & rates'}
                     </button>
                   </div>
+                  {pendingJson !== null && <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span>JSON has not been applied. Load it or keep editing the current quotation.</span>
+                    <button type="button" className="owner-action-secondary" onClick={() => {setPendingJson(null);setImportFeedback(null);}}>Discard pasted JSON</button>
+                  </div>}
+                  {importFeedback && <p className={importFeedback.ok ? 'text-xs' : 'form-error'} role={importFeedback.ok ? 'status' : 'alert'}>{importFeedback.message}</p>}
                 </div>
               </details>
 
@@ -1043,6 +1099,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       type="text"
                       aria-label="Quotation reference number"
                       value={workingDraft.quote.number || ''}
+                      readOnly={Boolean(editingRecord && editingRecord.status !== 'Draft')}
                       onChange={(e) =>
                         syncDraft({
                           ...workingDraft,
@@ -1081,7 +1138,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       min={0}
                       aria-label="Approved discount in rupees"
                       value={approvedDiscount}
-                      onChange={(e) => setApprovedDiscount(Number(e.target.value) || 0)}
+                      onChange={(e) => {setApprovedDiscount(Number(e.target.value) || 0);setDraftDirty(true);}}
                       className="w-full px-3 py-2 text-xs font-mono tabular-nums bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl"
                     />
                   </div>
@@ -1217,7 +1274,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 </div>
 
                 {/* MERGED INLINE RATE CARD & NEW WORK ELEMENT MEMORY EDITOR (No separate tab switching!) */}
-                {quotes.find(q=>q.publicId===supersedeId)?.workOrder && <label className="scope-optional"><input type="checkbox" checked={updateWorkOrderSelection} onChange={e=>setUpdateWorkOrderSelection(e.target.checked)}/><span>Apply this package to the confirmed work order<small>Use after agreeing a package change with the customer. Publishing records the change in revision history. Leave unchecked to keep their confirmed room-by-room choices.</small></span></label>}
+                {quotes.find(q=>q.publicId===supersedeId)?.workOrder && <label className="scope-optional"><input type="checkbox" checked={updateWorkOrderSelection} onChange={e=>{setUpdateWorkOrderSelection(e.target.checked);setDraftDirty(true);}}/><span>Apply this package to the confirmed work order<small>Use after agreeing a package change with the customer. Publishing records the change in revision history. Leave unchecked to keep their confirmed room-by-room choices.</small></span></label>}
                 <details className="p-4 bg-[#F6FAF7] border border-[#C5DEC9] rounded-xl space-y-3.5 owner-rates">
                   <summary className="font-bold cursor-pointer">Rates and reusable work types</summary>
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1330,7 +1387,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                   </form>
                 </details>
 
-                <RoomScopeEditor draft={workingDraft} catalogue={editableCatalogue} onChange={syncDraft}/>
+                <RoomScopeEditor key={editorGeneration} draft={workingDraft} catalogue={editableCatalogue} onChange={syncDraft}/>
 
                 {/* Live 3-Tier Price Preview & Publish Bar */}
                 <div className="pt-4 border-t border-[#EAE4D8] space-y-4">
@@ -1393,7 +1450,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         const id = e.target.value;
                         setSupersedeId(id);
                         const target = currentQuotes.find(q => q.publicId === id);
-                        syncDraft({...workingDraft, customer:target ? structuredClone(target.draft.customer) : workingDraft.customer, quote:{...workingDraft.quote,number:target ? target.draft.quote.number : nextQuoteNumber(quotes),date:indiaDate()}});
+                        setUpdateWorkOrderSelection(false);
+                        syncDraft({...workingDraft,quote:{...workingDraft.quote,number:target?.draft.quote.number || nextQuoteNumber(quotes)}});
                       }}
                       className="px-3.5 py-2.5 text-xs bg-[#FAF8F4] border border-[#D8D0C2] rounded-xl"
                     >
@@ -1406,7 +1464,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </select>
 
                     <div className="owner-publish-actions">
-                    {(!supersedeId || quotes.find(q => q.publicId === supersedeId)?.status === 'Draft') && <button type="button" disabled={savingDraft} onClick={async()=>{setSavingDraft(true);try{const saved=await onSaveOwnerDraft(workingDraft,supersedeId || undefined,approvedDiscount);syncDraft(saved.draft);setSupersedeId(saved.publicId);setPublishResult({ok:true,message:'Draft saved. It appears in Quotations and remains private until published.'});}catch(error){setPublishResult({ok:false,message:error instanceof Error?error.message:'Could not save draft.'});}finally{setSavingDraft(false);}}}>{savingDraft?'Saving…':'Save draft'}</button>}
+                    {(!supersedeId || quotes.find(q => q.publicId === supersedeId)?.status === 'Draft') && <button type="button" disabled={savingDraft} onClick={handleSaveDraftClick}>{savingDraft?'Saving…':'Save draft'}</button>}
                     <button type="button" onClick={() => openPreview('online')}>Preview online</button>
                     <button type="button" onClick={() => openPreview('pdf')}>Preview PDF</button>
                     <button
@@ -1430,7 +1488,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           : 'bg-[#FEF2F2] border-[#B91C1C] text-[#991B1B]'
                       }`}
                     >
-                      <span className="font-medium">{publishResult.message}</span>
+                      <span className="font-medium" role={publishResult.ok ? 'status' : 'alert'}>{publishResult.message}</span>
                       {publishResult.publicId && (
                         <button
                           type="button"
@@ -1445,7 +1503,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                 </div>
               </div>
             </div>
-          </div>
+          </fieldset>
         )}
 
         {/* TAB 2: CUSTOMER QUOTES, DEFAULT SENDING PACKAGE & SAVED SELECTIONS */}
@@ -1649,8 +1707,13 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         <button
                           type="button"
                           onClick={() => {
+                            if (supersedeId === q.publicId && editorHasChanges) {
+                              setActiveTab('unified_studio');
+                              return;
+                            }
+                            if (!canReplaceEditor()) return;
                             const draftCopy = normalizeFurnitureLayout(q.draft);
-                            draftCopy.quote=beginQuotationEdit(draftCopy.quote,indiaDate());
+                            if (q.status !== 'Draft') draftCopy.quote=beginQuotationEdit(draftCopy.quote,indiaDate());
                             if (q.defaultSentPackage) {
                               draftCopy.recommended = {
                                 grade: q.defaultSentPackage.grade,
@@ -1662,7 +1725,8 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                             setSupersedeId(q.publicId);
                             setUpdateWorkOrderSelection(false);
                             setApprovedDiscount(q.approvedDiscountRupees || 0);
-                            syncDraft(draftCopy);
+                            setReviewedOwnerRequests(false);
+                            loadEditorDraft(draftCopy);
                             setActiveTab('unified_studio');
                           }}
                           className="px-3 py-2 bg-[#FAF8F4] hover:bg-[#EAE3D5] border border-[#D8D0C2] rounded-xl text-xs font-bold cursor-pointer"
@@ -1683,7 +1747,19 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {if(q.status === 'Draft'){setSupersedeId(q.publicId);setApprovedDiscount(q.approvedDiscountRupees);syncDraft(structuredClone(q.draft));openPreview('online');}else onOpenCustomerQuote(q.publicId);}}
+                          onClick={() => {
+                            if (q.status !== 'Draft') { onOpenCustomerQuote(q.publicId); return; }
+                            if (supersedeId !== q.publicId || !editorHasChanges) {
+                              if (!canReplaceEditor()) return;
+                              setSupersedeId(q.publicId);
+                              setApprovedDiscount(q.approvedDiscountRupees);
+                              setReviewedOwnerRequests(false);
+                              setUpdateWorkOrderSelection(false);
+                              loadEditorDraft(structuredClone(q.draft));
+                            }
+                            setActiveTab('unified_studio');
+                            openPreview('online');
+                          }}
                           className="px-3.5 py-2 bg-[#1C3A2F] hover:bg-[#142920] text-[#E6CBA8] rounded-xl text-xs font-bold cursor-pointer"
                         >
                           {q.status === 'Draft' ? 'Preview draft' : q.workOrder ? 'Open work order' : 'Open quotation'}
@@ -1704,7 +1780,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           try {
                             const editingDeleted = supersedeId && seriesIds(quotes,q.publicId).has(supersedeId);
                             await onDeleteQuote(q.publicId);
-                            if (editingDeleted) { setSupersedeId('');syncDraft(createEmptyOwnerDraft(quotes));setPreviewMode(null); }
+                            if (editingDeleted) { setSupersedeId('');loadEditorDraft(createEmptyOwnerDraft(quotes));setPreviewMode(null); }
                             setExpandedQuoteDetailsId(null);
                           } catch(error) { setDeleteQuoteError(error instanceof Error ? error.message : 'Could not delete the quotation.'); }
                           finally { setDeletingQuoteId(null); }

@@ -49,6 +49,8 @@ export interface PricedLineMatrix {
   pvcEligible: boolean;
   pvcParts: string[];
   sourceTextEn: string;
+  ownerText?: DraftItem['owner_text'];
+  manualParent?: true;
   unitRates: Record<PackageComboKey, number>;
   exactAmounts: Record<PackageComboKey, number>;
   roundedAmounts: Record<PackageComboKey, number>;
@@ -303,7 +305,9 @@ export function calculateQuotationPricing(
         optional: isOptional,
         pvcEligible: isPvcEligible,
         pvcParts: automaticPvcScope.parts,
-        sourceTextEn: item.source_text_en,
+        sourceTextEn: item.source_text_en || '',
+        ...(item.owner_text ? {ownerText: item.owner_text} : {}),
+        ...(item.manual_parent === true ? {manualParent: true as const} : {}),
         unitRates,
         exactAmounts,
         roundedAmounts,

@@ -1,14 +1,14 @@
 import { validateCompanySettings } from '../src/lib/company-settings';
-import { KARTHIK_HISTORICAL_RATE_OVERRIDES } from '../src/lib/historicalData';
 import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, getPackageDisplayName, mergeRateCardJsonIntoCatalogue, type StudioCatalogue } from '../src/lib/catalogue';
 import { calculateMilestoneSchedule, calculateQuotationPricing, computeCustomerSelectionTotal, type PricedQuotationSnapshot } from '../src/lib/pricing';
-import { type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
+import { quotationDraftShapeIssue, type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
 import { randomHex, type OwnerAccount } from './auth';
 import { agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
 import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
 import { beginQuotationEdit,completeQuoteDates } from '../src/lib/quotation-dates';
 import { orderQuotationRooms } from '../src/lib/quotation-order';
+import { applyStandardPvcScopes } from '../src/lib/pvc-scope';
 
 export interface PaymentLedgerEntry {
   id: string;
@@ -269,9 +269,9 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
 
   // Public shell branding contains no bank, rate-card or owner-session data.
   app.post('/api/studio/drafts', (req, res) => {
-    const draft = prepareDraft(req.body.draft);
-    const validation = validateQuotationDraftV2(draft, {reviewedOwnerRequests:false});
+    const validation = validateQuotationDraftV2(req.body.draft, {reviewedOwnerRequests:false});
     if (!validation.validForDraft) { res.status(422).json({error:'Check the draft format before saving.',validation}); return; }
+    const draft = applyStandardPvcScopes(req.body.draft,activeCatalogue);
     const existing = req.body.publicId ? quotesStore.get(req.body.publicId) : undefined;
     if (req.body.publicId && (!existing || existing.deletedAt)) { res.status(404).json({error:'Draft not found.'}); return; }
     if (existing && existing.status !== 'Draft') { res.status(409).json({error:'Publish an update to save changes to an already published quotation.'}); return; }
@@ -423,91 +423,70 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     });
   });
 
-  // Update Any Line Item, Room, Customer Info, or Default Package on an Existing Published Quote in Place
+  // Save owner line edits as a revision using the quotation's approved rates.
   app.patch('/api/quotes/:publicId/draft', (req, res) => {
     const previous = latest(req.params.publicId);
-    if (!previous) {
-      res.status(404).json({ error: 'Quotation not found.' });
+    if (!previous || previous.status === 'Draft') {
+      res.status(404).json({ error: 'Published quotation not found.' });
       return;
     }
-
-    const { draft, defaultSentPackage, approvedDiscountRupees } = req.body as {
+    const { draft, defaultSentPackage, approvedDiscountRupees, expectedRevision } = req.body as {
       draft?: QuotationDraftV2;
       defaultSentPackage?: ResolvedPackageSelection;
       approvedDiscountRupees?: number;
+      expectedRevision?: number;
     };
-
-    if (draft) {
-      const validation = validateQuotationDraftV2(draft, { reviewedOwnerRequests: true });
-      if (!validation.readyForPublish) { res.status(422).json({ error: 'Resolve the missing quotation details before saving a revision.', validation }); return; }
+    if (expectedRevision !== undefined && expectedRevision !== previous.revision) {
+      res.status(409).json({error:'A newer revision exists. Keep a copy of your edits and reopen the latest quotation before saving.'});
+      return;
     }
+    const pricingCatalogue = previous.catalogueSnapshot || activeCatalogue;
+    let updatedDraft = previous.draft;
+    if (draft !== undefined) {
+      const shapeIssue = quotationDraftShapeIssue(draft);
+      if (shapeIssue) { res.status(422).json({error:shapeIssue.message}); return; }
+      updatedDraft = prepareQuotationDraft(draft,pricingCatalogue);
+      updatedDraft.quote.number = previous.draft.quote.number;
+      delete updatedDraft.rate_card_updates;
+      delete updatedDraft.assistant_memory_updates;
+      const validation = validateQuotationDraftV2(updatedDraft, {reviewedOwnerRequests:true});
+      if (!validation.readyForPublish) {
+        res.status(422).json({ error:validation.issues[0]?.message || 'Resolve the missing details before saving.', validation });
+        return;
+      }
+      const missing = updatedDraft.rooms.flatMap(room => room.items).find(item => !pricingCatalogue.workTypes[item.work_type || '']);
+      if (missing) {
+        res.status(422).json({error:'Save the rate for ' + missing.work_type + ' in the studio before publishing a revision with this work type.'});
+        return;
+      }
+    }
+
     const rec = startRevision(previous);
+    rec.draft = structuredClone(updatedDraft);
+    if (draft !== undefined) rec.snapshot = calculateQuotationPricing(rec.draft,pricingCatalogue);
+    if (typeof approvedDiscountRupees === 'number') rec.approvedDiscountRupees = Math.max(0,Math.round(approvedDiscountRupees));
 
-    if (draft && Array.isArray(draft.rooms)) {
-      const normalizedDraft = prepareDraft(draft);
-      const autoMerged = extractAndMergeRateCardFromDraft(activeCatalogue, normalizedDraft);
-      activeCatalogue = syncDrawerAllowances(autoMerged.catalogue);
-      rec.draft = structuredClone(normalizedDraft);
-      delete rec.draft.rate_card_updates;
-      rec.draft.quote.number = previous.draft.quote.number;
-      rec.draft.quote = beginQuotationEdit(rec.draft.quote,indiaDate());
-      delete rec.draft.assistant_memory_updates;
-      (rec as any).linesCustomizedByOwner = true;
-      const isKarthik = rec.publicId === 'ume3b71e904a52c88d1f603e219c4a7b810';
-      rec.snapshot = calculateQuotationPricing(
-        rec.draft,
-        activeCatalogue,
-        isKarthik ? { lineRateOverrides: KARTHIK_HISTORICAL_RATE_OVERRIDES } : undefined
-      );
-      const carried=carryAgreedSelection(previous.draft,rec.draft,previous.workOrder?.selection||previous.lastCustomerSelection);
-      rec.lastCustomerSelection={...rec.lastCustomerSelection,...carried};
+    const selection = carryAgreedSelection(previous.draft,rec.draft,previous.workOrder?.selection || previous.lastCustomerSelection);
+    rec.lastCustomerSelection = {...rec.lastCustomerSelection,...selection};
+    if (defaultSentPackage?.grade && !previous.workOrder) {
+      rec.defaultSentPackage = structuredClone(defaultSentPackage);
+      rec.draft.recommended = structuredClone(defaultSentPackage);
+      rec.lastCustomerSelection = {...rec.lastCustomerSelection,wholeHomeSelection:defaultSentPackage,mixByRoom:false,roomSelections:{},savedByCustomer:false};
     }
 
-    if (typeof approvedDiscountRupees === 'number') {
-      rec.approvedDiscountRupees = Math.max(0, Math.round(approvedDiscountRupees));
-    }
-
-    if (defaultSentPackage && defaultSentPackage.grade && !previous.workOrder) {
-      const normalizedPkg: ResolvedPackageSelection = {
-        grade: defaultSentPackage.grade,
-        protection: defaultSentPackage.protection || 'Standard',
-        finish: defaultSentPackage.finish || 'SF',
-        brand_preference:
-          defaultSentPackage.brand_preference ||
-          activeCatalogue.grades[defaultSentPackage.grade]?.approvedBrands[0]?.name ||
-          null,
-      };
-      rec.defaultSentPackage = structuredClone(normalizedPkg);
-      rec.draft.recommended = structuredClone(normalizedPkg);
-      rec.lastCustomerSelection.wholeHomeSelection = structuredClone(normalizedPkg);
-      rec.lastCustomerSelection.mixByRoom = false;
-      rec.lastCustomerSelection.roomSelections = {};
-      rec.lastCustomerSelection.savedByCustomer = false;
-    }
-
-    const calc = computeCustomerSelectionTotal(rec.snapshot, {
-      wholeHomeSelection: rec.lastCustomerSelection.wholeHomeSelection,
-      mixByRoom: rec.lastCustomerSelection.mixByRoom,
-      roomSelections: rec.lastCustomerSelection.roomSelections,
-      selectedOptionalPointers: rec.lastCustomerSelection.selectedOptionalPointers || [],
-      approvedDiscountRupees: rec.approvedDiscountRupees,
-    });
+    const calc = computeCustomerSelectionTotal(rec.snapshot,{...rec.lastCustomerSelection,approvedDiscountRupees:rec.approvedDiscountRupees});
     rec.lastCustomerSelection.savedFinalTotalRupees = calc.grandTotal;
-    rec.lastCustomerSelection.summaryLabel = buildSelectionSummaryLabel(
-      rec.snapshot,
-      rec.lastCustomerSelection.wholeHomeSelection,
-      rec.lastCustomerSelection.mixByRoom,
-      rec.lastCustomerSelection.roomSelections
-    );
-
-    rec.catalogueSnapshot = structuredClone(activeCatalogue);
-    if (previous.workOrder) { const carried=carryAgreedSelection(previous.draft,rec.draft,previous.workOrder.selection);rec.lastCustomerSelection = {...previous.lastCustomerSelection,...carried};rec.workOrder={...structuredClone(previous.workOrder),selection:carried,totalRupees:calc.grandTotal}; finalize(rec); }
+    rec.lastCustomerSelection.summaryLabel = buildSelectionSummaryLabel(rec.snapshot,rec.lastCustomerSelection.wholeHomeSelection,rec.lastCustomerSelection.mixByRoom,rec.lastCustomerSelection.roomSelections);
+    if (previous.workOrder) {
+      rec.workOrder = {...previous.workOrder,sourceRevision:rec.revision,selection,totalRupees:calc.grandTotal};
+      finalize(rec);
+    }
 
     saveDbToDisk();
     res.json({
       ok: true,
       quote: rec,
-      catalogue: activeCatalogue,
+      catalogue: { ...pricingCatalogue, company:activeCatalogue.company },
       quotes: visibleRecords(),
     });
   });
@@ -809,6 +788,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       approvedDiscountRupees,
       defaultSentPackage,
       confirmWorkOrderSelection,
+      expectedRevision,
     } = req.body as {
       draft: QuotationDraftV2;
       reviewedOwnerRequests?: boolean;
@@ -816,8 +796,11 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       approvedDiscountRupees?: number;
       defaultSentPackage?: ResolvedPackageSelection;
       confirmWorkOrderSelection?: boolean;
+      expectedRevision?: number;
     };
 
+    const shapeIssue = quotationDraftShapeIssue(draft);
+    if (shapeIssue) { res.status(422).json({error:shapeIssue.message}); return; }
     const normalizedDraft = prepareDraft(draft);
     const validation = validateQuotationDraftV2(normalizedDraft, { reviewedOwnerRequests });
     if (!validation.readyForPublish) {
@@ -828,7 +811,12 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       return;
     }
 
-    if (supersedePublicId && !latest(supersedePublicId)) { res.status(404).json({error:'The quotation to update no longer exists.'}); return; }
+    const previous = supersedePublicId ? latest(supersedePublicId) : undefined;
+    if (supersedePublicId && !previous) { res.status(404).json({error:'The quotation to update no longer exists.'}); return; }
+    if (expectedRevision !== undefined && previous?.revision !== expectedRevision) {
+      res.status(409).json({error:'A newer revision exists. Copy your edits and reopen the latest quotation before publishing.'});
+      return;
+    }
     // Automatically extract and persist any rate_card_updates or new work types from the draft into activeCatalogue
     const autoMerged = extractAndMergeRateCardFromDraft(activeCatalogue, normalizedDraft);
     const missingWorkTypes=[...new Set(normalizedDraft.rooms.flatMap(room=>room.items.map(item=>item.work_type||'')).filter(key=>!autoMerged.catalogue.workTypes[key]))];
@@ -839,8 +827,6 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     const todayStr = indiaDate(now);
 
     const finalizedDraft: QuotationDraftV2 = structuredClone(normalizedDraft);
-    const previous = supersedePublicId ? latest(supersedePublicId) : undefined;
-    if (supersedePublicId && !previous) { res.status(404).json({error:'The quotation to revise was not found.'}); return; }
     if (previous) finalizedDraft.quote.number = previous.draft.quote.number;
     if (!finalizedDraft.quote.number) {
       finalizedDraft.quote.number = nextQuoteNumber(allRecords(), now);

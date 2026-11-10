@@ -71,6 +71,13 @@ test('company-only updates preserve unsaved local rates, while incoming rate upd
   assert.equal(synced.workTypes[workType].rates.Base.Standard, savedRate + 73);
   assert.equal(local.company.proprietor, previous.company.proprietor);
 
+  local.assistantLessons = ['Confirm the scope before publishing.'];
+  incoming.commonMaterials = ['Updated laminate specification.'];
+  const afterMaterials = syncCatalogueDraft(previous,incoming,local);
+  assert.equal(afterMaterials.workTypes[workType].rates.Base.Standard,savedRate + 73);
+  assert.deepEqual(afterMaterials.assistantLessons,local.assistantLessons);
+  assert.deepEqual(afterMaterials.commonMaterials,incoming.commonMaterials);
+
   incoming.workTypes[workType].rates.Base.Standard = savedRate + 42;
   const refreshed = syncCatalogueDraft(previous, incoming, local);
   assert.equal(refreshed.workTypes[workType].rates.Base.Standard, savedRate + 42);

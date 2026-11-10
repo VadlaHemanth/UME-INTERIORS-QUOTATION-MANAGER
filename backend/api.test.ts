@@ -590,3 +590,71 @@ test('customer quote allowlist retains floor-plan checkbox metadata while hiding
   assert.equal(payload.quote.draft.quote.estimate_basis, 'floor_plan');
   assert.equal('internalOwnerNote' in payload.quote.draft.quote, false);
 });
+
+test('inline line edits keep manual wording, the quote rate card, and saved customer choices', async () => {
+  const initial = paymentFixture();
+  const first = initial.quotes[0];
+  first.catalogueSnapshot = structuredClone(initial.catalogue);
+  initial.catalogue.workTypes['Box type'].rates.Base.Standard += 300;
+  const store = memoryStore(initial);
+  const cookie = cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const choice = {grade:'Base',protection:'With PVC',finish:'SF',brand_preference:null};
+  const chosen = await handleApi(request('/api/quotes/ume-test-api/selection','PATCH',{
+    wholeHomeSelection:choice,mixByRoom:true,roomSelections:{4:{...choice,grade:'Normal'}},
+    selectedOptionalPointers:['/rooms/4/items/2'],explicitCustomerSave:true,acceptedTerms:true,
+  }),store,environment);
+  assert.equal(chosen.status,200);
+
+  const draft = structuredClone(first.draft);
+  const edited = draft.rooms[0].items[1];
+  edited.name = 'Wardrobe locker with storage';
+  edited.source_text_en = 'Box-type locker with outside laminate finish.';
+  edited.owner_text = {name:true,specification:true};
+  edited.custom_rates = {Normal:1800};
+  const patch = (body: unknown) => handleApi(request('/api/quotes/ume-test-api/draft','PATCH',body,cookie),store,environment);
+  edited.quantity = 1.5;
+  const rejected = await patch({draft,expectedRevision:1});
+  assert.equal(rejected.status,422);
+  assert.match((await rejected.json() as any).error,/Quantity must be a positive integer/);
+  assert.equal((await store.load()).state.quotes.length,1);
+  edited.quantity = 2;
+  const response = await patch({draft,expectedRevision:1});
+  assert.equal(response.status,200);
+  const revised = (await response.json() as any).quote as PublishedQuotationRecord;
+  assert.equal(revised.revision,2);
+  assert.deepEqual(revised.draft.rooms[0].items[1].owner_text,edited.owner_text);
+  assert.equal(revised.draft.rooms[0].items[1].source_text_en,edited.source_text_en);
+  assert.equal(revised.snapshot.rooms[0].items[1].name,edited.name);
+  assert.equal(revised.snapshot.rooms[0].items[1].unitRates.Normal__Standard__SF,1800);
+  assert.equal(revised.snapshot.rooms[0].items[2].unitRates.Base__Standard__SF,first.snapshot.rooms[0].items[2].unitRates.Base__Standard__SF);
+  assert.deepEqual(revised.defaultSentPackage,first.defaultSentPackage);
+  assert.deepEqual(revised.lastCustomerSelection.roomSelections[4],{...choice,grade:'Normal'});
+  assert.deepEqual(revised.lastCustomerSelection.selectedOptionalPointers,['/rooms/4/items/2']);
+  assert.equal(revised.lastCustomerSelection.savedByCustomer,true);
+  const publicResponse = await handleApi(request('/api/quotes/ume-test-api'),store,environment);
+  const publicQuote = (await publicResponse.json() as any).quote as PublishedQuotationRecord;
+  assert.equal(publicQuote.snapshot.rooms[0].items[1].sourceTextEn,edited.source_text_en);
+  assert.equal(publicQuote.draft.rooms[0].items[1].owner_text,undefined);
+  assert.equal((await patch({draft,expectedRevision:1})).status,409);
+  assert.equal((await handleApi(request('/api/studio/publish','POST',{draft,supersedePublicId:first.publicId,expectedRevision:1,reviewedOwnerRequests:true},cookie),store,environment)).status,409);
+  assert.deepEqual((await store.load()).state.quotes[0].snapshot,first.snapshot);
+});
+
+test('private draft saves keep unfinished values and reject malformed input without replacing the draft', async () => {
+  const store = memoryStore();
+  const cookie = cookieFrom(await handleApi(request('/api/studio/auth','POST',{username:environment.OWNER_USERNAME,password:environment.OWNER_PASSWORD}),store,environment));
+  const draft = structuredClone(VIDYA_SAGAR_REDDY_DRAFT);
+  draft.rooms[0].items[0] = {...draft.rooms[0].items[0],measure:{unit:'each',per_item:null},size_text:null,source_text_en:''};
+  const save = (body: unknown) => handleApi(request('/api/studio/drafts','POST',body,cookie),store,environment);
+  const response = await save({draft});
+  assert.equal(response.status,200);
+  const saved = (await response.json() as any).record as PublishedQuotationRecord;
+  assert.equal(saved.draft.rooms[0].items[0].measure.per_item,null);
+  assert.equal(saved.draft.rooms[0].items[0].size_text,null);
+  assert.equal(saved.draft.rooms[0].items[0].source_text_en,'');
+  const malformed = {...draft,rooms:[{name:'Kitchen',items:[null]}]};
+  const invalid = await save({draft:malformed,publicId:saved.publicId});
+  assert.equal(invalid.status,422);
+  assert.equal((await invalid.json() as any).validation.issues[0].path,'/rooms/0/items/0');
+  assert.deepEqual((await store.load()).state.quotes[0].draft,saved.draft);
+});

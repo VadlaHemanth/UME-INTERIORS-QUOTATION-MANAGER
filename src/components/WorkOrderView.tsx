@@ -1,8 +1,9 @@
+import { quotationFurnitureText } from '../lib/quotation-presentation';
 import React, { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { PrintableA4Sheet } from './PrintableA4Sheet';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
-import { formatCleanItemDescription, getPackageDisplayName, standardizeCompetitorItemName, type StudioCatalogue } from '../lib/catalogue';
+import { getPackageDisplayName, type StudioCatalogue } from '../lib/catalogue';
 import { computeCustomerSelectionTotal, formatINR, makeComboKey, type PricedQuotationSnapshot } from '../lib/pricing';
 import type { QuotationDraftV2 } from '../lib/schema';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
@@ -55,7 +56,7 @@ export function WorkOrderView({publicId,revision,draft,snapshot,catalogue,approv
         return <section className="work-order-room" key={room.roomIndex}>
           <header><h2>{room.name}</h2><span>{getPackageDisplayName(chosen.grade)} · {chosen.finish==='SF'?'SF matte':'High-gloss'}{chosen.protection==='With PVC'?' · with 6 mm PVC':''}</span><strong>{formatINR(calc.roomBreakdownTotals[room.roomIndex]?.total||0)}</strong></header>
           {chosen.brand_preference&&<p className="work-order-brand">Preferred plywood: {chosen.brand_preference}</p>}
-          {room.items.filter(item=>!item.optional||selection.selectedOptionalPointers.includes(`/rooms/${room.roomIndex}/items/${item.itemIndex}`)).map(item=><article key={item.itemIndex}><div><h3>{standardizeCompetitorItemName(item.name,item.workType,room.name,item.sourceTextEn)}</h3>{furnitureRelationshipLabel(item,room.items)&&<p className="work-order-relation">{furnitureRelationshipLabel(item,room.items)}</p>}<p>{formatCleanItemDescription(item.sourceTextEn,item.name,item.workType,room.name)}</p><p>{item.unit==='sq_ft'?'Height × Width: ':''}{item.sizeText} · {item.totalMeasure.toFixed(2)} {item.unit==='sq_ft'?'sq ft':item.unit==='each'?'items':item.unit==='running_ft'?'running ft':item.unit==='lumpsum'?'lump sum':item.unit}</p></div><strong>{formatINR(item.exactAmounts[combo])}</strong></article>)}
+          {room.items.filter(item=>!item.optional||selection.selectedOptionalPointers.includes(`/rooms/${room.roomIndex}/items/${item.itemIndex}`)).map(item=><article key={item.itemIndex}><div><h3>{quotationFurnitureText(item,room.name).name}</h3>{furnitureRelationshipLabel(item,room.items)&&<p className="work-order-relation">{furnitureRelationshipLabel(item,room.items)}</p>}<p>{quotationFurnitureText(item,room.name).specification}</p><p>{item.unit==='sq_ft'?'Height × Width: ':''}{item.sizeText} · {item.totalMeasure.toFixed(2)} {item.unit==='sq_ft'?'sq ft':item.unit==='each'?'items':item.unit==='running_ft'?'running ft':item.unit==='lumpsum'?'lump sum':item.unit}</p></div><strong>{formatINR(item.exactAmounts[combo])}</strong></article>)}
         </section>;
       })}
       <PlywoodSpecifications catalogue={catalogue} grades={grades} selectedGrade={selection.mixByRoom?null:selection.wholeHomeSelection.grade}/>

@@ -26,9 +26,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
-  formatCleanItemDescription,
   getPackageDisplayName,
-  standardizeCompetitorItemName,
   StudioCatalogue,
 } from '../lib/catalogue';
 import {
@@ -56,9 +54,12 @@ import { quotationDisplayRooms } from '../lib/quotation-order';
 import type { FinalizedWorkOrder } from '../lib/quote-workflow';
 import { WorkOrderView } from './WorkOrderView';
 import { PlywoodSpecifications } from './PlywoodSpecifications';
-import { formatQuotationDate } from '../lib/quotation-dates';
+import { beginQuotationEdit, formatQuotationDate } from '../lib/quotation-dates';
+import { indiaDate } from '../lib/quote-workflow';
 import {selectedRoomItems,selectedRoomPackageAmount} from '../lib/pricing';
 import { furnitureRelationshipLabel } from '../lib/quotation-order';
+import { RoomScopeEditor } from './RoomScopeEditor';
+import { quotationFurnitureText } from '../lib/quotation-presentation';
 import { PackageWarrantyLabel } from './PackageWarrantyLabel';
 
 interface CustomerQuotationViewProps {
@@ -102,10 +103,7 @@ interface CustomerQuotationViewProps {
     acceptedTerms?: boolean;
     explicitCustomerSave?: boolean;
   }) => Promise<void> | void;
-  onUpdateQuoteDraft?: (payload: {
-    draft: QuotationDraftV2;
-    defaultSentPackage?: ResolvedPackageSelection;
-  }) => Promise<void>;
+  onUpdateQuoteDraft?: (draft: QuotationDraftV2) => Promise<void>;
   onSubmitPayment: (payload: {
     utrReference: string;
     method: 'UPI / PhonePe' | 'NEFT / RTGS / IMPS';
@@ -232,16 +230,13 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
   const [editableDraft, setEditableDraft] = useState<QuotationDraftV2>(() =>
     structuredClone(draft)
   );
+  const [lineSaveError, setLineSaveError] = useState('');
   const [savingLines, setSavingLines] = useState<boolean>(false);
   const canEditLines = Boolean(isOwner && onUpdateQuoteDraft);
 
   useEffect(() => {
     if (!canEditLines) setIsEditingLines(false);
   }, [canEditLines]);
-
-  useEffect(() => {
-    setEditableDraft(structuredClone(draft));
-  }, [draft]);
 
   const [activeBreakdownRoomIdx, setActiveBreakdownRoomIdx] = useState<number | 'ALL'>(displayRooms[0]?.roomIndex??0);
   useEffect(()=>{setActiveBreakdownRoomIdx(quotationDisplayRooms(snapshot.rooms)[0]?.roomIndex??0);},[publicId,revision]);
@@ -543,20 +538,29 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     checkout?.focus({ preventScroll: true });
   };
 
+  const closeLineEditor = () => {
+    setIsEditingLines(false);
+    setLineSaveError('');
+  };
+
+  const openLineEditor = () => {
+    const next = structuredClone(draft);
+    next.quote = beginQuotationEdit(next.quote,indiaDate());
+    setEditableDraft(next);
+    setLineSaveError('');
+    setIsEditingLines(true);
+    requestAnimationFrame(() => document.getElementById('inline-quotation-editor')?.scrollIntoView({block:'start'}));
+  };
+
   const handleSaveEditedLines = async () => {
-    if (!canEditLines || !onUpdateQuoteDraft) return;
+    if (!canEditLines || !onUpdateQuoteDraft || savingLines) return;
     setSavingLines(true);
+    setLineSaveError('');
     try {
-      await onUpdateQuoteDraft({
-        draft: editableDraft,
-        defaultSentPackage: wholeHomeSelection,
-      });
-      setIsEditingLines(false);
-      setSaveToastMessage(
-        'Saved! All edited quotation lines and default package have been updated.'
-      );
+      await onUpdateQuoteDraft(editableDraft);
+      closeLineEditor();
     } catch (error) {
-      setSelectionSaveError(error instanceof Error ? error.message : 'Could not save the edited quotation. Please try again.');
+      setLineSaveError(error instanceof Error ? error.message : 'Could not save the edited quotation. Please try again.');
     } finally {
       setSavingLines(false);
     }
@@ -846,7 +850,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                 {canEditLines && (
                   <button
                     type="button"
-                    onClick={() => setIsEditingLines(!isEditingLines)}
+                    disabled={savingLines}
+                    onClick={isEditingLines ? closeLineEditor : openLineEditor}
                     className={`px-3.5 py-2 rounded-xl text-[13px] font-bold inline-flex items-center gap-1.5 border transition-colors cursor-pointer ${
                       isEditingLines
                         ? 'bg-[#1C3A2F] text-[#E6CBA8] border-[#1C3A2F]'
@@ -1378,41 +1383,17 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                   </div>
                 </div>
 
-                {/* Inline Line Editor Banner when active */}
-                {canEditLines && isEditingLines && (
-                  <div className="p-4 bg-[#E4EFE7] border-2 border-[#1C3A2F] rounded-xl flex flex-wrap items-center justify-between gap-3 text-[13px]">
-                    <div>
-                      <p className="font-bold text-[#1C3A2F]">
-                        Inline Quotation Line Editor Active
-                      </p>
-                      <p className="text-[#2D4F3E] mt-0.5">
-                        Edit any furniture title, sub-line specification text, dimension, or sq.ft area below, then click <strong>Save Line Changes</strong>.
-                      </p>
+                {canEditLines && isEditingLines ? (
+                  <fieldset id="inline-quotation-editor" className="min-w-0 space-y-4 scroll-mt-24" disabled={savingLines} aria-busy={savingLines}>
+                    <p className="text-sm text-[#2D4F3E]">Edit the rooms and furniture below. Saving publishes a revision to the existing customer link.</p>
+                    <RoomScopeEditor draft={editableDraft} catalogue={catalogue} onChange={setEditableDraft}/>
+                    {lineSaveError && <p className="form-error" role="alert">{lineSaveError}</p>}
+                    <div className="owner-publish-actions">
+                      <button type="button" onClick={closeLineEditor}>Cancel</button>
+                      <button type="button" className="owner-action-primary" onClick={handleSaveEditedLines}>{savingLines ? 'Saving…' : 'Save Line Changes'}</button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditableDraft(structuredClone(draft));
-                          setIsEditingLines(false);
-                        }}
-                        className="px-3 py-2 bg-white border border-[#D8D0C2] rounded-lg font-bold text-[#18221D] cursor-pointer"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        disabled={savingLines}
-                        onClick={handleSaveEditedLines}
-                        className="px-4 py-2 bg-[#1C3A2F] text-[#E6CBA8] rounded-lg font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Save className="w-3.5 h-3.5" />
-                        <span>{savingLines ? 'Saving...' : 'Save Line Changes'}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
+                  </fieldset>
+                ) : (
                 <div className="space-y-6">
                   {displayedBreakdownRooms.map((room) => {
                     const rSel =
@@ -1509,21 +1490,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                       ? 'rft'
                                       : item.unit;
 
-                                  const cleanTitle = standardizeCompetitorItemName(
-                                    item.name,
-                                    item.workType,
-                                    room.name,
-                                    item.sourceTextEn
-                                  );
-                                  const cleanDescription = formatCleanItemDescription(
-                                    item.sourceTextEn,
-                                    item.name,
-                                    item.workType,
-                                    room.name
-                                  );
-
-                                  const editableItem =
-                                    editableDraft.rooms?.[room.roomIndex]?.items?.[item.itemIndex];
+                                  const {name:cleanTitle,specification:cleanDescription} = quotationFurnitureText(item,room.name);
 
                                   return (
                                     <tr
@@ -1531,86 +1498,15 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                       className="hover:bg-[#FAF8F4]"
                                     >
                                       <td className="py-3.5 px-4">
-                                        {canEditLines && isEditingLines && editableItem ? (
-                                          <div className="space-y-1.5">
-                                            <input
-                                              type="text"
-                                              value={editableItem.name || ''}
-                                              onChange={(e) => {
-                                                const next = structuredClone(editableDraft);
-                                                next.rooms[room.roomIndex].items[item.itemIndex].name =
-                                                  e.target.value;
-                                                setEditableDraft(next);
-                                              }}
-                                              placeholder="Item title"
-                                              className="w-full px-2.5 py-1 text-[13px] font-bold bg-white border border-[#1C3A2F] rounded-md"
-                                            />
-                                            <input
-                                              type="text"
-                                              value={editableItem.source_text_en || ''}
-                                              onChange={(e) => {
-                                                const next = structuredClone(editableDraft);
-                                                next.rooms[room.roomIndex].items[
-                                                  item.itemIndex
-                                                ].source_text_en = e.target.value;
-                                                setEditableDraft(next);
-                                              }}
-                                              placeholder="Sub-line description under item"
-                                              className="w-full px-2.5 py-1 text-[13px] bg-white border border-[#D8D0C2] rounded-md text-[#4A524D]"
-                                            />
-                                          </div>
-                                        ) : (
-                                          <>
-                                            <p className="font-bold text-[#18221D] text-sm">
-                                              {cleanTitle}
-                                            </p>
-                                            {furnitureRelationshipLabel(item,room.items)&&<p className="text-xs text-[#31513D] mt-0.5">{furnitureRelationshipLabel(item,room.items)}</p>}
-                                            <p className="text-[13px] text-[#5C645F] mt-0.5 leading-relaxed">
-                                              {cleanDescription}
-                                            </p>
-                                          </>
-                                        )}
+                                        <p className="font-bold text-[#18221D] text-sm">{cleanTitle}</p>
+                                        {furnitureRelationshipLabel(item,room.items)&&<p className="text-xs text-[#31513D] mt-0.5">{furnitureRelationshipLabel(item,room.items)}</p>}
+                                        <p className="text-[13px] text-[#5C645F] mt-0.5 leading-relaxed">{cleanDescription}</p>
                                       </td>
-
                                       <td className="py-3.5 px-2.5 font-sans font-semibold text-[#18221D] tabular-nums whitespace-nowrap">
-                                        {canEditLines && isEditingLines && editableItem ? (
-                                          <input
-                                            type="text"
-                                            value={editableItem.size_text || ''}
-                                            onChange={(e) => {
-                                              const next = structuredClone(editableDraft);
-                                              next.rooms[room.roomIndex].items[
-                                                item.itemIndex
-                                              ].size_text = e.target.value;
-                                              setEditableDraft(next);
-                                            }}
-                                            className="w-28 px-2 py-1 text-[13px] font-sans bg-white border border-[#D8D0C2] rounded-md"
-                                          />
-                                        ) : (
-                                          item.sizeText
-                                        )}
+                                        {item.sizeText}
                                       </td>
-
                                       <td className="py-3.5 px-2.5 text-right font-sans font-semibold text-[#18221D] tabular-nums whitespace-nowrap">
-                                        {canEditLines && isEditingLines && editableItem ? (
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            value={editableItem.measure.per_item ?? ''}
-                                            onChange={(e) => {
-                                              const next = structuredClone(editableDraft);
-                                              next.rooms[room.roomIndex].items[
-                                                item.itemIndex
-                                              ].measure.per_item = Number(e.target.value) || 0;
-                                              setEditableDraft(next);
-                                            }}
-                                            className="w-20 px-2 py-1 text-[13px] font-sans text-right bg-white border border-[#D8D0C2] rounded-md"
-                                          />
-                                        ) : item.unit === 'each' ? (
-                                          `${item.quantity} nos`
-                                        ) : (
-                                          `${item.totalMeasure.toFixed(2)} ${uLabel}`
-                                        )}
+                                        {item.unit === 'each' ? item.quantity + ' nos' : item.totalMeasure.toFixed(2) + ' ' + uLabel}
                                       </td>
 
                                       {/* Standard Package Rate + Amount */}
@@ -1623,7 +1519,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                       >
                                         <div>{formatINR(stdAmt)}</div>
                                         <div className="text-[10px] text-[#5C645F] font-normal">
-                                          @{formatINR(stdRate)}/{uLabel}
+                                          @{formatINR(stdRate,!Number.isInteger(stdRate))}/{uLabel}
                                         </div>
                                       </td>
 
@@ -1637,7 +1533,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                       >
                                         <div>{formatINR(normAmt)}</div>
                                         <div className="text-[10px] text-[#5C645F] font-normal">
-                                          @{formatINR(normRate)}/{uLabel}
+                                          @{formatINR(normRate,!Number.isInteger(normRate))}/{uLabel}
                                         </div>
                                       </td>
 
@@ -1651,7 +1547,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                       >
                                         <div>{formatINR(premAmt)}</div>
                                         <div className="text-[10px] text-[#5C645F] font-normal">
-                                          @{formatINR(premRate)}/{uLabel}
+                                          @{formatINR(premRate,!Number.isInteger(premRate))}/{uLabel}
                                         </div>
                                       </td>
                                     </tr>
@@ -1680,6 +1576,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                     );
                   })}
                 </div>
+                )}
               </section>
             </div>
 

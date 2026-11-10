@@ -75,7 +75,7 @@ export function carryAgreedSelection(previous: QuotationDraftV2, next: Quotation
       if(match){
         consumed.add(match.key);
         if(oldIndex<0&&ii===0&&selection.mixByRoom)result.roomSelections[ri]=structuredClone(selection.roomSelections[match.oldRi]||selection.wholeHomeSelection);
-        if(selection.selectedOptionalPointers.includes(`/rooms/${match.oldRi}/items/${match.oldIi}`))result.selectedOptionalPointers.push(`/rooms/${ri}/items/${ii}`);
+        if(item.optional&&selection.selectedOptionalPointers.includes(`/rooms/${match.oldRi}/items/${match.oldIi}`))result.selectedOptionalPointers.push(`/rooms/${ri}/items/${ii}`);
       }
     }
   }
