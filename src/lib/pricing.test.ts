@@ -60,9 +60,9 @@ test('Vidya Sagar Reddy quote reproduces historical PDF totals and enforces SF =
   );
 
   // Public package names change without changing historical rate keys or totals.
-  assert.equal(getPackageDisplayName('Base'), 'Basic');
-  assert.equal(getPackageDisplayName('Normal'), 'Standard');
-  assert.equal(getPackageDisplayName('Premium'), 'Premium');
+  assert.equal(getPackageDisplayName('Base'), 'Standard');
+  assert.equal(getPackageDisplayName('Normal'), 'Premium');
+  assert.equal(getPackageDisplayName('Premium'), 'Luxury');
 
   // Verify UPI ID is 9177389543@oksbi
   assert.equal(DEFAULT_UME_CATALOGUE.company.bank.upiId, '9177389543@oksbi');

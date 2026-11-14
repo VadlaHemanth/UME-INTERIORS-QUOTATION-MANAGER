@@ -1,3 +1,5 @@
+import { getPackageDisplayName, type PackageDisplayName } from './package-tiers';
+export { getPackageDisplayName } from './package-tiers';
 import { FinishOption, PlywoodGrade, ProtectionOption } from './schema';
 import { canonicalFurnitureName } from './furniture';
 import {buildCommonScopeInstructions,buildFurnitureContractInstructions,formatFurnitureSpecification,OWNER_FRAME_TYPE_DEFINITION,KITCHEN_FITTINGS_DEFINITION,KITCHEN_DEFAULT_LESSON,COUNT_ITEM_LESSON,normalizedAssistantLessons,simplifyFurnitureLanguage} from './furniture-contract';
@@ -21,7 +23,7 @@ export interface WorkTypeDefinition {
 
 export interface GradeInfo {
   grade: PlywoodGrade;
-  displayLabel: 'Basic' | 'Standard' | 'Premium';
+  displayLabel: PackageDisplayName;
   allowances?: PackageAllowances;
   hardwareBrands?:string[];
   tagline: string;
@@ -137,15 +139,6 @@ export const STANDARD_DEPTH_SCHEDULE_INCHES: StandardDepthRule[] = [
     constructionNote: '14" ventilated footwear storage carcass',
   },
 ];
-
-/**
- * Stable storage keys map to the public Basic / Standard / Premium package names.
- */
-export function getPackageDisplayName(grade: PlywoodGrade): 'Basic' | 'Standard' | 'Premium' {
-  if (grade === 'Base') return 'Basic';
-  if (grade === 'Normal') return 'Standard';
-  return 'Premium';
-}
 
 /**
  * Resolves the standard carcass depth in inches (21", 20", 18", 16", 14", 12") for any item based on UME Interiors' depth schedule.
@@ -315,7 +308,7 @@ export interface StudioCatalogue {
 }
 
 export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
-  version: 'ume-catalogue-2026.11.v12',
+  version: 'ume-catalogue-2026.11.v13',
   hardwareScope:DEFAULT_HARDWARE_SCOPE,
   assistantLessons:[],
   company: {
@@ -342,7 +335,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     Base: {
       grade: 'Base',
       hardwareBrands:['Berlin','Ebco','Nimmi'],
-      displayLabel: 'Basic',
+      displayLabel: getPackageDisplayName('Base'),
       allowances: { handleRupees: 200, laminateSheetRupees: 1500, extraDrawerRupees: 4000, includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4 },
       tagline: 'BWP 710 & 303 Grade Plywood with Laminate Finish',
       warrantyBanner: '1.0 mm external laminate and standard hardware included',
@@ -388,7 +381,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     Normal: {
       grade: 'Normal',
       hardwareBrands:['Godrej','Berlin','Ebco','Nimmi'],
-      displayLabel: 'Standard',
+      displayLabel: getPackageDisplayName('Normal'),
       allowances: { handleRupees: 200, laminateSheetRupees: 1500, extraDrawerRupees: 5000, includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4 },
       tagline: 'BWR 710 / 303 Grade Plywood — Up to 15 Years Brand Warranty',
       warrantyBanner: 'Up to 15 years manufacturer warranty with brand certificate, depending on the selected product',
@@ -427,7 +420,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     Premium: {
       grade: 'Premium',
       hardwareBrands:['Hettich','Sleek','Godrej','Berlin','Ebco','Nimmi'],
-      displayLabel: 'Premium',
+      displayLabel: getPackageDisplayName('Premium'),
       allowances: { handleRupees: 200, laminateSheetRupees: 1500, extraDrawerRupees: 6000, includedBedroomDrawersMin: 2, includedBedroomDrawersMax: 4 },
       tagline: 'BWP 710 Marine Grade Plywood — 30 / 25 / 21 Yrs Brand Warranty',
       warrantyBanner: 'Up to 30 years manufacturer warranty with brand certificate, depending on the selected BWP product',
@@ -496,7 +489,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
   commonMaterials: [
     '1.0 mm Outside Decorative Laminate Finish (worth up to ₹1,500/sheet — Customer choice of SF or High-Gloss at same price)',
     '0.8 mm White / Fabric Inside Liner Laminate on interior faces (0.72 mm–0.80 mm standard manufacturer nominal gauge)',
-    'Handles (worth up to ₹200 each in Basic, Standard and Premium)',
+    'Handles (worth up to ₹200 each in Standard, Premium and Luxury)',
     'Woodworking adhesive: Fevicol and Jeevanjor.',
   ],
   workTypes: {
@@ -668,7 +661,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
     'Acrylic sheets, aluminium profile doors, heavy glass and custom CNC work are charged separately according to the approved selection.',
     'The 1.0 mm decorative laminate is applied to visible external surfaces.',
     'Hardware or plywood outside the listed brands or allowances is charged at the approved price difference.',
-    'Box-type bedroom wardrobes include 2–4 internal drawers, subject to size and the approved layout. Additional internal drawers cost Basic ₹4,000, Standard ₹5,000 and Premium ₹6,000 each, unless otherwise specified.',
+    'Box-type bedroom wardrobes include 2–4 internal drawers, subject to size and the approved layout. Additional internal drawers cost Standard ₹4,000, Premium ₹5,000 and Luxury ₹6,000 each, unless otherwise specified.',
     'Quoted prices include the materials and labour listed in the agreed scope.',
   ],
   termsAndConditions: [
@@ -739,7 +732,7 @@ export const DEFAULT_UME_CATALOGUE: StudioCatalogue = {
       id: 10,
       title: 'Materials, alternatives and manufacturer warranties',
       clause:
-        'Materials are sourced from the selected package’s approved brand list. Alternatives require written approval. Manufacturer plywood warranty is up to 15 years for Standard and up to 30 years for Premium, depending on the selected brand and product. The applicable brand warranty certificate, invoice and manufacturer terms govern coverage; this is not a blanket warranty on the entire furniture installation.',
+        'Materials are sourced from the selected package’s approved brand list. Alternatives require written approval. Manufacturer plywood warranty is up to 15 years for Premium and up to 30 years for Luxury, depending on the selected brand and product. The applicable brand warranty certificate, invoice and manufacturer terms govern coverage; this is not a blanket warranty on the entire furniture installation.',
       source: 'Owner-Approved Hyderabad Protection',
     },
   ],
@@ -767,7 +760,7 @@ export const RATECARD_EXTENSION_PRESETS: RateCardExtensionPreset[] = [
     title: '1. Profile Glass Shutters, Acrylic Finish & Bespoke CNC Jali Pack',
     badge: '3 Extra Work Elements · sq_ft',
     prompt:
-      'Add new rate card work elements: 1) Aluminum profile glass shutter (crockery/kitchen) at Base 1350, Normal 1450, Premium 1600 per sq ft, no PVC needed. 2) 1.5mm Acrylic high-gloss box unit at Base 1250, Normal 1350, Premium 1550 per sq ft with +75 PVC adder for back panel. 3) Bespoke CNC Mandir / Partition Jali work at Base 850, Normal 950, Premium 1100 per sq ft.',
+      'Add new rate card work elements: 1) Aluminum profile glass shutter (crockery/kitchen) at Standard 1350, Premium 1450, Luxury 1600 per sq ft, no PVC needed. 2) 1.5mm Acrylic high-gloss box unit at Standard 1250, Premium 1350, Luxury 1550 per sq ft with +75 PVC adder for back panel. 3) Bespoke CNC Mandir / Partition Jali work at Standard 850, Premium 950, Luxury 1100 per sq ft.',
     patch: {
       schema_version: 'quotation-studio.ratecard.v2',
       output_language: 'en',
@@ -825,7 +818,7 @@ export const RATECARD_EXTENSION_PRESETS: RateCardExtensionPreset[] = [
     title: '2. Curtain Pelmet, Upholstered Headboard & Extra Internal Drawer Pack',
     badge: 'running_ft · sq_ft · each',
     prompt:
-      'Rate card lo kotha items add cheyandi: 1) Curtain / AC pelmet box running ft basis Base 350, Normal 400, Premium 450. 2) Cushioned bed headboard panelling sq ft basis Base 650, Normal 750, Premium 850. 3) Additional internal drawer unit each basis Base 4000, Normal 5000, Premium 6000.',
+      'Rate card lo kotha items add cheyandi: 1) Curtain / AC pelmet box running ft basis Standard 350, Premium 400, Luxury 450. 2) Cushioned bed headboard panelling sq ft basis Standard 650, Premium 750, Luxury 850. 3) Additional internal drawer unit each basis Standard 4000, Premium 5000, Luxury 6000.',
     patch: {
       schema_version: 'quotation-studio.ratecard.v2',
       output_language: 'en',
@@ -895,34 +888,34 @@ function normalizeSingleWorkType(keyHint: string, raw: any): WorkTypeDefinition 
       ? 'lumpsum'
       : 'sq_ft';
 
-  const confirmedRate=(value:unknown,name:string)=>{if((typeof value!=='number'&&typeof value!=='string')||String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0)throw new Error(`Enter a confirmed non-negative ${name} rate for ${label}. Provide Basic, Standard and Premium together.`);return Number(value);};
+  const confirmedRate=(value:unknown,name:string)=>{if((typeof value!=='number'&&typeof value!=='string')||String(value).trim()===''||!Number.isFinite(Number(value))||Number(value)<0)throw new Error(`Enter a confirmed non-negative ${name} rate for ${label}. Provide Standard, Premium and Luxury together.`);return Number(value);};
   const pvcAdder = confirmedRate(raw?.pvcAdder ?? raw?.pvc_adder ?? 0,'PVC extra');
   const baseStd =
-    confirmedRate(raw?.rates?.Base?.Standard ?? raw?.baseRate ?? raw?.base,'Basic');
+    confirmedRate(raw?.rates?.Base?.Standard ?? raw?.baseRate ?? raw?.base,'Standard');
   const basePvc =
     confirmedRate(
       raw?.rates?.Base?.['With PVC'] ??
         raw?.basePvcRate ??
         (pvcAdder > 0 ? baseStd + pvcAdder : baseStd)
-    ,'Basic with PVC');
+    ,'Standard with PVC');
 
   const normalStd =
-    confirmedRate(raw?.rates?.Normal?.Standard ?? raw?.normalRate ?? raw?.normal,'Standard');
+    confirmedRate(raw?.rates?.Normal?.Standard ?? raw?.normalRate ?? raw?.normal,'Premium');
   const normalPvc =
     confirmedRate(
       raw?.rates?.Normal?.['With PVC'] ??
         raw?.normalPvcRate ??
         (pvcAdder > 0 ? normalStd + pvcAdder : normalStd)
-    ,'Standard with PVC');
+    ,'Premium with PVC');
 
   const premiumStd =
-    confirmedRate(raw?.rates?.Premium?.Standard ?? raw?.premiumRate ?? raw?.premium,'Premium');
+    confirmedRate(raw?.rates?.Premium?.Standard ?? raw?.premiumRate ?? raw?.premium,'Luxury');
   const premiumPvc =
     confirmedRate(
       raw?.rates?.Premium?.['With PVC'] ??
         raw?.premiumPvcRate ??
         (pvcAdder > 0 ? premiumStd + pvcAdder : premiumStd)
-    ,'Premium with PVC');
+    ,'Luxury with PVC');
   if(basePvc<baseStd||normalPvc<normalStd||premiumPvc<premiumStd)throw new Error(`With-PVC rates for ${label} cannot be below the base rates.`);
 
   const pvcDefaultEligible =
@@ -1245,7 +1238,7 @@ export function buildDynamicGemInstructions(catalogue: StudioCatalogue = DEFAULT
     `- ${getPackageDisplayName(key as PlywoodGrade)} (schema key ${JSON.stringify(key)}): ${grade.approvedBrands.map((brand) => `${brand.name} — ${brand.spec}; ${brand.warrantyYears > 0 ? `${brand.warrantyYears} years manufacturer warranty subject to brand certificate and invoice` : 'manufacturer terms apply, no fixed warranty period promised'}`).join(' | ')}.`
   ).join('\n');
   const reviewRateTable=[
-    '| Work type | Unit | Basic (₹) | Standard (₹) | Premium (₹) | PVC extra (₹) |',
+    '| Work type | Unit | Standard (₹) | Premium (₹) | Luxury (₹) | PVC extra (₹) |',
     '|---|---|---:|---:|---:|---|',
     ...Object.entries(catalogue.workTypes).map(([key,work])=>{const grades=['Base','Normal','Premium'] as const;const extras=grades.map(grade=>work.rates[grade]['With PVC']-work.rates[grade].Standard);const extra=new Set(extras).size===1?String(extras[0]):grades.map((grade,index)=>`${getPackageDisplayName(grade)}: ${extras[index]}`).join('; ');return `| ${key.replace(/\|/g,'/')} | ${work.unit} | ${grades.map(grade=>work.rates[grade].Standard).join(' | ')} | ${extra} |`;})
   ].join('\n');
@@ -1282,7 +1275,7 @@ DOCUMENT CONTENT OWNERSHIP — APPLY BEFORE EVERY JSON RESPONSE
 Prepare customer-specific scope data; the app assembles the complete online quotation, PDF and work order. DEFAULT TO quote.notes: [] AND owner_requests: []. Empty arrays are correct when the job has no unique note or genuine exception. Never fill them to make the document look complete.
 ALREADY GENERATED BY THE APP — DO NOT REPEAT IN JSON NOTES, OWNER REQUESTS OR CLARIFICATION QUESTIONS:
 - Business identity, proprietor/contact details, logo, quotation/work-order heading, page headers/footers, quote number/date/validity defaults, private links and QR codes.
-- Basic/Standard/Premium comparisons; selected-package highlighting; the owner-controlled Recommended label; room/item totals, optional-item calculations, package-level PVC prices and approved discounts.
+- Standard/Premium/Luxury comparisons; selected-package highlighting; the owner-controlled Recommended label; room/item totals, optional-item calculations, package-level PVC prices and approved discounts.
 - Package plywood brands, grades, product specifications, manufacturer warranty periods and certificate/invoice conditions from the saved catalogue.
 - Materials and labour inclusion; inside/outside laminate specifications and SF/high-gloss policy; saved laminate-sheet and handle allowances; hinges/channels, Fevicol/Jeevanjor and other saved material/hardware sentences.
 - Included bedroom wardrobe drawer limits and additional-drawer charges from the saved rate card. Do not write a separate generic drawer-charge note.
@@ -1325,7 +1318,7 @@ Apply this ordering before the final review and JSON for a new quotation, then r
 ${buildFurnitureContractInstructions()}
 
 2. EXACT SCHEMA AND MEASUREMENTS
-Output quotation-studio.draft.v2. All keys and human-readable JSON values must be English. languages may contain only te, hi and en; output_language is always en. The customer package names are Basic, Standard and Premium. Their exact machine keys are Base, Normal and Premium respectively. Protection is Standard or With PVC; this “Standard” protection value means no PVC upgrade and is separate from the Standard package. Finish is SF or High Gloss. The selected default package is the root recommended object; only quote.show_recommended_package controls its Recommended label. Do not rename machine keys.
+Output quotation-studio.draft.v2. All keys and human-readable JSON values must be English. languages may contain only te, hi and en; output_language is always en. The customer package names are Standard, Premium and Luxury. Their exact machine keys are Base, Normal and Premium respectively. Protection is Standard or With PVC; this “Standard” protection value means no PVC upgrade and is independent of the chosen package tier. Finish is SF or High Gloss. The selected default package is the root recommended object; only quote.show_recommended_package controls its Recommended label. Keep the machine keys. The app adds the tier captions and badges automatically. On older quotations, Basic corresponds to Standard, the former Standard corresponds to Premium, and the former Premium corresponds to Luxury. Preserve the underlying grade when revising an older quotation unless the owner asks to switch tiers.
 Use one line per distinct room/item/work type. Allowed units: sq_ft, running_ft, each and lumpsum. measure.per_item is the measured amount for ONE item; quantity is the count and is applied once by the app. For each or lumpsum use per_item 1 with the confirmed count. Convert 5 ft 6 in to 5.5 ft. Preserve explicit decimal feet exactly; never interpret a stated 6.9 ft as 6 ft 9 in. If spoken dimensions are ambiguous, keep a readable size_text, set the unknown measure field to null and ask a needs_clarification question with its JSON Pointer path.
 DIMENSION ORDER — HEIGHT × WIDTH
 For rectangular front-area measurements, write size_text in Height × Width order with units, for example “7 ft × 8 ft” means height 7 ft and width 8 ft. The online quotation and PDF label this column “Dimensions — Height × Width”; do not repeat that shared heading in source_text_en or quote.notes. Reorder an explicitly stated width/height pair only when both orientations are confirmed; never swap or guess an unlabelled pair. Include any unresolved height/width question once in the consolidated review table. Preserve confirmed length, depth, diameter, piece counts and lump-sum descriptions for other measurement types; do not relabel those as height/width or invent a second dimension. Keep measure.per_item equal to the confirmed billable area/length for one item, not the dimension string or an area multiplied by quantity twice.
@@ -1336,23 +1329,23 @@ Optional scope uses optional:true. Leave unknown required fields null and add ne
 3. PRICES, APPROVAL AND MEMORY
 The rate list below is a snapshot copied from the app when these instructions were copied. It is not a live sync. Use its work_type keys exactly. The app calculates totals; never invent a total or a rate absent from this list.
 RATE-CARD RESPONSIBILITY
-For ordinary quotations, reuse the saved rates for existing work types. Do not regenerate the rate card, attach redundant rate_card_updates or ask the same saved-rate questions for each item. A box-type cabinet, wardrobe or utility unit uses the saved Box type entry. Loft and low-roof frame-and-shutter closures use the same Basic/Standard/Premium base rates as Frame type, while keeping their own saved PVC extras. Folding tables, plywood wall panelling and Pooja CNC/glass doors use their own entries. Do not infer construction from an ambiguous nickname. The app adds the listed PVC extra once per measured billing unit, not a second time in the base rate or as a separate lump-sum item. Other zero-extra entries stay zero unless the owner approves a change.
-The AI CAN generate a reusable rate-card addition/change in JSON when the owner explicitly requests it and confirms every rate. The AI must NOT invent rates for a new work type. Collect all missing Basic, Standard, Premium, unit and PVC-extra values together in one table, showing “Needs confirmation” in unknown cells. Missing rates must stay unresolved; never fill 750/850/1000 or any other fallback merely to make JSON look complete.
+For ordinary quotations, reuse the saved rates for existing work types. Do not regenerate the rate card, attach redundant rate_card_updates or ask the same saved-rate questions for each item. A box-type cabinet, wardrobe or utility unit uses the saved Box type entry. Loft and low-roof frame-and-shutter closures use the same Standard/Premium/Luxury base rates as Frame type, while keeping their own saved PVC extras. Folding tables, plywood wall panelling and Pooja CNC/glass doors use their own entries. Do not infer construction from an ambiguous nickname. The app adds the listed PVC extra once per measured billing unit, not a second time in the base rate or as a separate lump-sum item. Other zero-extra entries stay zero unless the owner approves a change.
+The AI CAN generate a reusable rate-card addition/change in JSON when the owner explicitly requests it and confirms every rate. The AI must NOT invent rates for a new work type. Collect all missing Standard, Premium, Luxury, unit and PVC-extra values together in one table, showing “Needs confirmation” in unknown cells. Missing rates must stay unresolved; never fill 750/850/1000 or any other fallback merely to make JSON look complete.
 ONE CONSOLIDATED REVIEW BEFORE FINAL JSON
-Keep an ordinary quotation review compact. Show exactly THREE readable Markdown tables, once, using Basic / Standard / Premium in that order. Do not print the full saved catalogue or duplicate a full rate card and a current rate card. For a rate-card-only request, show only the changed-rate table and one combined confirmation; do not invent room scope or a package preview.
-1. “Rates used”: Work type | Unit | Basic ₹ | Standard ₹ | Premium ₹ | PVC extra ₹. Include only the DISTINCT work types used in this home and any approved item-specific rate override. Use saved defaults automatically; mark changed rates with “Owner change”. If PVC extras differ by package, show all three in that cell. Collect missing rates together as “Needs confirmation”; do not interview rate by rate or repeat questions already answered.
+Keep an ordinary quotation review compact. Show exactly THREE readable Markdown tables, once, using Standard / Premium / Luxury in that order. Do not print the full saved catalogue or duplicate a full rate card and a current rate card. For a rate-card-only request, show only the changed-rate table and one combined confirmation; do not invent room scope or a package preview.
+1. “Rates used”: Work type | Unit | Standard ₹ | Premium ₹ | Luxury ₹ | PVC extra ₹. Include only the DISTINCT work types used in this home and any approved item-specific rate override. Use saved defaults automatically; mark changed rates with “Owner change”. If PVC extras differ by package, show all three in that cell. Collect missing rates together as “Needs confirmation”; do not interview rate by rate or repeat questions already answered.
 2. “Room scope”: Room | Furniture | Height × Width / billing size | Qty | Area / unit. One short row per actual item, in the linked-unit sequence below. Mark optional items “Optional”; do not repeat full specifications or work-type definitions. Preserve meaningful count/length labels for non-area work. Keep unaccepted suggested additions outside this table and the prices.
-3. “Package preview”: Room | Basic ₹ | Standard ₹ | Premium ₹, followed by one TOTAL row. Calculate indicative package subtotals only from confirmed quantities, measures and the exact rates above. For each item: measure.per_item × quantity × package unit rate; keep paise until summing, round each displayed room subtotal and the whole-home total independently to the nearest rupee (do not sum rounded item prices). Base totals exclude optional items; show the optional allowance separately only when relevant. Label whether this preview includes the selected PVC upgrade. Do not apply an unapproved discount or charge for unaccepted suggestions. If any measure/rate is unresolved, show “Pending” for affected totals and ask for the missing facts once; never invent an amount. The app's computed totals after import are authoritative.
+3. “Package preview”: Room | Standard ₹ | Premium ₹ | Luxury ₹, followed by one TOTAL row. Calculate indicative package subtotals only from confirmed quantities, measures and the exact rates above. For each item: measure.per_item × quantity × package unit rate; keep paise until summing, round each displayed room subtotal and the whole-home total independently to the nearest rupee (do not sum rounded item prices). Base totals exclude optional items; show the optional allowance separately only when relevant. Label whether this preview includes the selected PVC upgrade. Do not apply an unapproved discount or charge for unaccepted suggestions. If any measure/rate is unresolved, show “Pending” for affected totals and ask for the missing facts once; never invent an amount. The app's computed totals after import are authoritative.
 After the tables, state the default package/finish/PVC choice, floor-plan flag and owner-controlled Recommended flag in one line. Include any unanswered relevant omission-check candidates in the ONE combined “Any changes?” question with all unresolved facts together; respect deliberate exclusions. If the owner already confirmed everything or explicitly requests final JSON using confirmed facts, do not ask again. After a correction, show only changed rows and updated totals unless a full review is requested. Preserve all other confirmed facts.
 The review belongs BEFORE the final JSON. After confirmation, return exactly one complete copyable fenced JSON block, with no tables or explanatory text outside it. Never put review tables or estimated totals into quote.notes or unsupported JSON fields.
 Use the single saved-rate reference in section 6 internally; do not reproduce it wholesale during an ordinary quotation review.
-ITEM-ONLY RATE EXCEPTION: When the owner changes the per-sq.ft rate of one furniture item in one room, put custom_rates on that ITEM only. Example: {"Normal":1200} changes only that item's Standard package rate; Basic and Premium still use the saved work-type rates. Use Base for Basic, Normal for Standard and Premium for Premium. Do not create rate_card_updates or change other items for this request. Rates are per the item's billing unit, not a lump-sum line total; the app multiplies by measured area/length and quantity. Omit unchanged package keys. PVC extra continues to use the saved work-type extra for each package; include pvc_adder only for an explicit owner-confirmed item-specific extra. If the work type is new, all three rates are required. These are examples, not default prices. Studio offers Rooms and furniture → Item rates with Basic/Standard/Premium inputs and Reset item to saved rates. These exceptions survive rate-card saves, online/PDF previews, publication and revisions, without changing future quotations.
+ITEM-ONLY RATE EXCEPTION: When the owner changes the per-sq.ft rate of one furniture item in one room, put custom_rates on that ITEM only. Example: {"Normal":1200} changes only that item's Premium package rate; Standard and Luxury still use the saved work-type rates. Use Base for Standard, Normal for Premium and Premium for Luxury. Do not create rate_card_updates or change other items for this request. Rates are per the item's billing unit, not a lump-sum line total; the app multiplies by measured area/length and quantity. Omit unchanged package keys. PVC extra continues to use the saved work-type extra for each package; include pvc_adder only for an explicit owner-confirmed item-specific extra. If the work type is new, all three rates are required. These are examples, not default prices. Studio offers Rooms and furniture → Item rates with Standard/Premium/Luxury inputs and Reset item to saved rates. These exceptions survive rate-card saves, online/PDF previews, publication and revisions, without changing future quotations.
 For an owner-confirmed reusable price change/addition, include rate_card_updates keyed by work_type. An existing-work-type price change is reusable by default unless the owner limits it to this job. Each definition uses label, unit, plainEnglishDefinition and rates:{"Base":{"Standard":amount,"With PVC":amount},"Normal":{...},"Premium":{...}}. Ask for all missing grade rates together in the consolidated review table rather than guessing or asking line by line. The app derives automatic site-protection applicability from the confirmed With PVC rate; do not ask for or emit per-item eligibility/contact-area fields. The app imports those reusable changes into its catalogue, so explain this consequence during the conversation before the final JSON. For a rate-card-only request use schema_version quotation-studio.ratecard.v2, output_language en and workTypes with the same definitions, without rooms.
 quote.notes is an English string array for explicitly approved job-specific facts only. These notes appear in BOTH the online quotation and PDF. Keep it [] when there is nothing unique to add. Put proposed discounts, genuine unapproved exceptions and unverified payment claims in owner_requests with path and text for review; keep that array [] otherwise. The standard material, plywood, drawer, glass/CNC, bank, payment and execution sections are already rendered automatically and must not be copied into either array. An imported note never changes a calculated charge, bank QR, milestone schedule or payment-verification status.
 PACKAGE ALLOWANCES AND WARRANTIES
-AUTOMATIC DOCUMENT NOTES: The app always prints the saved additional-drawer charges and included wardrobe drawer limits in the online quotation and PDF, even when quote.notes is empty. Do not generate these standard notes through AI, put them in owner_requests, or repeat them in quote.notes. The current defaults are Basic ₹4,000, Standard ₹5,000 and Premium ₹6,000 per additional internal drawer; saved owner settings below take priority. Only add an actual extra drawer as an item when the owner requests that work. Never add the charge to every wardrobe automatically.
+AUTOMATIC DOCUMENT NOTES: The app always prints the saved additional-drawer charges and included wardrobe drawer limits in the online quotation and PDF, even when quote.notes is empty. Do not generate these standard notes through AI, put them in owner_requests, or repeat them in quote.notes. The current defaults are Standard ₹4,000, Premium ₹5,000 and Luxury ₹6,000 per additional internal drawer; saved owner settings below take priority. Only add an actual extra drawer as an item when the owner requests that work. Never add the charge to every wardrobe automatically.
 MATERIAL WORDING: The owner edits the shared materials, hardware and laminate sentences in Settings → Packages & materials → Materials and hardware wording. The app prints that saved wording automatically. Use only Fevicol and Jeevanjor in the default woodworking-adhesive wording; do not introduce SH, Marine or Mirai variants. Do not duplicate shared material sentences in quote.notes.
-HARDWARE BRANDS: The app retains the saved package brand order. Bedroom sliding hardware means soft-close sliding WARDROBE-door fittings in bedrooms, not room-entry sliding doors. Soft-close tandem drawer systems, soft-close hinges and telescopic channels follow that package list only where included in the itemised scope; handles use the separate allowance. Tandem systems are soft-close; retain this specification when describing a confirmed tandem item. Say “telescopic channels” only: they may or may not be soft-close, so do not promise soft-close channels unless explicitly confirmed for a particular item. The shipped Basic list is Berlin → Ebco → Nimmi; Standard is Godrej → Berlin → Ebco → Nimmi; Premium is Hettich → Sleek → Godrej → Berlin → Ebco → Nimmi. Saved owner edits below take priority. These are brand options, not a promise to supply all brands, every hardware type in every cabinet, extra tandem systems, electronic sensors or free additional work. Do not duplicate this standard section in quote.notes.
+HARDWARE BRANDS: The app retains the saved package brand order. Bedroom sliding hardware means soft-close sliding WARDROBE-door fittings in bedrooms, not room-entry sliding doors. Soft-close tandem drawer systems, soft-close hinges and telescopic channels follow that package list only where included in the itemised scope; handles use the separate allowance. Tandem systems are soft-close; retain this specification when describing a confirmed tandem item. Say “telescopic channels” only: they may or may not be soft-close, so do not promise soft-close channels unless explicitly confirmed for a particular item. The shipped Standard list is Berlin → Ebco → Nimmi; Premium is Godrej → Berlin → Ebco → Nimmi; Luxury is Hettich → Sleek → Godrej → Berlin → Ebco → Nimmi. Saved owner edits below take priority. These are brand options, not a promise to supply all brands, every hardware type in every cabinet, extra tandem systems, electronic sensors or free additional work. Do not duplicate this standard section in quote.notes.
 CUSTOMER PRESENTATION: Hardware is labelled “Hardware brands included” with every brand bold; the saved array order is retained without showing a preferred-order/ranking label to customers. The cream-and-white material comparison appears directly under Package comparison on the PDF cover page, using the same content as the online section. When quote.is_floor_plan_estimate is true, the app places its automatic floor-plan notice after the client summary on the PDF cover page; when false, the automatic notice is omitted. These are app-generated presentation rules, not quotation notes.
 DOCUMENT SHARING: The app automatically suggests the PDF filename “Quotation - Customer Name - Quote Number.pdf”; confirmed orders use “Work Order - Customer Name - Quote Number.pdf”. Every published private link has a personalized UME social-preview headline, description and PNG card generated from the customer name, quotation reference, issue date and room count. Prices, discounts, payment/bank details, phone numbers, addresses and private notes are excluded from link-preview metadata and images. Revisions use the latest public document; unpublished drafts and deleted links have no share card. Do not invent or emit pdf_filename, social_image, open_graph, download_url or related JSON fields, and do not repeat these app-generated features in quotation notes.
 Current customer-facing hardware scope: ${customerHardwareScope(catalogue)}
@@ -1437,8 +1430,8 @@ export const LUXURY_IMAGE_PROMPTS: LuxuryImagePromptItem[] = [
   },
   {
     id: 'pkg-base',
-    slotName: 'Basic Package Card Visual — Wardrobe, Loft & Dressing Carpentry',
-    whereUsed: 'Choose a Package -> Basic Package Card',
+    slotName: 'Standard Package Card Visual — Wardrobe, Loft & Dressing Carpentry',
+    whereUsed: 'Choose a Package -> Standard Package Card',
     defaultImageUrl: '/assets/pkg-standard.webp',
     aspectRatio: '1:1',
     prompt:
@@ -1446,8 +1439,8 @@ export const LUXURY_IMAGE_PROMPTS: LuxuryImagePromptItem[] = [
   },
   {
     id: 'pkg-normal',
-    slotName: 'Standard Package Card Visual — Modular Kitchen, Louvers & Tandem Units',
-    whereUsed: 'Choose a Package -> Standard Package Card',
+    slotName: 'Premium Package Card Visual — Modular Kitchen, Louvers & Tandem Units',
+    whereUsed: 'Choose a Package -> Premium Package Card',
     defaultImageUrl: '/assets/pkg-normal.webp',
     aspectRatio: '1:1',
     prompt:
@@ -1455,8 +1448,8 @@ export const LUXURY_IMAGE_PROMPTS: LuxuryImagePromptItem[] = [
   },
   {
     id: 'pkg-premium',
-    slotName: 'Premium Package Card Visual — Bespoke BWP 710 Marine & Louver Console',
-    whereUsed: 'Choose a Package -> Premium Package Card',
+    slotName: 'Luxury Package Card Visual — Bespoke BWP 710 Marine & Louver Console',
+    whereUsed: 'Choose a Package -> Luxury Package Card',
     defaultImageUrl: '/assets/pkg-premium.webp',
     aspectRatio: '1:1',
     prompt:

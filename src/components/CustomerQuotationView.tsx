@@ -1,3 +1,5 @@
+import { PackageTierCopy } from './PackageTierCopy';
+import { packageLinkGrade } from '../lib/package-tiers';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { sharePaymentImage } from '../lib/payment-image-share';
@@ -119,18 +121,10 @@ function parseUrlPackageParam(
   if (typeof window === 'undefined') return null;
   const params = new URLSearchParams(window.location.search);
   const rawPkg = params.get('pkg') || params.get('package') || params.get('default');
-  if (!rawPkg) return null;
+  const grade = packageLinkGrade(params);
+  if (!grade) return null;
 
-  const lower = rawPkg.toLowerCase();
-  if (!/(premium|normal|standard|base|basic)/.test(lower)) return null;
-  const packageToken = lower.match(/premium|normal|standard|base|basic/)?.[0];
-  const grade: PlywoodGrade =
-    packageToken === 'premium'
-      ? 'Premium'
-      : packageToken === 'normal' || packageToken === 'standard'
-      ? 'Normal'
-      : 'Base';
-
+  const lower = params.has('tier') ? '' : rawPkg?.toLowerCase() || '';
   const protection: ProtectionOption = lower.includes('pvc') && !/(without|no[-_ ]?pvc)/.test(lower) ? 'With PVC' : 'Standard';
   const finish: FinishOption =
     lower.includes('gloss') || lower.includes('hg') ? 'High Gloss' : 'SF';
@@ -176,6 +170,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     return () => { document.title = previousTitle; };
   }, [draft.customer.name,draft.quote.number,Boolean(workOrder)]);
   const resolvedStartingSelection = useMemo((): ResolvedPackageSelection => {
+    if (isPreview) return defaultSentPackage || initialSelection.wholeHomeSelection;
     if (initialSelection.savedByCustomer) {
       return initialSelection.wholeHomeSelection;
     }
@@ -183,7 +178,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     if (fromUrl) return fromUrl;
     if (defaultSentPackage) return defaultSentPackage;
     return initialSelection.wholeHomeSelection;
-  }, [initialSelection, defaultSentPackage, catalogue]);
+  }, [initialSelection, defaultSentPackage, catalogue, isPreview]);
 
   const [wholeHomeSelection, setWholeHomeSelection] =
     useState<ResolvedPackageSelection>(resolvedStartingSelection);
@@ -694,7 +689,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
     return found ? [found] : displayRooms.slice(0, 1);
   }, [displayRooms, activeBreakdownRoomIdx]);
 
-  // Pre-compute whole-home totals for Standard, Normal, Premium side-by-side under active PVC setting
+  // Pre-compute whole-home totals for all tiers under active PVC setting
   const sideBySideWholeHomeTotals = useMemo(() => {
     const p = wholeHomeSelection.protection;
     const f = wholeHomeSelection.finish;
@@ -973,6 +968,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                           </span>
                         </div>
 
+                        <PackageTierCopy grade={g}/>
                         <PackageWarrantyLabel grade={gInfo}/>
 
                         <p
@@ -1039,8 +1035,8 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                       Tailor each room
                     </h2>
                     <p className="text-[13px] text-[#5C645F] mt-0.5">
-                      Compare <strong>Basic</strong>, <strong>Standard</strong> and{' '}
-                      <strong>Premium</strong>. Choose a package and optional <strong>6 mm PVC</strong> protection for each room.
+                      Compare <strong>{getPackageDisplayName('Base')}</strong>, <strong>{getPackageDisplayName('Normal')}</strong> and{' '}
+                      <strong>{getPackageDisplayName('Premium')}</strong>. Choose a package and optional <strong>6 mm PVC</strong> protection for each room.
                     </p>
                   </div>
 
@@ -1069,13 +1065,13 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                           Room Package & +PVC Add-On
                         </th>
                         <th className="py-3 px-3 text-right font-semibold whitespace-nowrap">
-                          Basic
+                          {getPackageDisplayName('Base')}
                         </th>
                         <th className="py-3 px-3 text-right font-semibold whitespace-nowrap">
-                          Standard
+                          {getPackageDisplayName('Normal')}
                         </th>
                         <th className="py-3 px-3.5 text-right font-semibold whitespace-nowrap">
-                          Premium (BWP)
+                          {getPackageDisplayName('Premium')} (BWP)
                         </th>
                       </tr>
                     </thead>
@@ -1168,7 +1164,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                               </div>
                             </td>
 
-                            {/* Side-by-Side Standard Rate Cell */}
+                            {/* Standard rate */}
                             <td className="py-3 px-3 text-right font-sans tabular-nums whitespace-nowrap">
                               <button
                                 type="button"
@@ -1177,7 +1173,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 }
                                 disabled={selectionIsBusy}
                                 aria-pressed={rSel.grade === 'Base'}
-                                aria-label={`Select Basic package for ${room.name}`}
+                                aria-label={`Select ${getPackageDisplayName('Base')} package for ${room.name}`}
                                 className={`px-2.5 py-1 rounded-md text-[13px] transition-colors cursor-pointer ${
                                   rSel.grade === 'Base'
                                     ? 'bg-[#1C3A2F] text-white font-bold'
@@ -1188,7 +1184,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                               </button>
                             </td>
 
-                            {/* Side-by-Side Normal Rate Cell */}
+                            {/* Premium rate */}
                             <td className="py-3 px-3 text-right font-sans tabular-nums whitespace-nowrap">
                               <button
                                 type="button"
@@ -1197,7 +1193,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 }
                                 disabled={selectionIsBusy}
                                 aria-pressed={rSel.grade === 'Normal'}
-                                aria-label={`Select Standard package for ${room.name}`}
+                                aria-label={`Select ${getPackageDisplayName('Normal')} package for ${room.name}`}
                                 className={`px-2.5 py-1 rounded-md text-[13px] transition-colors cursor-pointer ${
                                   rSel.grade === 'Normal'
                                     ? 'bg-[#1C3A2F] text-white font-bold'
@@ -1208,7 +1204,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                               </button>
                             </td>
 
-                            {/* Side-by-Side Premium Rate Cell */}
+                            {/* Luxury rate */}
                             <td className="py-3 px-3.5 text-right font-sans tabular-nums whitespace-nowrap">
                               <button
                                 type="button"
@@ -1217,7 +1213,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                 }
                                 disabled={selectionIsBusy}
                                 aria-pressed={rSel.grade === 'Premium'}
-                                aria-label={`Select Premium package for ${room.name}`}
+                                aria-label={`Select ${getPackageDisplayName('Premium')} package for ${room.name}`}
                                 className={`px-2.5 py-1 rounded-md text-[13px] transition-colors cursor-pointer ${
                                   rSel.grade === 'Premium'
                                     ? 'bg-[#1C3A2F] text-[#E6CBA8] font-bold'
@@ -1449,21 +1445,21 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                     rSel.grade === 'Base' ? 'bg-[#E4EFE7] text-[#1C3A2F]' : ''
                                   }`}
                                 >
-                                  Basic
+                                  {getPackageDisplayName('Base')}
                                 </th>
                                 <th
                                   className={`py-3 px-2.5 text-right font-bold whitespace-nowrap ${
                                     rSel.grade === 'Normal' ? 'bg-[#E4EFE7] text-[#1C3A2F]' : ''
                                   }`}
                                 >
-                                  Standard
+                                  {getPackageDisplayName('Normal')}
                                 </th>
                                 <th
                                   className={`py-3 px-3 text-right font-bold whitespace-nowrap ${
                                     rSel.grade === 'Premium' ? 'bg-[#E4EFE7] text-[#1C3A2F]' : ''
                                   }`}
                                 >
-                                  Premium (BWP)
+                                  {getPackageDisplayName('Premium')} (BWP)
                                 </th>
                               </tr>
                             </thead>
@@ -1509,7 +1505,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                         {item.unit === 'each' ? item.quantity + ' nos' : item.totalMeasure.toFixed(2) + ' ' + uLabel}
                                       </td>
 
-                                      {/* Standard Package Rate + Amount */}
+                                      {/* Standard rate and amount */}
                                       <td
                                         className={`py-3.5 px-2.5 text-right font-sans tabular-nums whitespace-nowrap ${
                                           rSel.grade === 'Base'
@@ -1523,7 +1519,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                         </div>
                                       </td>
 
-                                      {/* Normal Package Rate + Amount */}
+                                      {/* Premium rate and amount */}
                                       <td
                                         className={`py-3.5 px-2.5 text-right font-sans tabular-nums whitespace-nowrap ${
                                           rSel.grade === 'Normal'
@@ -1537,7 +1533,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                                         </div>
                                       </td>
 
-                                      {/* Premium Package Rate + Amount */}
+                                      {/* Luxury rate and amount */}
                                       <td
                                         className={`py-3.5 px-3 text-right font-sans tabular-nums whitespace-nowrap ${
                                           rSel.grade === 'Premium'
@@ -1557,7 +1553,7 @@ export const CustomerQuotationView: React.FC<CustomerQuotationViewProps> = ({
                               {/* Room Totals Row for all 3 Packages */}
                               <tr className="bg-[#FAF8F4] font-bold text-[13px] border-t border-[#D8CEBC]">
                                 <td className="py-2.5 px-4 text-[#18221D]" colSpan={3}>
-                                  {room.name} total (Basic, Standard and Premium)
+                                  {room.name} total (Standard, Premium and Luxury)
                                 </td>
                                 <td className="py-2.5 px-2.5 text-right font-sans tabular-nums text-[#4A524D]">
                                   {formatINR(stdRoomTotal)}

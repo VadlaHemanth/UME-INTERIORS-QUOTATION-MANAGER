@@ -5,7 +5,7 @@ import {registerHooks} from 'node:module';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {DEFAULT_UME_CATALOGUE} from './catalogue';
 
-test('plywood comparison exposes each saved product and warranty without an accordion or invented Basic coverage',async()=>{
+test('plywood comparison exposes each saved product and warranty without an accordion or invented Standard coverage',async()=>{
   const hook=registerHooks({load(url,context,next){if(url.endsWith('.css'))return{format:'module',source:'export default {}',shortCircuit:true};return next(url,context);}});
   try{
     const {PlywoodSpecifications,plywoodProductDescription,compactPlywoodProduct}=await import('../components/PlywoodSpecifications');
@@ -15,7 +15,7 @@ test('plywood comparison exposes each saved product and warranty without an acco
     const html=renderToStaticMarkup(<PlywoodSpecifications catalogue={catalogue} grades={['Premium','Normal','Base','Normal']} selectedGrade="Normal"/>);
     assert.doesNotMatch(html,/<details|<summary/);
     assert.equal((html.match(/class="plywood-package"/g)||[]).length,3);
-    assert.ok(html.indexOf('<h3>Basic')<html.indexOf('<h3>Standard')&&html.indexOf('<h3>Standard')<html.indexOf('<h3>Premium'));
+    assert.ok(html.indexOf('<h3>Standard')<html.indexOf('<h3>Premium')&&html.indexOf('<h3>Premium')<html.indexOf('<h3>Luxury'));
     for(const grade of ['Base','Normal','Premium'] as const)for(const brand of catalogue.grades[grade].approvedBrands)assert.ok(html.includes(brand.name));
     assert.ok(html.includes('20 years'));assert.ok(html.includes('30 years'));assert.ok(html.includes('Warranty under manufacturer terms'));
     assert.equal((html.match(/class="plywood-package" data-selected="true"/g)||[]).length,1);

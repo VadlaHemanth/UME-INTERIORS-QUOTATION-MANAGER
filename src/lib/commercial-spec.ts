@@ -1,3 +1,4 @@
+import { getPackageDisplayName } from './package-tiers';
 import type { GradeInfo, StudioCatalogue } from './catalogue';
 import type { PlywoodGrade, QuotationDraftV2 } from './schema';
 import { applyApprovedCoreRates } from './rate-card';
@@ -47,11 +48,10 @@ export const additionalMaterialLines = (catalogue: StudioCatalogue) => catalogue
 
 export function materialLines(catalogue: StudioCatalogue, grades: PlywoodGrade[]): string[] {
   const unique = [...new Set(grades)];
-  const names = { Base: 'Basic', Normal: 'Standard', Premium: 'Premium' };
   const wording = materialWording(catalogue);
   const allowance = (field: 'handleRupees' | 'laminateSheetRupees' | 'extraDrawerRupees', suffix: string) => {
     const amounts = unique.map(g => packageAllowances(catalogue.grades[g])[field]);
-    return new Set(amounts).size === 1 ? `₹${amounts[0].toLocaleString('en-IN')} ${suffix}` : unique.map((g, i) => `${names[g]}: ₹${amounts[i].toLocaleString('en-IN')} ${suffix}`).join('; ');
+    return new Set(amounts).size === 1 ? `₹${amounts[0].toLocaleString('en-IN')} ${suffix}` : unique.map((g, i) => `${getPackageDisplayName(g)}: ₹${amounts[i].toLocaleString('en-IN')} ${suffix}`).join('; ');
   };
   return [
     wording.materialsAndLabour,
@@ -59,15 +59,14 @@ export function materialLines(catalogue: StudioCatalogue, grades: PlywoodGrade[]
     wording.internalLaminate,
     `${wording.handles.replace(/[:.]+$/, '')}: ${allowance('handleRupees', 'per handle')}.`,
     ...additionalMaterialLines(catalogue),
-    ...unique.flatMap(g => (packageAllowances(catalogue.grades[g]).additionalAllowances || []).map(a => `${names[g]} · ${a.name}: ₹${a.amountRupees.toLocaleString('en-IN')} ${a.unit}.`)),
+    ...unique.flatMap(g => (packageAllowances(catalogue.grades[g]).additionalAllowances || []).map(a => `${getPackageDisplayName(g)} · ${a.name}: ₹${a.amountRupees.toLocaleString('en-IN')} ${a.unit}.`)),
   ];
 }
 
 export function scopeNotes(catalogue: StudioCatalogue, grades: PlywoodGrade[]): string[] {
   const unique = [...new Set(grades)];
-  const labels = { Base: 'Basic', Normal: 'Standard', Premium: 'Premium' };
   const prices = unique.map(g => catalogue.workTypes['Additional internal drawer']?.rates[g].Standard ?? packageAllowances(catalogue.grades[g]).extraDrawerRupees);
-  const priceText = new Set(prices).size === 1 ? `₹${prices[0].toLocaleString('en-IN')} each` : unique.map((g, i) => `${labels[g]} ₹${prices[i].toLocaleString('en-IN')} each`).join('; ');
+  const priceText = new Set(prices).size === 1 ? `₹${prices[0].toLocaleString('en-IN')} each` : unique.map((g, i) => `${getPackageDisplayName(g)} ₹${prices[i].toLocaleString('en-IN')} each`).join('; ');
   const ranges = [...new Set(unique.map(g => { const a = packageAllowances(catalogue.grades[g]); return `${a.includedBedroomDrawersMin}–${a.includedBedroomDrawersMax}`; }))];
   return [
     'Acrylic sheets, aluminium profile doors, heavy glass and custom CNC design work are charged separately unless explicitly included in the itemised scope.',
@@ -85,10 +84,9 @@ export function quotationCustomerNotes(draft: QuotationDraftV2): string[] {
 }
 
 export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[], workOrder = false) {
-  const labels = {Base:'Basic',Normal:'Standard',Premium:'Premium'};
   return catalogue.termsAndConditions.map(term => {
     if (term.id === 9) { const wording = materialWording(catalogue); return {...term,clause:`${wording.internalLaminate} ${wording.externalLaminate}`}; }
-    if (term.id === 10) return {...term,clause:`Materials follow the approved product list for the selected package. ${[...new Set(grades)].map(grade=>{const years=packageWarrantyYears(catalogue.grades[grade]);return `${labels[grade]} plywood: ${years ? `up to ${years} years manufacturer warranty` : 'warranty under the selected manufacturer’s terms; no fixed period is promised'}.`;}).join(' ')} Actual coverage follows the selected product, brand warranty certificate, invoice and manufacturer terms. Alternatives require written customer approval. This is not a blanket warranty on the entire furniture installation.`};
+    if (term.id === 10) return {...term,clause:`Materials follow the approved product list for the selected package. ${[...new Set(grades)].map(grade=>{const years=packageWarrantyYears(catalogue.grades[grade]);return `${getPackageDisplayName(grade)} plywood: ${years ? `up to ${years} years manufacturer warranty` : 'warranty under the selected manufacturer’s terms; no fixed period is promised'}.`;}).join(' ')} Actual coverage follows the selected product, brand warranty certificate, invoice and manufacturer terms. Alternatives require written customer approval. This is not a blanket warranty on the entire furniture installation.`};
     if (workOrder && term.id === 8) return {...term,title:'Confirmed scope and recorded changes',clause:'This work order records the agreed package, measurements, quantities and specifications. Changes to the confirmed scope, materials, requirements or prices must be documented in an updated work order and approved by the customer before the affected work proceeds.'};
     return workOrder ? {...term,clause:term.clause.replace(/a revised quotation/g, 'an updated work order').replace(/quotation total/g,'work order total')} : term;
   }).map(term=>({...term,clause:simplifyFurnitureLanguage(term.clause)}));
@@ -96,15 +94,22 @@ export function documentTerms(catalogue: StudioCatalogue, grades: PlywoodGrade[]
 
 /** Upgrade the old shipped defaults once; retain owner-entered brands and rates. */
 export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
-  if (catalogue.version === 'ume-catalogue-2026.11.v12') return catalogue;
+  if (catalogue.version === 'ume-catalogue-2026.11.v13') return catalogue;
   const next = structuredClone(catalogue);
+  if (catalogue.version === 'ume-catalogue-2026.11.v12') {
+    for (const grade of ['Base','Normal','Premium'] as const) {
+      next.grades[grade].displayLabel = getPackageDisplayName(grade);
+    }
+    next.version = 'ume-catalogue-2026.11.v13';
+    return next;
+  }
   if(catalogue.version==='ume-catalogue-2026.11.v11'){
     const frame=next.workTypes['Frame type'],fittings=next.workTypes['Tandem or SS baskets'];
     if(frame&&['Wall-anchored framework with shutters, internal lining, and external decorative laminate finish.','Plywood frame fixed to an existing wall recess or stone shelves, with laminated doors at the front. Billed by front area (height × width).'].includes(frame.plainEnglishDefinition))frame.plainEnglishDefinition=OWNER_FRAME_TYPE_DEFINITION;
     if(fittings&&['Modular kitchen tandem drawers or stainless steel wire pull-out baskets including hardware channels and fitting.','Kitchen pull-out tandem drawer or stainless-steel basket with the specified channels and installation. Confirm the basket grade and hardware model in the agreed item specification.'].includes(fittings.plainEnglishDefinition))fittings.plainEnglishDefinition=KITCHEN_FITTINGS_DEFINITION;
     next.assistantLessons=normalizedAssistantLessons(next.assistantLessons);
     next.version='ume-catalogue-2026.11.v12';
-    return next;
+    return upgradeCatalogue(next);
   }
   if(catalogue.version==='ume-catalogue-2026.11.v10'){
     for(const grade of ['Base','Normal','Premium'] as const)next.grades[grade].hardwareBrands||=[...DEFAULT_HARDWARE_BRANDS[grade]];
@@ -139,10 +144,9 @@ export function upgradeCatalogue(catalogue: StudioCatalogue): StudioCatalogue {
     next.version = 'ume-catalogue-2026.11.v8';
     return upgradeCatalogue(next);
   }
-  const labels = { Base: 'Basic', Normal: 'Standard', Premium: 'Premium' } as const;
   for (const g of ['Base', 'Normal', 'Premium'] as const) {
     const info = next.grades[g];
-    info.displayLabel = labels[g];
+    info.displayLabel = getPackageDisplayName(g);
     info.allowances ||= structuredClone(DEFAULT_PACKAGE_ALLOWANCES);
     info.handleAllowance = 'Handles worth up to ₹200 each';
     info.outerLaminateAllowance = '1.0 mm external laminate, SF matte or high-gloss, up to ₹1,500 per sheet';

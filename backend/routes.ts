@@ -1,13 +1,12 @@
 import { validateCompanySettings } from '../src/lib/company-settings';
-import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, getPackageDisplayName, mergeRateCardJsonIntoCatalogue, type StudioCatalogue } from '../src/lib/catalogue';
+import { DEFAULT_UME_CATALOGUE, extractAndMergeRateCardFromDraft, mergeRateCardJsonIntoCatalogue, type StudioCatalogue } from '../src/lib/catalogue';
 import { calculateMilestoneSchedule, calculateQuotationPricing, computeCustomerSelectionTotal, type PricedQuotationSnapshot } from '../src/lib/pricing';
 import { quotationDraftShapeIssue, type QuotationDraftV2, type ResolvedPackageSelection, validateQuotationDraftV2 } from '../src/lib/schema';
 import { randomHex, type OwnerAccount } from './auth';
-import { agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
+import { buildSelectionSummaryLabel, agreedSelectionIdentity, carryAgreedSelection, indiaDate, latestRecord, nextQuoteNumber, seriesIds, type FinalizedWorkOrder } from '../src/lib/quote-workflow';
 import { DEFAULT_MATERIAL_WORDING, packageAllowances, syncDrawerAllowances } from '../src/lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../src/lib/quotation-presentation';
 import { beginQuotationEdit,completeQuoteDates } from '../src/lib/quotation-dates';
-import { orderQuotationRooms } from '../src/lib/quotation-order';
 import { applyStandardPvcScopes } from '../src/lib/pvc-scope';
 
 export interface PaymentLedgerEntry {
@@ -17,6 +16,7 @@ export interface PaymentLedgerEntry {
   customerName: string;
   revision: number;
   selectedPackageLabel: string;
+  packageLabelVersion?: 2;
   amountRupees: number;
   method: 'UPI / PhonePe' | 'NEFT / RTGS / IMPS';
   utrReference: string;
@@ -102,25 +102,6 @@ export interface ApiRouter {
 }
 export function emptyState(): StudioState { return { catalogue: structuredClone(DEFAULT_UME_CATALOGUE), quotes: [], ledger: [] }; }
 
-function buildSelectionSummaryLabel(
-  snapshot: PricedQuotationSnapshot,
-  wholeHome: ResolvedPackageSelection,
-  mixByRoom: boolean,
-  roomSelections: Record<number, ResolvedPackageSelection>
-): string {
-  const pkgLabel = getPackageDisplayName(wholeHome.grade);
-  const pvcLabel = wholeHome.protection === 'With PVC' ? 'With 6mm PVC' : 'Without PVC';
-  if (!mixByRoom) {
-    return `${pkgLabel} · ${pvcLabel} · ${wholeHome.finish}${
-      wholeHome.brand_preference ? ` (${wholeHome.brand_preference})` : ''
-    }`;
-  }
-  const roomParts = orderQuotationRooms(snapshot.rooms).map((r) => {
-    const sel = roomSelections[r.roomIndex] || wholeHome;
-    return `${r.name}: ${getPackageDisplayName(sel.grade)}/${sel.protection === 'With PVC' ? '+PVC' : 'No-PVC'}/${sel.finish}`;
-  });
-  return `Room-Wise Mix (${roomParts.join(' · ')})`;
-}
 
 
 export function registerDataRoutes(app: ApiRouter, state: StudioState, markChanged: () => void) {
@@ -412,7 +393,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       savedByCustomer: false,
       savedAt: null,
       savedFinalTotalRupees: calc.grandTotal,
-      summaryLabel: buildSelectionSummaryLabel(rec.snapshot, normalizedPkg, false, {}),
+      summaryLabel: buildSelectionSummaryLabel(rec.snapshot, {wholeHomeSelection:normalizedPkg,mixByRoom:false,roomSelections:{}}),
     };
 
     saveDbToDisk();
@@ -476,7 +457,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
 
     const calc = computeCustomerSelectionTotal(rec.snapshot,{...rec.lastCustomerSelection,approvedDiscountRupees:rec.approvedDiscountRupees});
     rec.lastCustomerSelection.savedFinalTotalRupees = calc.grandTotal;
-    rec.lastCustomerSelection.summaryLabel = buildSelectionSummaryLabel(rec.snapshot,rec.lastCustomerSelection.wholeHomeSelection,rec.lastCustomerSelection.mixByRoom,rec.lastCustomerSelection.roomSelections);
+    rec.lastCustomerSelection.summaryLabel = buildSelectionSummaryLabel(rec.snapshot,rec.lastCustomerSelection);
     if (previous.workOrder) {
       rec.workOrder = {...previous.workOrder,sourceRevision:rec.revision,selection,totalRupees:calc.grandTotal};
       finalize(rec);
@@ -562,12 +543,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       approvedDiscountRupees: rec.approvedDiscountRupees,
     });
 
-    const summaryLabel = buildSelectionSummaryLabel(
-      rec.snapshot,
-      rec.lastCustomerSelection.wholeHomeSelection,
-      rec.lastCustomerSelection.mixByRoom,
-      rec.lastCustomerSelection.roomSelections
-    );
+    const summaryLabel = buildSelectionSummaryLabel(rec.snapshot,rec.lastCustomerSelection);
 
     rec.lastCustomerSelection.savedFinalTotalRupees = calc.grandTotal;
     rec.lastCustomerSelection.summaryLabel = summaryLabel;
@@ -662,7 +638,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       }
     }
 
-    const { utrReference, method, amountRupees, selectedPackageLabel } = req.body;
+    const { utrReference, method, amountRupees } = req.body;
     if (method !== 'NEFT / RTGS / IMPS' && amountRupees > activeCatalogue.company.bank.upiLimitRupees) {
       res.status(400).json({ error: 'This amount exceeds the configured UPI limit. Use a bank transfer instead.' });
       return;
@@ -691,7 +667,8 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
       quoteNumber: rec.draft.quote.number || 'UME-QUOTE',
       customerName: rec.draft.customer.name || 'Customer',
       revision: rec.revision,
-      selectedPackageLabel: selectedPackageLabel || 'Selected Package',
+      selectedPackageLabel: buildSelectionSummaryLabel(rec.snapshot,rec.lastCustomerSelection),
+      packageLabelVersion: 2,
       amountRupees: Number(amountRupees) || 50000,
       method: method === 'NEFT / RTGS / IMPS' ? 'NEFT / RTGS / IMPS' : 'UPI / PhonePe',
       utrReference: cleanUtr,
@@ -757,7 +734,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
     if (paymentLedger.some(p => p.utrReference.toLowerCase() === reference.toLowerCase() && p.status !== 'Rejected')) {
       res.status(409).json({error:'This bank reference is already recorded.'}); return;
     }
-    const entry: PaymentLedgerEntry = { id:`pay-${randomHex(8)}`, publicId:record.publicId, quoteNumber:record.draft.quote.number || '', customerName:record.draft.customer.name || '', revision:record.revision, selectedPackageLabel:record.lastCustomerSelection.summaryLabel || '', amountRupees:amount, method:'NEFT / RTGS / IMPS', utrReference:reference, status:'Verified Paid', submittedAt:new Date().toISOString(), verifiedAt:new Date().toISOString() };
+    const entry: PaymentLedgerEntry = { id:`pay-${randomHex(8)}`, publicId:record.publicId, quoteNumber:record.draft.quote.number || '', customerName:record.draft.customer.name || '', revision:record.revision, selectedPackageLabel:buildSelectionSummaryLabel(record.snapshot,record.lastCustomerSelection), packageLabelVersion:2, amountRupees:amount, method:'NEFT / RTGS / IMPS', utrReference:reference, status:'Verified Paid', submittedAt:new Date().toISOString(), verifiedAt:new Date().toISOString() };
     paymentLedger.unshift(entry);
     const calc = computeCustomerSelectionTotal(record.snapshot, {...record.lastCustomerSelection, approvedDiscountRupees:record.approvedDiscountRupees});
     if (paid(record.publicId) >= Math.min(50000, calc.grandTotal * .5)) finalize(record);
@@ -887,7 +864,7 @@ export function registerDataRoutes(app: ApiRouter, state: StudioState, markChang
         savedByCustomer: false,
         savedAt: null,
         savedFinalTotalRupees: initialCalc.grandTotal,
-        summaryLabel: buildSelectionSummaryLabel(snapshot, defaultSentPkg, false, {}),
+        summaryLabel: buildSelectionSummaryLabel(snapshot, {wholeHomeSelection:defaultSentPkg,mixByRoom:false,roomSelections:{}}),
       },
       selectionHistory: [],
       customerFeedback: [],

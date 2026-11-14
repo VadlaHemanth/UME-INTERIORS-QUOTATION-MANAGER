@@ -49,11 +49,11 @@
   .customer-quotation .detail-price-table td:nth-child(n+2)::before,
   .customer-quotation .milestone-table td:nth-child(n+2)::before { display: block; margin-bottom: 5px; font-size: 11px; font-family: var(--font-sans); font-weight: 600; line-height: 1.4; color: #5c645e; letter-spacing: 0; }
   .customer-quotation .room-comparison-table td:nth-child(3)::before,
-  .customer-quotation .detail-price-table td:nth-child(4)::before { content: 'Basic'; }
+  .customer-quotation .detail-price-table td:nth-child(4)::before { content: 'Standard'; }
   .customer-quotation .room-comparison-table td:nth-child(4)::before,
-  .customer-quotation .detail-price-table td:nth-child(5)::before { content: 'Standard'; }
+  .customer-quotation .detail-price-table td:nth-child(5)::before { content: 'Premium'; }
   .customer-quotation .room-comparison-table td:nth-child(5)::before,
-  .customer-quotation .detail-price-table td:nth-child(6)::before { content: 'Premium'; }
+  .customer-quotation .detail-price-table td:nth-child(6)::before { content: 'Luxury'; }
   .customer-quotation .room-comparison-table td:nth-child(n+3) button { padding: 6px 4px; width: 100%; font-size: 13px; white-space: nowrap; }
   .customer-quotation .room-comparison-table tr:last-child td:nth-child(n+3) span { display: inline-block; padding: 5px 2px; font-size: 13px; white-space: nowrap; }
   .customer-quotation .detail-price-table td:first-child { grid-column: 1 / -1; }
@@ -63,9 +63,9 @@
   .customer-quotation .detail-price-table td:nth-child(n+4) { font-size: 13px; padding: 8px 4px; border-radius: 6px; }
   .customer-quotation .detail-price-table td[colspan] { grid-column: 1 / -1; }
   .customer-quotation .detail-price-table tr:last-child td:not([colspan]) { grid-column: auto; font-size: 13px; }
-  .customer-quotation .detail-price-table tr:last-child td:nth-child(2)::before { content: 'Basic'; }
-  .customer-quotation .detail-price-table tr:last-child td:nth-child(3)::before { content: 'Standard'; }
-  .customer-quotation .detail-price-table tr:last-child td:nth-child(4)::before { content: 'Premium'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(2)::before { content: 'Standard'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(3)::before { content: 'Premium'; }
+  .customer-quotation .detail-price-table tr:last-child td:nth-child(4)::before { content: 'Luxury'; }
   .customer-quotation .milestone-table td:first-child { grid-column: 1 / -1; }
   .customer-quotation .milestone-table td:nth-child(2)::before { content: 'Instalment'; }
   .customer-quotation .milestone-table td:nth-child(3)::before { content: 'Cumulative'; }

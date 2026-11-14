@@ -13,7 +13,7 @@ test('package warranty labels and document terms follow saved product coverage w
   catalogue.grades.Normal.approvedBrands[0].warrantyYears=12;
   catalogue.grades.Normal.approvedBrands[1].warrantyYears=8;
   assert.equal(packageWarrantyLabel(catalogue.grades.Normal),'Up to 12 years plywood warranty');
-  assert.match(documentTerms(catalogue,['Normal']).find(term=>term.id===10)!.clause,/Standard plywood: up to 12 years/);
+  assert.match(documentTerms(catalogue,['Normal']).find(term=>term.id===10)!.clause,/Premium plywood: up to 12 years/);
   catalogue.grades.Normal.approvedBrands=[];
   assert.equal(packageWarrantyLabel(catalogue.grades.Normal),null);
 });
@@ -50,13 +50,13 @@ test('material allowances and exclusions use editable values and all package nam
   assert.match(materialLines(catalogue,['Base']).join('\n'),/₹250 per handle/);
   const notes=scopeNotes(catalogue,['Base']).join('\n');
   assert.match(notes,/₹6,000 each/);assert.match(notes,/2–4/);assert.match(notes,/aluminium/);assert.match(notes,/visible/);assert.match(notes,/materials and labour|cleaning/i);
-  assert.deepEqual(['Base','Normal','Premium'].map(g=>getPackageDisplayName(g as any)),['Basic','Standard','Premium']);
+  assert.deepEqual(['Base','Normal','Premium'].map(g=>getPackageDisplayName(g as any)),['Standard','Premium','Luxury']);
 });
 
 test('automatic notes use drawer rate-card prices and material wording without AI notes',()=>{
   const catalogue=structuredClone(DEFAULT_UME_CATALOGUE);
   const notes=scopeNotes(catalogue,['Base','Normal','Premium']).join('\n');
-  assert.match(notes,/Basic ₹4,000 each; Standard ₹5,000 each; Premium ₹6,000 each/);
+  assert.match(notes,/Standard ₹4,000 each; Premium ₹5,000 each; Luxury ₹6,000 each/);
   catalogue.workTypes['Additional internal drawer'].rates.Base.Standard=4500;
   assert.match(scopeNotes(catalogue,['Base']).join('\n'),/₹4,500 each/);
   catalogue.materialWording={...DEFAULT_MATERIAL_WORDING,externalLaminate:'Owner-approved decorative laminate finish.',handles:'Included handles'};

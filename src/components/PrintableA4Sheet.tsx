@@ -1,3 +1,4 @@
+import { PackageTierCopy } from './PackageTierCopy';
 import { quotationFurnitureText } from '../lib/quotation-presentation';
 import React, { useLayoutEffect, useRef } from 'react';
 import './pdf-owner.css';
@@ -507,6 +508,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <p className="text-[11px] text-[#1C3A2F] font-semibold mt-0.5">
                 {mixByRoom ? 'Grades and PVC options vary by room. Manufacturer warranties follow the selected product’s certificate and terms.' : `${activeGradeInfo.termiteProofBadge} · ${packageWarrantyLabel(activeGradeInfo) || activeGradeInfo.warrantyBanner}`}
               </p>
+              {isWorkOrder&&!mixByRoom&&<PackageTierCopy grade={wholeHomeSelection.grade}/>}
               {isWorkOrder&&!mixByRoom&&<p className="text-[10px] text-[#4A524D] mt-1">Finish: {wholeHomeSelection.finish==='SF'?'SF matte':'High-gloss'}{wholeHomeSelection.brand_preference?` · Preferred plywood: ${wholeHomeSelection.brand_preference}`:''}</p>}
               {ownerRecommendedGrade && (
                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#76541C] mt-2">
@@ -574,6 +576,7 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
                       )}
                     </span>
                   </div>
+                  <PackageTierCopy grade={g}/>
                   <div className="mt-2 pt-2 border-t border-[#E5DFD3] space-y-1 font-mono tabular-nums">
                     <div className="flex items-center justify-between">
                       <span>Without PVC:</span>
@@ -608,10 +611,10 @@ export const PrintableA4Sheet: React.FC<PrintableA4SheetProps> = ({
               <thead>
                 <tr className="bg-[#1C3A2F] text-white">
                   <th className="py-2.5 px-3 font-semibold">Room and items</th>
-                  <th className="py-2.5 px-2.5 text-right font-semibold">Basic</th>
-                  <th className="py-2.5 px-2.5 text-right font-semibold">Standard</th>
+                  <th className="py-2.5 px-2.5 text-right font-semibold">{getPackageDisplayName('Base')}</th>
+                  <th className="py-2.5 px-2.5 text-right font-semibold">{getPackageDisplayName('Normal')}</th>
                   <th className="py-2.5 px-2.5 text-right font-semibold">
-                    Premium (BWP)
+                    {getPackageDisplayName('Premium')} (BWP)
                   </th>
                   <th className="py-2.5 px-2.5 font-semibold">Selected package</th>
                   <th className="py-2.5 px-3 text-right font-semibold">Room total</th>

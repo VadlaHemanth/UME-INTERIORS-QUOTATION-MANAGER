@@ -14,8 +14,8 @@ export const APPROVED_CORE_RATES: Record<string,readonly [number,number,number,n
 };
 export const FRAME_RATE_WORK_TYPES=['Frame type','Loft - frame and shutter','Low roof - frame and shutter'];
 export const OTHER_CORE_WORK_TYPES=['Additional internal drawer','Louvers wall paneling','Tandem or SS baskets','Wall mount bed','Mirror wall paneling','False ceiling (Saint Gobain)'];
-export function packageRates(basic:number,standard:number,premium:number,pvcExtra=0):WorkTypeDefinition['rates'] {
-  return {Base:{Standard:basic,'With PVC':basic+pvcExtra},Normal:{Standard:standard,'With PVC':standard+pvcExtra},Premium:{Standard:premium,'With PVC':premium+pvcExtra}};
+export function packageRates(standard:number,premium:number,luxury:number,pvcExtra=0):WorkTypeDefinition['rates'] {
+  return {Base:{Standard:standard,'With PVC':standard+pvcExtra},Normal:{Standard:premium,'With PVC':premium+pvcExtra},Premium:{Standard:luxury,'With PVC':luxury+pvcExtra}};
 }
 export function applyApprovedCoreRates(catalogue:StudioCatalogue):StudioCatalogue {
   for(const [key,amounts] of Object.entries(APPROVED_CORE_RATES)) {

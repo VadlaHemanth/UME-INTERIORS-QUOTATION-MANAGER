@@ -81,7 +81,7 @@ test('the PDF booking QR uses the edited bank recipient and the actual quotation
       approvedDiscountRupees={0} verifiedPaidRupees={0}
     />);
     const svg = /<svg\b[^>]*\baria-label="UPI booking"[^>]*>[\s\S]*?<\/svg>/.exec(html)?.[0];
-    assert.match(html,/Basic ₹4,000 each; Standard ₹5,000 each; Premium ₹6,000 each/);
+    assert.match(html,/Standard ₹4,000 each; Premium ₹5,000 each; Luxury ₹6,000 each/);
     assert.match(html,/Materials and installation labour are included/);
     assert.match(html,/Approved external laminate finish/);
     assert.match(html,/Fevicol and Jeevanjor/);

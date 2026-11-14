@@ -1,3 +1,6 @@
+import { getPackageDisplayName } from './package-tiers';
+import { orderQuotationRooms } from './quotation-order';
+import type { PricedQuotationSnapshot } from './pricing';
 import type { QuotationDraftV2, ResolvedPackageSelection } from './schema';
 import { expiryFromIssue } from './quotation-dates';
 import { canonicalFurnitureName } from './furniture';
@@ -80,4 +83,23 @@ export function carryAgreedSelection(previous: QuotationDraftV2, next: Quotation
     }
   }
   return result;
+}
+
+export function buildSelectionSummaryLabel(
+  snapshot: PricedQuotationSnapshot,
+  selection: Pick<AgreedSelection, 'wholeHomeSelection' | 'mixByRoom' | 'roomSelections'>,
+): string {
+  const {wholeHomeSelection:wholeHome,mixByRoom,roomSelections} = selection;
+  const pkgLabel = getPackageDisplayName(wholeHome.grade);
+  const pvcLabel = wholeHome.protection === 'With PVC' ? 'With 6mm PVC' : 'Without PVC';
+  if (!mixByRoom) {
+    return `${pkgLabel} · ${pvcLabel} · ${wholeHome.finish}${
+      wholeHome.brand_preference ? ` (${wholeHome.brand_preference})` : ''
+    }`;
+  }
+  const roomParts = orderQuotationRooms(snapshot.rooms).map((r) => {
+    const sel = roomSelections[r.roomIndex] || wholeHome;
+    return `${r.name}: ${getPackageDisplayName(sel.grade)}/${sel.protection === 'With PVC' ? '+PVC' : 'No-PVC'}/${sel.finish}`;
+  });
+  return `Room-Wise Mix (${roomParts.join(' · ')})`;
 }

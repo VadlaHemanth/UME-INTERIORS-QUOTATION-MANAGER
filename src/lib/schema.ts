@@ -543,7 +543,7 @@ export function validateQuotationDraftV2(
             if (typeof item.custom_rates !== 'object' || Array.isArray(item.custom_rates)) {
               issues.push({path:`${iPath}/custom_rates`,severity:'publish_blocker',code:'SCHEMA_MISMATCH',message:'Item rates must be an object containing confirmed package prices.'});
             } else for (const [key,rate] of Object.entries(item.custom_rates)) {
-              if (!['Base','Normal','Premium','pvc_adder'].includes(key) || typeof rate!=='number' || !Number.isFinite(rate) || rate<0) issues.push({path:`${iPath}/custom_rates/${key}`,severity:'publish_blocker',code:'SCHEMA_MISMATCH',message:'Use a confirmed, non-negative number for each item rate (Basic: Base, Standard: Normal, Premium: Premium, optional PVC extra: pvc_adder).'});
+              if (!['Base','Normal','Premium','pvc_adder'].includes(key) || typeof rate!=='number' || !Number.isFinite(rate) || rate<0) issues.push({path:`${iPath}/custom_rates/${key}`,severity:'publish_blocker',code:'SCHEMA_MISMATCH',message:'Use a confirmed, non-negative number for each item rate (Standard: Base, Premium: Normal, Luxury: Premium, optional PVC extra: pvc_adder).'});
             }
           }
 

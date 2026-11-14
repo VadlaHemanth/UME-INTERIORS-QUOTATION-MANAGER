@@ -1,3 +1,4 @@
+import { buildSelectionSummaryLabel } from '../src/lib/quote-workflow';
 import type { StudioCatalogue } from '../src/lib/catalogue';
 import type { PackageSelection, QuotationDraftV2, ResolvedPackageSelection } from '../src/lib/schema';
 import type { PublishedQuotationRecord } from './routes';
@@ -71,7 +72,7 @@ export function publicQuote(record: PublishedQuotationRecord) {
       savedByCustomer: current.savedByCustomer,
       savedAt: current.savedAt,
       savedFinalTotalRupees: current.savedFinalTotalRupees,
-      summaryLabel: current.summaryLabel,
+      summaryLabel: buildSelectionSummaryLabel(record.snapshot,current),
     },
     customerFeedback: (record.customerFeedback || []).map((entry) => ({ id: entry.id, topic: entry.topic, message: entry.message, submittedAt: entry.submittedAt })),
   };

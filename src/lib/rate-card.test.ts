@@ -27,7 +27,7 @@ test('approved default update runs once and retains brands, company, custom work
 });
 
 test('rate-card JSON never fabricates missing package rates and respects explicitly confirmed zeroes',()=>{
-  assert.throws(()=>mergeRateCardJsonIntoCatalogue(DEFAULT_UME_CATALOGUE,{workTypes:{'Unpriced work':{rates:{Base:{Standard:10}}}}}),/Provide Basic, Standard and Premium together/);
+  assert.throws(()=>mergeRateCardJsonIntoCatalogue(DEFAULT_UME_CATALOGUE,{workTypes:{'Unpriced work':{rates:{Base:{Standard:10}}}}}),/Provide Standard, Premium and Luxury together/);
   const zero=mergeRateCardJsonIntoCatalogue(DEFAULT_UME_CATALOGUE,{workTypes:{'Included adjustment':{unit:'each',rates:packageRates(0,0,0)}}});
   assert.deepEqual(zero.catalogue.workTypes['Included adjustment'].rates,packageRates(0,0,0));
   const rooms=[{items:[{work_type:'Unknown scope',measure:{unit:'each'},custom_rates:{Base:100}}]}];

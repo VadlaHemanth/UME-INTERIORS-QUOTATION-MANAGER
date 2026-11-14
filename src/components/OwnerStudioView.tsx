@@ -1,3 +1,5 @@
+import { PackageTierCopy } from './PackageTierCopy';
+import { PACKAGE_TIERS, legacyPaymentPackageLabel } from '../lib/package-tiers';
 import { parseStudioJson } from '../lib/studio-json';
 import { applyStandardPvcScopes } from '../lib/pvc-scope';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -57,7 +59,7 @@ import {
   quotationDraftShapeIssue,
 } from '../lib/schema';
 import { getQuotationBasisLabel, getQuotationEstimateNote, isFloorPlanEstimate } from '../lib/quotation-notes';
-import { indiaDate, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../lib/quote-workflow';
+import { buildSelectionSummaryLabel, indiaDate, nextQuoteNumber, quoteExpiry, seriesIds, type FinalizedWorkOrder } from '../lib/quote-workflow';
 import { CustomerQuotationView } from './CustomerQuotationView';
 import { packageAllowances } from '../lib/commercial-spec';
 import { prepareQuotationDraft, reviewedQuotationNotes } from '../lib/quotation-presentation';
@@ -118,6 +120,7 @@ export interface LedgerEntrySummary {
   customerName: string;
   revision: number;
   selectedPackageLabel: string;
+  packageLabelVersion?: 2;
   amountRupees: number;
   method: 'UPI / PhonePe' | 'NEFT / RTGS / IMPS';
   utrReference: string;
@@ -678,8 +681,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
       'Default Sent Package',
       'Customer Saved Selection',
       'Saved Final Total',
-      'Base SF Total',
-      'Premium SF Total',
+      ...ALL_GRADES.map(grade => getPackageDisplayName(grade) + ' SF Total'),
       'Views',
       'Published At',
     ];
@@ -693,11 +695,10 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
         q.draft.customer.phone || '',
         `"${(q.draft.customer.site || '').replace(/"/g, '""')}"`,
         q.status,
-        `"${defPkg.grade} ${defPkg.protection} ${defPkg.finish}"`,
-        `"${q.lastCustomerSelection.summaryLabel || 'Not modified yet'}"`,
+        `"${getPackageDisplayName(defPkg.grade)} ${defPkg.protection} ${defPkg.finish}"`,
+        `"${(q.lastCustomerSelection.savedByCustomer ? buildSelectionSummaryLabel(q.snapshot,q.lastCustomerSelection) : 'Not modified yet').replaceAll('"','""')}"`,
         q.lastCustomerSelection.savedFinalTotalRupees || 0,
-        q.snapshot.baseWholeHomeTotals['Base__Standard__SF'] || 0,
-        q.snapshot.baseWholeHomeTotals['Premium__Standard__SF'] || 0,
+        ...ALL_GRADES.map(grade => q.snapshot.baseWholeHomeTotals[makeComboKey(grade,'Standard','SF')] || 0),
         q.viewsCount,
         q.publishedAt,
       ];
@@ -1190,7 +1191,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         Package shown first
                       </p>
                       <p className="text-xs text-[#5C645F] mt-0.5">
-                        Choose Basic, Standard or Premium for the customer’s starting selection.
+                        Choose Standard, Premium or Luxury for the customer’s starting selection.
                       </p>
                     </div>
                     {supersedeId && <p className="text-xs text-[#5C645F]">Editing {workingDraft.quote.number}. Publish an update below to record your changes.</p>}
@@ -1244,7 +1245,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         }
                         className="w-full px-3 py-2 text-xs font-bold bg-white border border-[#D8D0C2] rounded-lg"
                       >
-                        <option value="Standard">Without PVC (Standard)</option>
+                        <option value="Standard">Without PVC</option>
                         <option value="With PVC">With Optional 6mm PVC Wall Shield</option>
                       </select>
                     </div>
@@ -1283,7 +1284,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         Rate card
                       </p>
                       <p className="text-xs text-[#2D4F3E] mt-0.5">
-                        Change Basic, Standard, Premium or PVC rates, then save. Publish an update when you want the new prices on a customer quotation.
+                        Change Standard, Premium, Luxury or PVC rates, then save. Publish an update when you want the new prices on a customer quotation.
                       </p>
                     </div>
                     <button
@@ -1323,27 +1324,14 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-[10px] font-bold uppercase text-[#5C645F] mb-1">
-                        Basic (₹)
-                      </label>
-                      <input
-                        type="number"
-                        min="0" step="0.01" inputMode="decimal" required
-                        aria-label="New work type Basic rate in rupees"
-                      value={newWorkBase}
-                        onChange={(e) => setNewWorkBase(e.target.value)}
-                        className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
-                      />
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-[10px] font-bold uppercase text-[#5C645F] mb-1">
                         Standard (₹)
                       </label>
                       <input
                         type="number"
                         min="0" step="0.01" inputMode="decimal" required
                         aria-label="New work type Standard rate in rupees"
-                      value={newWorkNormal}
-                        onChange={(e) => setNewWorkNormal(e.target.value)}
+                      value={newWorkBase}
+                        onChange={(e) => setNewWorkBase(e.target.value)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
                       />
                     </div>
@@ -1355,6 +1343,19 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                         type="number"
                         min="0" step="0.01" inputMode="decimal" required
                         aria-label="New work type Premium rate in rupees"
+                      value={newWorkNormal}
+                        onChange={(e) => setNewWorkNormal(e.target.value)}
+                        className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-[10px] font-bold uppercase text-[#5C645F] mb-1">
+                        Luxury (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0" step="0.01" inputMode="decimal" required
+                        aria-label="New work type Luxury rate in rupees"
                       value={newWorkPremium}
                         onChange={(e) => setNewWorkPremium(e.target.value)}
                         className="w-full px-2 py-1.5 text-xs font-mono bg-white border border-[#C5DEC9] rounded-lg"
@@ -1416,7 +1417,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                               : 'bg-[#FAF8F4] border-[#E5DFD3]'
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-1">
+                          <div className="flex flex-wrap items-center justify-between gap-1">
                             <p className="font-bold text-[#18221D]">{getPackageDisplayName(g)} Package</p>
                             <span className="inline-flex items-center gap-1">
                               {isOwnerRecommended && (
@@ -1431,6 +1432,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                               )}
                             </span>
                           </div>
+                          <PackageTierCopy grade={g}/>
                           <p className="font-mono tabular-nums text-[#1C3A2F] font-bold text-sm mt-1">
                             {formatINR(previewSnapshot.baseWholeHomeTotals[makeComboKey(g, 'Standard', 'SF')])}
                           </p>
@@ -1688,10 +1690,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                             </span>
                           </div>
                           <p className="text-xs font-bold text-[#18221D] truncate">
-                            {q.lastCustomerSelection.summaryLabel ||
-                              (q.lastCustomerSelection.mixByRoom
-                                ? 'Custom Room-Wise Mix'
-                                : `${getPackageDisplayName(sel.grade)} · ${sel.protection}`)}
+                            {buildSelectionSummaryLabel(q.snapshot,q.lastCustomerSelection)}
                           </p>
                           <p className="text-[10px] text-[#5C645F] font-mono">
                             {q.lastCustomerSelection.savedAt
@@ -1792,11 +1791,11 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                       <div className="p-4 sm:p-5 border-t border-[#EAE4D8] bg-[#FAF8F4] space-y-4 text-xs">
                         <div className="space-y-1.5">
                           <p className="font-bold text-[#18221D]">
-                            Starting package for this link (Basic / Standard / Premium):
+                            Starting package for this link (Standard / Premium / Luxury):
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {(['Base', 'Normal', 'Premium'] as PlywoodGrade[]).map((g) => {
-                              const pkgUrl = `${customerLink}?pkg=${g}-Standard-SF`;
+                              const pkgUrl = `${customerLink}?tier=${PACKAGE_TIERS[g].slug}`;
                               const copyKey = `${q.publicId}-${g}`;
                               return (
                                 <button
@@ -1842,7 +1841,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                                     className="p-2.5 bg-white border border-[#E5DFD3] rounded-lg flex items-center justify-between gap-2"
                                   >
                                     <div>
-                                      <p className="font-bold text-[#18221D]">{h.summaryLabel}</p>
+                                      <p className="font-bold text-[#18221D]">{buildSelectionSummaryLabel(q.snapshot,h)}</p>
                                       <p className="text-[10px] text-[#5C645F] font-mono">
                                         {new Date(h.savedAt).toLocaleString()}
                                       </p>
@@ -2047,7 +2046,7 @@ export const OwnerStudioView: React.FC<OwnerStudioViewProps> = ({
                           {entry.quoteNumber} · Rev {entry.revision}
                         </p>
                       </td>
-                      <td className="py-3.5 px-3 text-[#18221D]">{entry.selectedPackageLabel}</td>
+                      <td className="py-3.5 px-3 text-[#18221D]">{entry.packageLabelVersion === 2 ? entry.selectedPackageLabel : legacyPaymentPackageLabel(entry.selectedPackageLabel)}</td>
                       <td className="py-3.5 px-3 font-mono tabular-nums">
                         <p className="font-bold text-[#18221D]">UTR: {entry.utrReference}</p>
                         <p className="text-[11px] text-[#5C645F]">{entry.method}</p>

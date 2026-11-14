@@ -26,7 +26,7 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions,/Wardrobe → Wardrobe Loft → Dressing Table → Dressing Loft/);
   assert.match(instructions,/exactly THREE readable Markdown tables/);
   assert.match(instructions,/do not print the full saved catalogue/i);
-  assert.match(instructions,/“Package preview”: Room \| Basic ₹ \| Standard ₹ \| Premium ₹/);
+  assert.match(instructions,/“Package preview”: Room \| Standard ₹ \| Premium ₹ \| Luxury ₹/);
   assert.match(instructions,/root assistant_memory_updates/);
   assert.match(instructions,/parent_item_index:2/);
   assert.match(instructions,/recompute suggested_addons\[\]\.room_index/);
@@ -41,7 +41,7 @@ test('assistant instructions use current edited rates and keep the example behin
   assert.match(instructions,/The AI CAN generate a reusable rate-card addition\/change in JSON/);
   assert.match(instructions,/For ordinary quotations, reuse the saved rates/);
   assert.ok(instructions.includes('| Box type | sq_ft | 987 | 1150 | 1350 |'));
-  assert.match(instructions, /Standard: Up to 20 years plywood warranty/);
+  assert.match(instructions, /Premium: Up to 20 years plywood warranty/);
   assert.match(instructions, /Do not generate these labels or comparisons in JSON, quote.notes or owner_requests/);
   const example = parseStudioJson(instructions.slice(instructions.lastIndexOf('```json'))) as QuotationDraftV2;
   const validation = validateQuotationDraftV2(example);
@@ -118,7 +118,7 @@ test('automatic-document references use the actual saved renderers without modif
   const instructions=buildDynamicGemInstructions(catalogue);
   for(const line of [...materialLines(catalogue,['Base','Normal','Premium']),...scopeNotes(catalogue,['Base','Normal','Premium'])]) assert.ok(instructions.includes(line),`missing saved automatic text: ${line}`);
   for(const term of documentTerms(catalogue,['Base','Normal','Premium'])) assert.ok(instructions.includes(`${term.title}: ${term.clause}`));
-  assert.match(instructions,/Basic: handles up to ₹200 each; laminate up to ₹1500 per sheet; additional internal drawers ₹4250 each/);
+  assert.match(instructions,/Standard: handles up to ₹200 each; laminate up to ₹1500 per sheet; additional internal drawers ₹4250 each/);
   assert.match(instructions,/Owner-approved BWR product/);
   assert.deepEqual(catalogue,before,'copying assistant instructions must not alter settings');
 });

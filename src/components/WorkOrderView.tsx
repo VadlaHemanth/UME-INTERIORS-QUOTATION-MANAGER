@@ -1,3 +1,4 @@
+import { PackageTierCopy } from './PackageTierCopy';
 import { quotationFurnitureText } from '../lib/quotation-presentation';
 import React, { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -46,7 +47,7 @@ export function WorkOrderView({publicId,revision,draft,snapshot,catalogue,approv
     {pdf&&<div className="quotation-print-shell block py-8 px-4"><PrintableA4Sheet publicId={publicId} revision={revision} draft={draft} snapshot={snapshot} catalogue={catalogue} {...selection} approvedDiscountRupees={approvedDiscountRupees} verifiedPaidRupees={verifiedPaidRupees} isWorkOrder isPreview={isPreview} workOrderConfirmedAt={workOrder.confirmedAt}/></div>}
     {!pdf&&<div className="work-order-content no-print">
       <section className="work-order-summary" id="work-order-scope">
-        <div><h2>{isPreview?'Proposed work-order scope':'Your agreed scope'}</h2><p>{draft.customer.site}</p><p>{selection.mixByRoom?'Packages confirmed by room':`${getPackageDisplayName(selection.wholeHomeSelection.grade)} package`}</p><p>{isPreview?'Existing confirmation':'Confirmed after bank verification'}: {formatQuotationDate(indiaDate(new Date(workOrder.confirmedAt)))}.</p></div>
+        <div><h2>{isPreview?'Proposed work-order scope':'Your agreed scope'}</h2><p>{draft.customer.site}</p><p>{selection.mixByRoom?'Packages confirmed by room':`${getPackageDisplayName(selection.wholeHomeSelection.grade)} package`}</p>{!selection.mixByRoom&&<PackageTierCopy grade={selection.wholeHomeSelection.grade}/>}<p>{isPreview?'Existing confirmation':'Confirmed after bank verification'}: {formatQuotationDate(indiaDate(new Date(workOrder.confirmedAt)))}.</p></div>
         <dl><div><dt>Work order total</dt><dd>{formatINR(calc.grandTotal)}</dd></div><div><dt>Verified payments</dt><dd>{formatINR(verifiedPaidRupees)}</dd></div><div><dt>Balance</dt><dd>{formatINR(payment.balance)}</dd></div></dl>
       </section>
       <p className="work-order-notice">{isPreview?'This is an unpublished work-order revision. Review the proposed changes before publishing. Payment and sharing actions are available after publication.':'Your package and scope are confirmed. To change measurements, materials or work, contact UME; approved changes will be recorded in an updated work order.'}</p>
